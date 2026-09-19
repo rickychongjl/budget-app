@@ -55,6 +55,19 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         return user;
     }
 
+    // Arranges rows as the given user. There is no request here, so the context gets its user directly;
+    // the tenant stamping and write guard still apply.
+    public async Task SeedAsync(User user, params object[] rows)
+    {
+        using var scope = Services.CreateScope();
+        var options = scope.ServiceProvider.GetRequiredService<DbContextOptions<BudgetDbContext>>();
+        await using var db = new BudgetDbContext(options, new SeedUser(user.Id));
+        db.AddRange(rows);
+        await db.SaveChangesAsync();
+    }
+
+    private sealed record SeedUser(Guid Id) : Budget.Application.ICurrentUser;
+
     public HttpClient ClientFor(User user)
     {
         var client = CreateClient();

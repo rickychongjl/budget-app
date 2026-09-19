@@ -6,6 +6,8 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services) => services
         .AddSingleton(TimeProvider.System)
+        .AddScoped<UserToday>()
         .AddScoped<Me>()
-        .AddScoped<RolloverCycles>();
+        .AddScoped<RolloverCycles>()
+        .AddScoped<Cycles>();
 }

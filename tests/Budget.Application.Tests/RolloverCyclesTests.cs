@@ -8,7 +8,7 @@ public sealed class RolloverCyclesTests
     private readonly FakeStore _store = new();
 
     private RolloverCycles At(int year, int month, int day, int hourUtc = 12) =>
-        new(_store, _store, _store, _store, _store, new FixedClock(new DateTimeOffset(year, month, day, hourUtc, 0, 0, TimeSpan.Zero)));
+        new(_store, _store, new UserToday(_store, _store, new FixedClock(new DateTimeOffset(year, month, day, hourUtc, 0, 0, TimeSpan.Zero))), _store);
 
     private Cycle ConfirmedCycle(User user, DateOnly start)
     {
