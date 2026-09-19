@@ -44,6 +44,9 @@ public sealed class TenantIsolationTests(ApiFactory api)
         "GET /api/categories",
     ];
 
+    // Takes ids, but answers 200 with a refusal per item rather than 404, so its attack lives in SyncTests.
+    private static readonly HashSet<string> AttackedElsewhere = ["POST /api/sync"];
+
     public static TheoryData<string> AttackedRoutes => [.. Attacks.Keys];
 
     [Theory]
@@ -71,8 +74,9 @@ public sealed class TenantIsolationTests(ApiFactory api)
             .ToList();
 
         routes.Should().NotBeEmpty();
-        routes.Except(Attacks.Keys).Except(TakesNoIds).Should().BeEmpty("a new /api route needs a cross-user attack here, or a reason it cannot be aimed at another user");
-        Attacks.Keys.Concat(TakesNoIds).Except(routes).Should().BeEmpty("these entries no longer match a route");
+        routes.Except(Attacks.Keys).Except(TakesNoIds).Except(AttackedElsewhere)
+            .Should().BeEmpty("a new /api route needs a cross-user attack here, or a reason it cannot be aimed at another user");
+        Attacks.Keys.Concat(TakesNoIds).Concat(AttackedElsewhere).Except(routes).Should().BeEmpty("these entries no longer match a route");
     }
 
     private async Task<(Victim, HttpClient)> SeedVictimAsync()

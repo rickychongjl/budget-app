@@ -11,6 +11,7 @@ public static class DependencyInjection
         .AddScoped<DemoCaps>()
         .AddScoped<CycleCategories>()
         .AddScoped<Transactions>()
+        .AddScoped<Sync>()
         .AddScoped<Me>()
         .AddScoped<RolloverCycles>()
         .AddScoped<Cycles>();

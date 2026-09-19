@@ -18,5 +18,8 @@ internal static class TransactionEndpoints
         });
         transactions.MapPatch("/{id:guid}", (Guid id, EditTransactionRequest request, Transactions useCase, CancellationToken ct) => useCase.EditAsync(id, request, ct));
         transactions.MapDelete("/{id:guid}", (Guid id, Transactions useCase, CancellationToken ct) => useCase.DeleteAsync(id, ct));
+
+        // Always 200 when the batch itself is readable: each item carries its own outcome.
+        api.MapPost("/sync", (SyncRequest request, Sync useCase, CancellationToken ct) => useCase.ApplyAsync(request, ct));
     }
 }
