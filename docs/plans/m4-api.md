@@ -16,14 +16,14 @@ Code lands in `src/Budget.Application` (use cases, DTOs, validators), `src/Budge
 
 ## Routes in M4
 
-`GET|PATCH /api/me`, `GET|POST /api/cycles`, `POST /api/cycles/{id}/confirm`, `GET /api/cycles/current`, `GET|PATCH /api/cycles/{id}`, `POST /api/cycles/{id}/categories`, `PATCH|DELETE /api/cycles/{id}/categories/{categoryId}`, `GET /api/categories`, `GET|POST /api/transactions`, `PATCH|DELETE /api/transactions/{id}`, `POST /api/sync`, `GET /health`, `GET /health/ready`.
+`GET|PATCH /api/me`, `GET|POST /api/cycles`, `POST /api/cycles/{id}/confirm`, `GET /api/cycles/current`, `GET|PATCH /api/cycles/{id}`, `POST /api/cycles/{id}/categories`, `PATCH|DELETE /api/cycles/{id}/categories/{categoryId}`, `GET /api/categories`, `GET|POST /api/transactions`, `PATCH|DELETE /api/transactions/{id}`, `POST /api/sync`, `POST /auth/demo`, `POST /auth/logout`, `GET /health`, `GET /health/ready`.
 
 ## Out of scope (and where it goes)
 
 | Thing | Milestone |
 |---|---|
-| `/auth/login`, `/auth/callback`, `/auth/logout`, `/auth/demo`, `oid` allowlist, Data Protection to blob, the stricter `/auth/*` rate-limit policy, anti-forgery | M5. There is no cookie to forge until something issues one |
-| Seed, `fixtures/demo-seed.json`, `reset-demo` job | M5 |
+| `/auth/login`, `/auth/callback`, `oid` allowlist, Data Protection to blob, anti-forgery | M5. `/auth/demo` and `/auth/logout` are slice 12 |
+| Demo fixture (`fixtures/demo-seed.json`), `reset-demo` job | M5. Slice 12 only ensures the demo `User` row exists |
 | `rollover` job entry point and its per-user DI scope | M5/M9. `RolloverCycles` itself is here; the job is a ten-line caller |
 | `GET /api/reports/cycles` and its repository methods | M7, when the chart gives it a caller |
 | `GET /api/me/export`, delete account | M10 |
@@ -100,9 +100,15 @@ Infrastructure change: `AddInfrastructure(connectionString)`; `BudgetDbContext.S
 ### 11. `migrate` and the compose `api` service
 - `Budget.Jobs migrate` calls `Database.MigrateAsync`. `src/Budget.Api/Dockerfile`. Compose gains `migrate` (runs once, after `sql` is healthy) and `api` (after `migrate` completes).
 
+### 12. Demo session (moved from M5)
+- `POST /auth/demo` looks up the demo user and signs in on the cookie scheme with a 4-hour absolute expiry; `POST /auth/logout` signs out. `migrate` ensures exactly one `IsDemo` user exists, because the app never creates users.
+- Without this the compose `api` service answers `/health` and `401` for everything else: nothing else can issue the cookie until Entra arrives, and there is deliberately no dev-login.
+- Tests drive the real cookie: demo sign-in then `GET /api/me` succeeds with `isDemo: true`; the cookie is `HttpOnly`, `Secure`, `SameSite=Strict`; after logout the same client is `401`; `/auth/demo` has its own per-IP limit (5 per minute) and trips with `429`.
+- Still M5: Entra login and callback, the `oid` allowlist, Data Protection keys in Blob Storage, the demo fixture (`demo-seed.json`) and the nightly `reset-demo` job.
+
 ## Decisions taken
 
-Decisions 2 to 6 were reviewed and confirmed on 2026-09-19. Decision 1 stands; whether the demo session moves from M5 into this milestone is still open.
+Decisions 1 to 6 were reviewed and confirmed on 2026-09-19, with one change to decision 1: the demo session moves from M5 into this milestone as slice 12.
 
 1. **The auth seam is the real cookie scheme, with nothing issuing the cookie yet.** Endpoints, `ICurrentUser` and the isolation tests are written against the production pipeline, and M5 only adds issuers. The alternative, a dev-login endpoint, is ruled out by CLAUDE.md. Until M5 the API is reachable only from tests.
 2. **Another user's id is `404`, never `403`.** The tenant filter makes the row not exist; saying `403` would confirm that it does.
@@ -111,4 +117,4 @@ Decisions 2 to 6 were reviewed and confirmed on 2026-09-19. Decision 1 stands; w
 5. **Feature classes, not one class per use case and no mediator.** About twenty routes of load, call the domain, save; a handler type and a registration per route would be most of the code.
 6. **`POST /api/sync` carries transaction creates, edits and deletes, plus category and budget edits. Adding or removing a category is online only** (confirmed). An edit is idempotent and last-write-wins, so it replays safely with no schema change. A new category has a server-generated id and no `ClientId`, so a replay would duplicate it and a queued transaction could not reference it; a removal depends on "no transactions", which the queue can invalidate. **For M6:** the UI must make this plain while offline: the add and remove controls are disabled with a visible reason, not hidden and not left to fail. Recorded in design section 7.
 7. **`Budget.Api.Tests` gets its own container fixture** rather than a shared test-support project. It is fifteen lines; a third project to share them is not worth the reference.
-8. **No `/auth/*` rate-limit policy until there is an `/auth/*` endpoint.**
+8. **The `/auth/*` rate-limit policy arrives with its first endpoint**, in slice 12, not with the global limiter in slice 9.
