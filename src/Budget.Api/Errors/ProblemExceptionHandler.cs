@@ -23,6 +23,7 @@ internal sealed class ProblemExceptionHandler(IProblemDetailsService problems) :
             },
             // A body that does not parse or bind. The framework's message can echo input, so it is not passed on.
             BadHttpRequestException => Problem(StatusCodes.Status400BadRequest, "request.malformed", "The request could not be read."),
+            ForbiddenException e => Problem(StatusCodes.Status403Forbidden, e.Code, e.Message),
             NotFoundException e => Problem(StatusCodes.Status404NotFound, e.Code, e.Message),
             DomainException e => Problem(StatusCodes.Status422UnprocessableEntity, e.Code, e.Message),
             ConflictException e => Problem(StatusCodes.Status409Conflict, e.Code, e.Message),

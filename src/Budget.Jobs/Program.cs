@@ -13,7 +13,7 @@ if (string.IsNullOrWhiteSpace(connectionString))
 }
 
 await using var services = new ServiceCollection()
-    .AddApplication()
+    .AddApplication(Environment.GetEnvironmentVariable("Auth__AllowedOids")?.Split(','))
     .AddInfrastructure(connectionString)
     .AddScoped<ICurrentUser, Nobody>()
     .BuildServiceProvider();
@@ -23,9 +23,11 @@ switch (args)
 {
     case ["migrate"]:
         await scope.ServiceProvider.GetRequiredService<BudgetDbContext>().Database.MigrateAsync();
-        // The app never creates users, so the row a demo session signs in as has to exist before the API starts.
+        // The app never creates users, so the rows a session signs in as have to exist before the API starts:
+        // the demo user, and one per allowlisted Entra oid.
         await scope.ServiceProvider.GetRequiredService<DemoUser>().EnsureExistsAsync();
-        Console.WriteLine("Migrations applied; demo user present.");
+        await scope.ServiceProvider.GetRequiredService<RealUsers>().EnsureExistAsync();
+        Console.WriteLine("Migrations applied; users present.");
         return 0;
 
     default:

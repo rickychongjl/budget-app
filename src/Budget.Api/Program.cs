@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services
-    .AddApplication()
+    .AddApplication(builder.Configuration["Auth:AllowedOids"]?.Split(','))
     .AddInfrastructure(builder.Configuration.GetConnectionString("Budget"))
     .AddHttpContextAccessor()
     .AddScoped<ICurrentUser, HttpCurrentUser>();

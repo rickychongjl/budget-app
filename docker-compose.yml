@@ -5,6 +5,7 @@ x-app: &app
     dockerfile: src/Budget.Api/Dockerfile
   environment:
     ConnectionStrings__Budget: Server=sql;Database=budget;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=true
+    Auth__AllowedOids: ${AUTH_ALLOWED_OIDS:-}
 
 services:
   sql:
@@ -36,6 +37,7 @@ services:
     <<: *app
     environment:
       ConnectionStrings__Budget: Server=sql;Database=budget;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=true
+      Auth__AllowedOids: ${AUTH_ALLOWED_OIDS:-}
       # Local only: lets the session cookie work over plain http. Production never sets this.
       ASPNETCORE_ENVIRONMENT: Development
     ports:
