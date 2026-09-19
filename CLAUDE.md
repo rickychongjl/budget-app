@@ -110,7 +110,7 @@ npm run test
 npm run dev                                   # Vite; proxies /api and /auth to the API
 
 # Local stack
-docker compose up -d                          # sql (SQL Server 2022 Express) + api
+docker compose up -d                          # sql (SQL Server 2022 Express); api service arrives in M4
 docker compose down
 
 # E2E (against docker compose)
