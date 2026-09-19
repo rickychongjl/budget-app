@@ -1,8 +1,10 @@
 using System.Text.Json.Serialization;
+using Azure.Identity;
 using Budget.Api;
 using Budget.Application;
 using Budget.Infrastructure;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +21,14 @@ builder.Services.Configure<RouteHandlerOptions>(o => o.ThrowOnBadRequest = true)
 builder.Services.AddExceptionHandler<ProblemExceptionHandler>();
 builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = context =>
     context.ProblemDetails.Extensions.TryAdd("code", $"http.{context.ProblemDetails.Status}"));
+
+// The session cookie and the antiforgery tokens are protected by this key ring. In Azure it lives in Blob Storage, reached with
+// the managed identity, so sessions survive a deployment and every replica reads the same keys. Locally it is the default.
+var dataProtection = builder.Services.AddDataProtection().SetApplicationName("budget");
+if (builder.Configuration["DataProtection:BlobUri"] is { Length: > 0 } blobUri)
+{
+    dataProtection.PersistKeysToAzureBlobStorage(new Uri(blobUri), new DefaultAzureCredential());
+}
 
 // Recognises a session on every request. Issuing one is separate: /auth/demo, and Entra through /auth/login.
 // An API answers 401 and 403; it never redirects to a login page.
