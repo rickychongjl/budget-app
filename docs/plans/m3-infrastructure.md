@@ -3,6 +3,16 @@
 Source: `docs/solution-design.md` sections 2.3, 3.1, 3.3, 8 and section 17 item 3. No endpoints, no use cases, no UI.
 Code lands in `src/Budget.Application` (interfaces only), `src/Budget.Infrastructure` and a new `tests/Budget.Infrastructure.Tests`, test first.
 
+## Status: implemented
+
+All five slices are in. 29 integration tests against a SQL Server 2022 container; Domain coverage is 98.65% after the two private constructors.
+
+Where the code differs from the plan below:
+
+- Entity mapping is one `OnModelCreating` in `BudgetDbContext.cs`, not an `IEntityTypeConfiguration<T>` per entity: the query filters need the context instance, and the whole model fits on one screen.
+- Slices 1 to 3 landed as one commit, because there is no migration to test without a mapped model and the mapping tests cannot isolate themselves without the tenant filter.
+- The five decisions at the bottom were implemented as written.
+
 ## Done when
 
 - The initial migration applies to an empty SQL Server 2022 container and the model has no pending changes.

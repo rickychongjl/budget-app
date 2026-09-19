@@ -103,6 +103,10 @@ dotnet build -warnaserror
 dotnet test
 dotnet test tests/Budget.Domain.Tests        # fast inner loop, no Docker; fails under 90% line coverage (coverlet.msbuild, set in the csproj)
 
+# Migrations (dotnet-ef is pinned in dotnet-tools.json; needs no database)
+dotnet tool restore
+dotnet ef migrations add <Name> --project src/Budget.Infrastructure
+
 # Web (in src/web)
 npm ci
 npm run lint
