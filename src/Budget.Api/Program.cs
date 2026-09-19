@@ -14,6 +14,8 @@ builder.Services
 
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
+// By default an unreadable body throws only in Development. Always throwing sends it through the one exception handler.
+builder.Services.Configure<RouteHandlerOptions>(o => o.ThrowOnBadRequest = true);
 builder.Services.AddExceptionHandler<ProblemExceptionHandler>();
 builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = context =>
     context.ProblemDetails.Extensions.TryAdd("code", $"http.{context.ProblemDetails.Status}"));

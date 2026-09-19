@@ -71,12 +71,13 @@ public sealed class HostTests(ApiFactory api)
         await ShouldBeProblem(response, HttpStatusCode.NotFound, "user.not-found");
     }
 
-    internal static async Task ShouldBeProblem(HttpResponseMessage response, HttpStatusCode status, string code)
+    internal static async Task<JsonElement> ShouldBeProblem(HttpResponseMessage response, HttpStatusCode status, string code)
     {
         response.StatusCode.Should().Be(status);
         response.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
         var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
         problem.GetProperty("status").GetInt32().Should().Be((int)status);
         problem.GetProperty("code").GetString().Should().Be(code);
+        return problem;
     }
 }
