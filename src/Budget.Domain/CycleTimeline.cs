@@ -57,6 +57,35 @@ public sealed class CycleTimeline
     // A past-cycle transaction write is allowed, but the UI should prompt for a closing balance update.
     public bool RequiresClosingBalanceReview(Cycle cycle, DateOnly today) => PhaseOf(cycle, today) == CyclePhase.Past;
 
+    // Transactions are deliberately not involved: they keep their CycleId whatever the new dates are.
+    public void MoveStart(Cycle cycle, DateOnly newStart, DateOnly today)
+    {
+        EnsureCanEdit(cycle, CycleEdit.StartDate, today);
+
+        var index = _cycles.IndexOf(cycle);
+        if (index < 0)
+        {
+            throw new ArgumentException("The cycle is not part of this timeline.", nameof(cycle));
+        }
+
+        if (index > 0 && newStart <= _cycles[index - 1].EndDate)
+        {
+            throw new DomainException("cycle.start.overlap", "A cycle must start after the previous cycle ends.");
+        }
+
+        // Otherwise one edit would turn the current cycle into a past one and trigger a rollover.
+        if (cycle.Status == CycleStatus.Confirmed && newStart.AddDays(Cycle.LengthInDays - 1) < today)
+        {
+            throw new DomainException("cycle.start.ends-before-today", "The current cycle cannot be moved so that it has already ended.");
+        }
+
+        cycle.MoveTo(newStart);
+        for (var i = index + 1; i < _cycles.Count; i++)
+        {
+            _cycles[i].MoveTo(_cycles[i - 1].StartDate.AddDays(Cycle.LengthInDays));
+        }
+    }
+
     public void SetOpeningBalance(Cycle cycle, decimal amount, DateOnly today)
     {
         EnsureCanEdit(cycle, CycleEdit.OpeningBalance, today);

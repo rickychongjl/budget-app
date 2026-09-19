@@ -22,7 +22,9 @@ public sealed class Cycle
 
     public bool Covers(DateOnly date) => date >= StartDate && date <= EndDate;
 
-    // Internal: balances are changed through CycleTimeline, which knows whether the cycle is editable.
+    // Internal: dates and balances are changed through CycleTimeline, which knows whether the cycle is editable.
+    internal void MoveTo(DateOnly startDate) => StartDate = startDate;
+
     internal void SetOpeningBalance(decimal? value) => OpeningBalance = value;
 
     internal void SetClosingBalance(decimal value) => ClosingBalance = value;
