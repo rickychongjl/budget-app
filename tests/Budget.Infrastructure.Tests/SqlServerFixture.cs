@@ -13,12 +13,15 @@ public sealed class SqlServerFixture : IAsyncLifetime
     private readonly MsSqlContainer _container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
     private DbContextOptions<BudgetDbContext> _options = null!;
 
+    public string ConnectionString { get; private set; } = "";
+
     public async Task InitializeAsync()
     {
         await _container.StartAsync();
 
         var connectionString = new SqlConnectionStringBuilder(_container.GetConnectionString()) { InitialCatalog = "budget" };
-        _options = new DbContextOptionsBuilder<BudgetDbContext>().UseSqlServer(connectionString.ConnectionString).Options;
+        ConnectionString = connectionString.ConnectionString;
+        _options = new DbContextOptionsBuilder<BudgetDbContext>().UseSqlServer(ConnectionString).Options;
 
         await using var db = NoUser();
         await db.Database.MigrateAsync();
