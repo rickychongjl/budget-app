@@ -86,6 +86,34 @@ public sealed class CycleTimeline
         }
     }
 
+    // Idempotent. Chains from the latest cycle, so a gap left by a start-date move is never back-filled.
+    // cycleCategories may hold rows for any cycle; only the latest cycle's rows are copied.
+    public RolloverResult RollForward(DateOnly today, IEnumerable<CycleCategory> cycleCategories)
+    {
+        var newCycles = new List<Cycle>();
+        var newCategories = new List<CycleCategory>();
+
+        var latest = _cycles.LastOrDefault();
+        if (latest is null || latest.Status == CycleStatus.Draft)
+        {
+            return new RolloverResult(newCycles, newCategories);
+        }
+
+        var toCopy = cycleCategories.Where(c => c.CycleId == latest.Id).ToList();
+        while (latest.EndDate < today)
+        {
+            var next = latest.CreateNext();
+            toCopy = [.. toCopy.Select(c => c.CopyTo(next))];
+
+            _cycles.Add(next);
+            newCycles.Add(next);
+            newCategories.AddRange(toCopy);
+            latest = next;
+        }
+
+        return new RolloverResult(newCycles, newCategories);
+    }
+
     public void SetOpeningBalance(Cycle cycle, decimal amount, DateOnly today)
     {
         EnsureCanEdit(cycle, CycleEdit.OpeningBalance, today);
@@ -96,5 +124,13 @@ public sealed class CycleTimeline
     {
         EnsureCanEdit(cycle, CycleEdit.ClosingBalance, today);
         cycle.SetClosingBalance(Money.Balance(amount));
+
+        // The next opening balance follows this closing balance. It is a system write, so it
+        // applies whatever the next cycle's phase, and replaces an opening balance typed in earlier.
+        var index = _cycles.IndexOf(cycle);
+        if (index >= 0 && index < _cycles.Count - 1)
+        {
+            _cycles[index + 1].SetOpeningBalance(amount);
+        }
     }
 }
