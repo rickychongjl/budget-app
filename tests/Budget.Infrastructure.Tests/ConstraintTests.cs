@@ -1,3 +1,4 @@
+using Budget.Application;
 using Budget.Domain;
 using Microsoft.EntityFrameworkCore;
 
@@ -24,11 +25,12 @@ public class ConstraintTests(SqlServerFixture sql)
         return (user, cycle, category);
     }
 
-    private async Task ShouldBeRejectedAsync(User user, params object[] rows)
+    // A lost unique index is a ConflictException, which Application can recover from. Anything else stays EF's.
+    private async Task ShouldBeRejectedAsync<TException>(User user, params object[] rows) where TException : Exception
     {
         await using var db = sql.ContextFor(user);
         db.AddRange(rows);
-        await db.Invoking(x => x.SaveChangesAsync()).Should().ThrowAsync<DbUpdateException>();
+        await db.Invoking(x => x.SaveChangesAsync()).Should().ThrowAsync<TException>();
     }
 
     [Fact]
@@ -36,7 +38,21 @@ public class ConstraintTests(SqlServerFixture sql)
     {
         var a = await SeedAsync();
 
-        await ShouldBeRejectedAsync(a.User, new Cycle(a.User.Id, a.Cycle.StartDate));
+        await ShouldBeRejectedAsync<ConflictException>(a.User, new Cycle(a.User.Id, a.Cycle.StartDate));
+    }
+
+    [Fact]
+    public async Task A_conflict_discards_the_failed_unit_of_work()
+    {
+        var a = await SeedAsync();
+        await using var db = sql.ContextFor(a.User);
+        db.Add(new Cycle(a.User.Id, a.Cycle.StartDate));
+        await db.Invoking(x => x.SaveChangesAsync()).Should().ThrowAsync<ConflictException>();
+
+        db.Add(new Cycle(a.User.Id, a.Cycle.StartDate.AddDays(Cycle.LengthInDays)));
+        await db.SaveChangesAsync();
+
+        (await db.Cycles.CountAsync()).Should().Be(2);
     }
 
     [Fact]
@@ -44,7 +60,7 @@ public class ConstraintTests(SqlServerFixture sql)
     {
         var a = await SeedAsync();
 
-        await ShouldBeRejectedAsync(a.User, TestData.Groceries(a.Cycle, a.Category, name: "Again"));
+        await ShouldBeRejectedAsync<ConflictException>(a.User, TestData.Groceries(a.Cycle, a.Category, name: "Again"));
     }
 
     [Fact]
@@ -67,7 +83,7 @@ public class ConstraintTests(SqlServerFixture sql)
             await db.SaveChangesAsync();
         }
 
-        await ShouldBeRejectedAsync(a.User, With(a.Cycle, a.Category));
+        await ShouldBeRejectedAsync<ConflictException>(a.User, With(a.Cycle, a.Category));
     }
 
     [Fact]
@@ -78,7 +94,7 @@ public class ConstraintTests(SqlServerFixture sql)
         await sql.NewUserAsync();
         await sql.NewUserAsync();
 
-        await sql.Invoking(x => x.NewUserAsync(externalId)).Should().ThrowAsync<DbUpdateException>();
+        await sql.Invoking(x => x.NewUserAsync(externalId)).Should().ThrowAsync<ConflictException>();
     }
 
     [Fact]
@@ -87,7 +103,7 @@ public class ConstraintTests(SqlServerFixture sql)
         var a = await SeedAsync();
         var b = await SeedAsync(withCycleCategory: false);
 
-        await ShouldBeRejectedAsync(b.User, TestData.Groceries(b.Cycle, a.Category));
+        await ShouldBeRejectedAsync<DbUpdateException>(b.User, TestData.Groceries(b.Cycle, a.Category));
     }
 
     [Fact]
@@ -95,7 +111,7 @@ public class ConstraintTests(SqlServerFixture sql)
     {
         var a = await SeedAsync(withCycleCategory: false);
 
-        await ShouldBeRejectedAsync(a.User, new Transaction(a.Cycle, a.Category.Id, 5m, TestData.Jan1, null, Guid.NewGuid(), TestData.Now));
+        await ShouldBeRejectedAsync<DbUpdateException>(a.User, new Transaction(a.Cycle, a.Category.Id, 5m, TestData.Jan1, null, Guid.NewGuid(), TestData.Now));
     }
 
     [Fact]

@@ -1,0 +1,123 @@
+using Budget.Domain;
+using FluentValidation;
+using Microsoft.Extensions.Logging;
+
+namespace Budget.Application;
+
+public sealed record CycleDto(
+    Guid Id,
+    DateOnly StartDate,
+    DateOnly EndDate,
+    CycleStatus Status,
+    CyclePhase Phase,
+    decimal? OpeningBalance,
+    decimal? ClosingBalance);
+
+public sealed record CycleSummaryDto(CycleDto Cycle, CycleRollup Rollup);
+
+public sealed class Cycles(
+    ICurrentUser currentUser,
+    IUnitOfWork unitOfWork,
+    ICycleRepository cycles,
+    ICategoryRepository categories,
+    ITransactionRepository transactions,
+    CycleFinder finder,
+    RolloverCycles rollover,
+    ILogger<Cycles> logger)
+{
+    public async Task<IReadOnlyList<CycleDto>> ListAsync(CancellationToken ct = default)
+    {
+        var (timeline, today) = await finder.TimelineAsync(ct);
+        return [.. timeline.Cycles.Select(c => ToDto(c, timeline, today))];
+    }
+
+    public async Task<CycleSummaryDto> GetAsync(Guid id, CancellationToken ct = default)
+    {
+        var (cycle, timeline, today) = await finder.FindAsync(id, ct);
+        return await SummaryAsync(cycle, timeline, today, ct);
+    }
+
+    // The fallback rollover trigger: a late or failed job must never leave the app without a current cycle.
+    public async Task<CycleSummaryDto> GetCurrentAsync(CancellationToken ct = default)
+    {
+        var created = await rollover.RunAsync(ct);
+        if (created > 0)
+        {
+            logger.LogWarning("Rollover fallback created {Count} cycle(s) at request time; the rollover job is behind.", created);
+        }
+
+        var (timeline, today) = await finder.TimelineAsync(ct);
+        var current = timeline.Current(today) ?? throw new NotFoundException("cycle.none", "There is no current cycle yet.");
+        return await SummaryAsync(current, timeline, today, ct);
+    }
+
+    // Onboarding only. Every later cycle comes from RolloverCycles.
+    public async Task<CycleDto> CreateFirstAsync(CreateCycleRequest request, CancellationToken ct = default)
+    {
+        CreateCycleValidator.Instance.ValidateAndThrow(request);
+
+        var (existing, today) = await finder.TimelineAsync(ct);
+        // ponytail: two simultaneous first requests with different start dates would both pass this check.
+        // One person onboarding once does not do that; a filtered unique index on Draft would close it.
+        if (existing.Cycles.Count > 0)
+        {
+            throw new DomainException("cycle.exists", "The first cycle already exists; later cycles are created automatically.");
+        }
+
+        var cycle = new Cycle(currentUser.Id, request.StartDate);
+        var timeline = new CycleTimeline([cycle]);
+        if (request.OpeningBalance is { } opening)
+        {
+            timeline.SetOpeningBalance(cycle, opening, today);
+        }
+
+        cycles.Add(cycle);
+        await unitOfWork.SaveChangesAsync(ct);
+        return ToDto(cycle, timeline, today);
+    }
+
+    public async Task<CycleDto> ConfirmAsync(Guid id, CancellationToken ct = default)
+    {
+        var (cycle, timeline, today) = await finder.FindAsync(id, ct);
+        cycle.Confirm();
+        await unitOfWork.SaveChangesAsync(ct);
+        return ToDto(cycle, timeline, today);
+    }
+
+    public async Task<CycleDto> UpdateAsync(Guid id, UpdateCycleRequest request, CancellationToken ct = default)
+    {
+        UpdateCycleValidator.Instance.ValidateAndThrow(request);
+
+        var (cycle, timeline, today) = await finder.FindAsync(id, ct);
+        if (request.StartDate is { } start)
+        {
+            timeline.MoveStart(cycle, start, today);
+        }
+
+        if (request.OpeningBalance is { } opening)
+        {
+            timeline.SetOpeningBalance(cycle, opening, today);
+        }
+
+        if (request.ClosingBalance is { } closing)
+        {
+            timeline.SetClosingBalance(cycle, closing, today);
+        }
+
+        await unitOfWork.SaveChangesAsync(ct);
+        return ToDto(cycle, timeline, today);
+    }
+
+    private async Task<CycleSummaryDto> SummaryAsync(Cycle cycle, CycleTimeline timeline, DateOnly today, CancellationToken ct)
+    {
+        var rollup = CycleRollup.Calculate(
+            cycle,
+            await categories.ListForCycleAsync(cycle.Id, ct),
+            await categories.ListAsync(ct),
+            await transactions.ListForCycleAsync(cycle.Id, null, ct));
+        return new CycleSummaryDto(ToDto(cycle, timeline, today), rollup);
+    }
+
+    private static CycleDto ToDto(Cycle cycle, CycleTimeline timeline, DateOnly today) =>
+        new(cycle.Id, cycle.StartDate, cycle.EndDate, cycle.Status, timeline.PhaseOf(cycle, today), cycle.OpeningBalance, cycle.ClosingBalance);
+}

@@ -5,6 +5,22 @@ namespace Budget.Infrastructure.Tests;
 [Collection(SqlServerCollection.Name)]
 public class RepositoryTests(SqlServerFixture sql)
 {
+    // The only test in this project that makes demo users, so "the oldest demo user" is the first one made here.
+    [Fact]
+    public async Task The_demo_user_is_the_oldest_user_flagged_as_demo()
+    {
+        await using var db = sql.NoUser();
+        var users = new UserRepository(db);
+        (await users.GetDemoAsync()).Should().BeNull();
+
+        var first = new User("Demo", "Australia/Sydney", "AUD", TestData.Now, isDemo: true);
+        var second = new User("Demo again", "Australia/Sydney", "AUD", TestData.Now.AddDays(1), isDemo: true);
+        db.Users.AddRange(second, first);
+        await db.SaveChangesAsync();
+
+        (await users.GetDemoAsync())!.Id.Should().Be(first.Id);
+    }
+
     [Fact]
     public async Task Users_are_found_by_id_and_external_id_and_listed_across_tenants()
     {
@@ -144,6 +160,11 @@ public class RepositoryTests(SqlServerFixture sql)
             (await transactions.GetByClientIdAsync(Guid.NewGuid())).Should().BeNull();
             (await transactions.AnyForCategoryAsync(cycle.Id, fuel.Id)).Should().BeTrue();
             (await transactions.AnyForCategoryAsync(next.Id, fuel.Id)).Should().BeFalse();
+            (await transactions.CountAsync()).Should().Be(4);
+            await using (var nobodyElse = sql.ContextFor(await sql.NewUserAsync()))
+            {
+                (await new TransactionRepository(nobodyElse).CountAsync()).Should().Be(0);
+            }
 
             transactions.Remove((await transactions.GetAsync(late.Id))!);
             await db.SaveChangesAsync();

@@ -1,3 +1,11 @@
+x-app: &app
+  image: budget-api:dev
+  build:
+    context: .
+    dockerfile: src/Budget.Api/Dockerfile
+  environment:
+    ConnectionStrings__Budget: Server=sql;Database=budget;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=true
+
 services:
   sql:
     image: mcr.microsoft.com/mssql/server:2022-latest
@@ -15,6 +23,26 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
+
+  # Same order as production: the migration job finishes before the API starts.
+  migrate:
+    <<: *app
+    entrypoint: ["dotnet", "jobs/Budget.Jobs.dll", "migrate"]
+    depends_on:
+      sql:
+        condition: service_healthy
+
+  api:
+    <<: *app
+    environment:
+      ConnectionStrings__Budget: Server=sql;Database=budget;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=true
+      # Local only: lets the session cookie work over plain http. Production never sets this.
+      ASPNETCORE_ENVIRONMENT: Development
+    ports:
+      - "8080:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   sql-data:

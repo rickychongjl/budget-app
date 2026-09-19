@@ -44,4 +44,29 @@ public class UserTests
         demo.Currency.Should().Be("AUD");
         demo.CreatedAt.Should().Be(TestData.Now);
     }
+
+    [Fact]
+    public void Display_name_and_time_zone_can_change_and_today_follows_the_new_zone()
+    {
+        var user = Sydney();
+        var clock = new FixedClock(DateTimeOffset.Parse("2026-01-15T13:30:00Z"));
+
+        user.Rename("Ricky C");
+        user.ChangeTimeZone("Europe/London");
+
+        user.DisplayName.Should().Be("Ricky C");
+        user.TimeZone.Should().Be("Europe/London");
+        user.Today(clock).Should().Be(new DateOnly(2026, 1, 15));
+    }
+
+    [Fact]
+    public void Changing_to_an_unknown_time_zone_is_rejected_and_changes_nothing()
+    {
+        var user = Sydney();
+
+        var act = () => user.ChangeTimeZone("Mars/Olympus_Mons");
+
+        act.Should().Throw<DomainException>().Which.Code.Should().Be("user.timezone.unknown");
+        user.TimeZone.Should().Be("Australia/Sydney");
+    }
 }
