@@ -6,5 +6,7 @@
 .claude
 .env
 tests
+# The demo fixture is shared with the Playwright specs but ships with the jobs.
+!tests/e2e/fixtures/demo-seed.json
 docs
 design-system

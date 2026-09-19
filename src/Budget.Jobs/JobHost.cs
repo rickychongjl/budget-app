@@ -43,6 +43,22 @@ public static class JobHost
         Console.WriteLine($"Rollover: {userIds.Count} users, {created} cycles created, {failed} failed.");
         return failed == 0 ? 0 : 1;
     }
+
+    // Runs as the demo user, so the demo goes through the tenant filter like everyone else. The fixture ships beside the
+    // job (tests/e2e/fixtures/demo-seed.json, shared with the Playwright specs). onlyIfEmpty is migrate's first-run seed.
+    public static async Task<int> ResetDemoAsync(IServiceProvider services, bool onlyIfEmpty = false, CancellationToken ct = default)
+    {
+        var fixture = DemoFixture.Parse(await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "demo-seed.json"), ct));
+
+        await using var scope = services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<JobUser>().Id = await scope.ServiceProvider.GetRequiredService<DemoUser>().GetIdAsync(ct);
+
+        var reset = scope.ServiceProvider.GetRequiredService<ResetDemo>();
+        await (onlyIfEmpty ? reset.SeedIfEmptyAsync(fixture, ct) : reset.RunAsync(fixture, ct));
+
+        Console.WriteLine(onlyIfEmpty ? "Demo data present." : "Demo reset to the fixture.");
+        return 0;
+    }
 }
 
 // Who the current scope is working as. Nobody by default: the tenant filter then hides everything and the write guard

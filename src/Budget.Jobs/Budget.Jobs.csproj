@@ -1,7 +1,12 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\Budget.Infrastructure\Budget.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <!-- The demo fixture is shared with the Playwright specs, so it lives with them and ships beside the job. -->
+  <ItemGroup>
+    <Content Include="..\..\tests\e2e\fixtures\demo-seed.json" Link="demo-seed.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <PropertyGroup>

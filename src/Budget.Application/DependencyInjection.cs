@@ -13,6 +13,7 @@ public static class DependencyInjection
         .AddScoped<DemoCaps>()
         .AddScoped<DemoUser>()
         .AddScoped<RealUsers>()
+        .AddScoped<ResetDemo>()
         .AddScoped<Login>()
         .AddScoped<CycleCategories>()
         .AddScoped<Transactions>()

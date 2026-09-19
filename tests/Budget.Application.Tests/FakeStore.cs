@@ -42,6 +42,16 @@ internal sealed class FakeStore : ICurrentUser, IUnitOfWork, IUserRepository, IC
     Task<IReadOnlyList<User>> IUserRepository.ListAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<User>>(Users);
     public void Add(User user) => Users.Add(user);
 
+    // Like the real one, it is filtered by the current user as well as by the id it is given.
+    Task IUserRepository.DeleteDataAsync(Guid userId, CancellationToken ct)
+    {
+        Transactions.RemoveAll(t => t.UserId == userId && t.UserId == Id);
+        CycleCategories.RemoveAll(c => c.UserId == userId && c.UserId == Id);
+        Cycles.RemoveAll(c => c.UserId == userId && c.UserId == Id);
+        Categories.RemoveAll(c => c.UserId == userId && c.UserId == Id);
+        return Task.CompletedTask;
+    }
+
     Task<IReadOnlyList<Cycle>> ICycleRepository.ListAsync(CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<Cycle>>([.. Cycles.Where(c => c.UserId == Id).OrderBy(c => c.StartDate)]);
     Task<Cycle?> ICycleRepository.GetAsync(Guid id, CancellationToken ct) => Task.FromResult(Cycles.SingleOrDefault(c => c.UserId == Id && c.Id == id));

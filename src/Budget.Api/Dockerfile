@@ -5,6 +5,8 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /repo
 COPY global.json Directory.Build.props ./
 COPY src/ src/
+# The reset-demo job reads the demo fixture, which lives with the Playwright specs that share it.
+COPY tests/e2e/fixtures/demo-seed.json tests/e2e/fixtures/demo-seed.json
 RUN dotnet publish src/Budget.Api -c Release -o /out/api \
  && dotnet publish src/Budget.Jobs -c Release -o /out/jobs
 

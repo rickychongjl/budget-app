@@ -29,6 +29,11 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <!-- ResetDemoTests run against the real demo fixture. -->
+  <ItemGroup>
+    <Content Include="..\e2e\fixtures\demo-seed.json" Link="demo-seed.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\Budget.Application\Budget.Application.csproj" />
   </ItemGroup>
