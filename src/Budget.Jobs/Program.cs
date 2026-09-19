@@ -23,7 +23,9 @@ switch (args)
 {
     case ["migrate"]:
         await scope.ServiceProvider.GetRequiredService<BudgetDbContext>().Database.MigrateAsync();
-        Console.WriteLine("Migrations applied.");
+        // The app never creates users, so the row a demo session signs in as has to exist before the API starts.
+        await scope.ServiceProvider.GetRequiredService<DemoUser>().EnsureExistsAsync();
+        Console.WriteLine("Migrations applied; demo user present.");
         return 0;
 
     default:

@@ -34,6 +34,10 @@ services:
 
   api:
     <<: *app
+    environment:
+      ConnectionStrings__Budget: Server=sql;Database=budget;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=true
+      # Local only: lets the session cookie work over plain http. Production never sets this.
+      ASPNETCORE_ENVIRONMENT: Development
     ports:
       - "8080:8080"
     depends_on:

@@ -20,12 +20,15 @@ builder.Services.AddExceptionHandler<ProblemExceptionHandler>();
 builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = context =>
     context.ProblemDetails.Extensions.TryAdd("code", $"http.{context.ProblemDetails.Status}"));
 
-// Nothing issues this cookie until M5. An API answers 401 and 403; it never redirects to a login page.
+// Recognises a session on every request. Issuing one is separate: /auth/demo now, Entra in M5.
+// An API answers 401 and 403; it never redirects to a login page.
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(o =>
 {
     o.Cookie.Name = "budget.session";
     o.Cookie.HttpOnly = true;
-    o.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    // Always Secure, except in Development: curl and Safari will not send a Secure cookie back over http://localhost,
+    // which is what docker compose and the Vite proxy use. There it follows the request, so https still gets Secure.
+    o.Cookie.SecurePolicy = builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
     o.Cookie.SameSite = SameSiteMode.Strict;
     o.Events.OnRedirectToLogin = context => Status(context.Response, StatusCodes.Status401Unauthorized);
     o.Events.OnRedirectToAccessDenied = context => Status(context.Response, StatusCodes.Status403Forbidden);
@@ -46,6 +49,8 @@ app.UseAuthorization();
 app.MapGet("/health", () => Results.Ok());
 app.MapGet("/health/ready", async (BudgetDbContext db, CancellationToken ct) =>
     await db.Database.CanConnectAsync(ct) ? Results.Ok() : Results.StatusCode(StatusCodes.Status503ServiceUnavailable));
+
+app.MapAuth();
 
 var api = app.MapGroup("/api").RequireAuthorization();
 api.MapMe();

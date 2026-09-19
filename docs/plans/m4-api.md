@@ -3,7 +3,19 @@
 Source: `docs/solution-design.md` sections 3.2, 3.3, 4, 5.3 (caps only), 6 (rate limiting row) and section 17 item 4. No login flow, no UI.
 Code lands in `src/Budget.Application` (use cases, DTOs, validators), `src/Budget.Api` (host and endpoints), `src/Budget.Jobs` (`migrate` only) and two new test projects, test first.
 
-## Status: in progress
+## Status: implemented
+
+All twelve slices are in. 274 tests: Domain 119, Application 70, Infrastructure 31, API 54 (the last two against a SQL Server 2022 container). Line coverage: Application 95.09%, Domain 98.66%. `docker compose up -d --build` was run for real: `migrate` applied the migrations and created the demo user, and a curl session signed in through `/auth/demo`, created a cycle and was `401` again after logout.
+
+Where the code differs from the plan below:
+
+- Two small shared helpers the plan did not name: `UserToday` (the user's local date) and `CycleFinder` (a cycle with its timeline and today). Every feature class needed the same lookup.
+- Sync items name a transaction by `ClientId`, not `Id`: one created offline has no server id until its create has synced. A sync delete of something already gone counts as done, so a replayed batch reports no errors. A per-item result carries `ok`, `result`, `code` and `detail` rather than an HTTP status, which Application should not know about. A batch is capped at 500 items.
+- The demo profile is read-only (`422 demo.profile.readonly`). The design's three caps do not cover it, and every visitor shares that row.
+- The session cookie is `Secure` always, except in the Development environment, where it follows the request scheme. Found by running the container: curl (and Safari) will not send a `Secure` cookie back over `http://localhost`. The compose `api` service therefore runs as Development. A test pins that Production stays `Secure` even for an http request.
+- `/auth/demo` is limited to 5 a minute per address. The design's "20 a day" is not implemented (marked `ponytail:` in `RateLimiting.cs`).
+- An unreadable body throws in every environment (`RouteHandlerOptions.ThrowOnBadRequest`), so it is the same `400 request.malformed` everywhere instead of a bare `400` outside Development.
+- Tests were written before the code in every slice, but only some were run red first: the host skeleton, `RolloverCycles`, rate limiting and the cookie `Secure` fix. In the other slices the tests could not compile until the use case existed, and were first run once it did.
 
 ## Done when
 

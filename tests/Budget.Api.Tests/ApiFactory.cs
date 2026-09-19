@@ -3,6 +3,7 @@ using System.Text.Encodings.Web;
 using Budget.Domain;
 using Budget.Infrastructure;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -78,22 +79,24 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     }
 }
 
-// Stands in for the session cookie, which nothing can issue until M5. Everything after authentication is the real pipeline.
+// Lets a test act as any user without signing in: only the demo user can get a real cookie until Entra arrives in M5.
+// Everything after authentication is the real pipeline.
 internal sealed class TestAuth(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder)
     : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
 {
     public const string SchemeName = "Test";
     public const string Header = "X-Test-User";
 
-    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+    protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
+        // Without the header this is the production path: the real session cookie, or nobody.
         if (!Request.Headers.TryGetValue(Header, out var userId))
         {
-            return Task.FromResult(AuthenticateResult.NoResult());
+            return await Context.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         }
 
         var identity = new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, userId.ToString())], SchemeName);
-        return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(identity), SchemeName)));
+        return AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(identity), SchemeName));
     }
 }
 

@@ -38,6 +38,7 @@ internal sealed class FakeStore : ICurrentUser, IUnitOfWork, IUserRepository, IC
 
     Task<User?> IUserRepository.GetAsync(Guid id, CancellationToken ct) => Task.FromResult(Users.SingleOrDefault(u => u.Id == id));
     Task<User?> IUserRepository.GetByExternalIdAsync(string externalId, CancellationToken ct) => Task.FromResult(Users.SingleOrDefault(u => u.ExternalId == externalId));
+    Task<User?> IUserRepository.GetDemoAsync(CancellationToken ct) => Task.FromResult(Users.Where(u => u.IsDemo).OrderBy(u => u.CreatedAt).FirstOrDefault());
     Task<IReadOnlyList<User>> IUserRepository.ListAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<User>>(Users);
     public void Add(User user) => Users.Add(user);
 

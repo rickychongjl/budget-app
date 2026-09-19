@@ -9,13 +9,22 @@ internal static class RateLimiting
     // One sliding window per client address over everything except liveness. Defaults: 100 requests a minute.
     // ponytail: behind Cloudflare and the Container Apps ingress every request arrives from the proxy's address,
     // so until M9 configures forwarded headers this is one shared bucket in production. Locally it is per client.
+    public const string AuthPolicy = "auth";
+
     public static IServiceCollection AddBudgetRateLimiting(this IServiceCollection services, IConfiguration configuration)
     {
         var permitLimit = configuration.GetValue("RateLimiting:PermitLimit", 100);
+        var authPermitLimit = configuration.GetValue("RateLimiting:AuthPermitLimit", 5);
         var window = TimeSpan.FromSeconds(configuration.GetValue("RateLimiting:WindowSeconds", 60));
 
         return services.AddRateLimiter(o =>
         {
+            // On top of the global limit, for /auth/*: 5 a minute per address.
+            // ponytail: the design also suggests 20 a day. A second, day-long window needs a chained limiter; add it if the demo gets hammered.
+            o.AddPolicy(AuthPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
+                context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = authPermitLimit, Window = window }));
+
             o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
                 context.Request.Path.StartsWithSegments("/health")
                     ? RateLimitPartition.GetNoLimiter("health")
