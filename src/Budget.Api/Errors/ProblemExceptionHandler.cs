@@ -14,6 +14,7 @@ internal sealed class ProblemExceptionHandler(IProblemDetailsService problems) :
         {
             NotFoundException e => (StatusCodes.Status404NotFound, e.Code),
             DomainException e => (StatusCodes.Status422UnprocessableEntity, e.Code),
+            ConflictException e => (StatusCodes.Status409Conflict, e.Code),
             _ => (0, ""),
         };
 

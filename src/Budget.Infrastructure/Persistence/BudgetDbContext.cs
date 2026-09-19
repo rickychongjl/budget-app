@@ -1,5 +1,6 @@
 using Budget.Application;
 using Budget.Domain;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 namespace Budget.Infrastructure;
@@ -22,13 +23,38 @@ public sealed class BudgetDbContext(DbContextOptions<BudgetDbContext> options, I
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         EnforceTenant();
-        return base.SaveChanges(acceptAllChangesOnSuccess);
+        try
+        {
+            return base.SaveChanges(acceptAllChangesOnSuccess);
+        }
+        catch (DbUpdateException e) when (IsUniqueViolation(e))
+        {
+            throw Conflict(e);
+        }
     }
 
-    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
         EnforceTenant();
-        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        try
+        {
+            return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+        catch (DbUpdateException e) when (IsUniqueViolation(e))
+        {
+            throw Conflict(e);
+        }
+    }
+
+    // 2601 is a unique index, 2627 a unique constraint. Both mean a concurrent writer got there first.
+    private static bool IsUniqueViolation(DbUpdateException e) => e.InnerException is SqlException { Number: 2601 or 2627 };
+
+    // Application cannot see EF, so it gets its own exception. The rows that lost are dropped from the tracker:
+    // otherwise the next save in this scope would try to insert them again.
+    private ConflictException Conflict(DbUpdateException e)
+    {
+        ChangeTracker.Clear();
+        return new ConflictException("conflict", "The row already exists.", e);
     }
 
     // The query filter covers reads. This covers writes: every tenant row that is inserted, updated or deleted

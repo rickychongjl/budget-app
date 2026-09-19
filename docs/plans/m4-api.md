@@ -60,9 +60,9 @@ Infrastructure change: `AddInfrastructure(connectionString)`; `BudgetDbContext.S
 - Tests: `/health` answers with the database unreachable; `/api/me` without a user is `401` problem details; an unknown `/api` route is `404` problem details; `GET /api/me` returns the profile.
 
 ### 2. `RolloverCycles`
-- `tests/Budget.Application.Tests` with in-memory fakes and `FakeTimeProvider`.
-- Nothing due is a no-op; several missed cycles are all created with categories copied; a `Draft`-only user is skipped; today is the user's time zone, not UTC; a `ConflictException` on save re-reads and finishes without duplicating.
-- Infrastructure test: a duplicate `Cycle (UserId, StartDate)` surfaces as `ConflictException`.
+- `tests/Budget.Application.Tests` with one in-memory `FakeStore` (all four repositories, unit of work and current user) and the same `FixedClock` the Domain tests use; no extra package.
+- Nothing due is a no-op; several missed cycles are all created with categories copied; a `Draft`-only user is skipped; today is the user's time zone, not UTC; a `ConflictException` on save means the other trigger created the same cycles in its one save, so it reports nothing created and does not retry.
+- Infrastructure tests: a lost unique index surfaces as `ConflictException` and the failed unit of work is cleared from the change tracker; a foreign-key violation is still EF's `DbUpdateException`.
 
 ### 3. Cycles, read side
 - `GET /api/cycles` (phase per cycle), `GET /api/cycles/{id}` (rollup and totals), `GET /api/cycles/current` (runs the fallback; warning logged only when it created something; `404` with `cycle.none` before onboarding).
