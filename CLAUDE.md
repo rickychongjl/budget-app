@@ -101,7 +101,7 @@ dotnet build -warnaserror
 
 # Test (Docker must be running; Testcontainers starts SQL Server)
 dotnet test
-dotnet test tests/Budget.Domain.Tests        # fast inner loop, no Docker
+dotnet test tests/Budget.Domain.Tests        # fast inner loop, no Docker; fails under 90% line coverage (coverlet.msbuild, set in the csproj)
 
 # Web (in src/web)
 npm ci

@@ -4,14 +4,28 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
+  <!-- Coverage gate: `dotnet test` fails when Budget.Domain drops below 90% line coverage. -->
+  <PropertyGroup>
+    <CollectCoverage>true</CollectCoverage>
+    <Include>[Budget.Domain]*</Include>
+    <Threshold>90</Threshold>
+    <ThresholdType>line</ThresholdType>
+    <CoverletOutput>$(MSBuildProjectDirectory)/obj/coverage/</CoverletOutput>
+  </PropertyGroup>
+
   <ItemGroup>
-    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="coverlet.msbuild" Version="10.0.1">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="FluentAssertions" Version="8.11.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
   </ItemGroup>
 
   <ItemGroup>
+    <Using Include="FluentAssertions" />
     <Using Include="Xunit" />
   </ItemGroup>
 
