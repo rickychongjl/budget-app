@@ -2,15 +2,24 @@ using System.Security.Claims;
 using Budget.Application;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 
 namespace Budget.Api;
 
 internal static class AuthEndpoints
 {
-    // Public and unauthenticated by nature, so it has the strict limit. /auth/login and /auth/callback (Entra) join this group in M5.
-    public static void MapAuth(this IEndpointRouteBuilder app)
+    // Public and unauthenticated by nature, so it has the strict limit.
+    // /auth/callback is not here: the OpenID Connect middleware answers it before routing, under the global limit only.
+    public static void MapAuth(this IEndpointRouteBuilder app, IConfiguration configuration)
     {
         var auth = app.MapGroup("/auth").RequireRateLimiting(RateLimiting.AuthPolicy);
+
+        if (EntraSignIn.IsConfigured(configuration))
+        {
+            auth.MapGet("/login", () => Results.Challenge(
+                new AuthenticationProperties { RedirectUri = "/" },
+                [OpenIdConnectDefaults.AuthenticationScheme]));
+        }
 
         // The same cookie a real login issues, for the demo user, with a fixed four-hour life that does not slide.
         auth.MapPost("/demo", async (HttpContext context, DemoUser demo, TimeProvider clock, CancellationToken ct) =>

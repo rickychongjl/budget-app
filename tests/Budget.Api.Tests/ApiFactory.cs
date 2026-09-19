@@ -48,9 +48,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             .AddScheme<AuthenticationSchemeOptions, TestAuth>(TestAuth.SchemeName, null));
     }
 
-    public async Task<User> NewUserAsync(bool isDemo = false)
+    public async Task<User> NewUserAsync(bool isDemo = false, string? externalId = null)
     {
-        var user = new User("Test", "Australia/Sydney", "AUD", DateTimeOffset.UtcNow, isDemo: isDemo);
+        var user = new User("Test", "Australia/Sydney", "AUD", DateTimeOffset.UtcNow, externalId, isDemo);
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<BudgetDbContext>();
         db.Users.Add(user);
