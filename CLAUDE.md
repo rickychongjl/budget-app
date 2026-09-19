@@ -152,6 +152,7 @@ Also fixed: offline-first PWA (Dexie + `POST /api/sync`, replays idempotent via 
 - Namespaces are `Budget.*` (working name; do not rename unprompted).
 - Group files into folders; do not leave types loose in a project root. A new file goes in the folder it belongs to, and a new aggregate gets its own folder.
   - `Budget.Domain`: one folder per aggregate (`Cycles/`, `Categories/`, `Transactions/`, `Users/`). Only types shared by every aggregate (`Money`, `DomainException`) stay in the root.
+  - `Budget.Application`: one folder per feature (`Users/`, `Cycles/`, `Categories/`, `Transactions/`), each holding that feature's use-case class, DTOs, validators and repository interface, plus `Errors/` for the exceptions the Api maps to status codes. Only `IUnitOfWork` and `DependencyInjection` stay in the root.
   - `Budget.Infrastructure`: by role (`Persistence/` for the `DbContext` and its factory, `Repositories/`, `Migrations/`).
   - Folders are for navigation only: the namespace stays the project's (`Budget.Domain`, `Budget.Infrastructure`), so moving a file never touches a `using`. `Migrations` keeps EF's generated namespace.
 - Azure naming `bgt-<env>-<resource>`; tags `project=budget`, `env=prod`, `owner=ricky`.

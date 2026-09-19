@@ -32,7 +32,16 @@ Code lands in `src/Budget.Application` (use cases, DTOs, validators), `src/Budge
 
 ## Application
 
-- One class per feature, plain constructor injection, no mediator and no interface per use case: `Me`, `Cycles`, `CycleCategories`, `Transactions`, `Sync`. `RolloverCycles` stands alone because it has two callers.
+- One class per feature, plain constructor injection, no mediator and no interface per use case. `RolloverCycles` stands alone because it has two callers. Each class sits in its feature folder with its DTOs, validators and repository interface, and is mirrored by one endpoint file in `src/Budget.Api/Endpoints/`:
+
+  | Class (file) | Methods | Routes |
+  |---|---|---|
+  | `Me` (`Users/Me.cs`) | `GetAsync`, `UpdateAsync` | `GET`/`PATCH /api/me` |
+  | `Cycles` (`Cycles/Cycles.cs`) | `ListAsync`, `GetAsync`, `GetCurrentAsync`, `CreateFirstAsync`, `ConfirmAsync`, `UpdateAsync` | the six `/api/cycles` routes |
+  | `CycleCategories` (`Categories/CycleCategories.cs`) | `AddAsync`, `EditAsync`, `RemoveAsync`, `ListIdentitiesAsync` | `/api/cycles/{id}/categories...`, `GET /api/categories` |
+  | `Transactions` (`Transactions/Transactions.cs`) | `ListAsync`, `CreateAsync`, `EditAsync`, `DeleteAsync` | `/api/transactions...` |
+  | `Sync` (`Transactions/Sync.cs`) | `ApplyAsync` | `POST /api/sync` |
+  | `RolloverCycles` (`Cycles/RolloverCycles.cs`) | `RunAsync` | called by `Cycles.GetCurrentAsync` and the job |
 - Each method loads through the repositories, builds a `CycleTimeline`, asks `User.Today(TimeProvider)` for today, calls the domain, saves through `IUnitOfWork`, returns a DTO record. Entities never leave Application.
 - FluentValidation validators for request shape, using the column lengths from the M3 plan. Domain rules stay in Domain.
 - Three exceptions, mapped once in the Api: FluentValidation's `ValidationException`, `NotFoundException`, `ConflictException`. `DomainException` already exists.
@@ -86,18 +95,20 @@ Infrastructure change: `AddInfrastructure(connectionString)`; `BudgetDbContext.S
 - The limit trips at the configured count with `429` problem details and `Retry-After`; `/health` is never limited.
 
 ### 10. `POST /api/sync`
-- An ordered batch of transaction creates, edits and deletes, each applied through the `Transactions` use case in its own save. Per-item result: status, body or problem. One bad item does not stop the rest; replaying the whole batch changes nothing.
+- An ordered batch of transaction creates, edits and deletes and of category edits, each applied through the `Transactions` or `CycleCategories` use case in its own save. A category add or remove in a batch is rejected per item with `sync.online-only`. Per-item result: status, body or problem. One bad item does not stop the rest; replaying the whole batch changes nothing.
 
 ### 11. `migrate` and the compose `api` service
 - `Budget.Jobs migrate` calls `Database.MigrateAsync`. `src/Budget.Api/Dockerfile`. Compose gains `migrate` (runs once, after `sql` is healthy) and `api` (after `migrate` completes).
 
-## Decisions taken (say if any is wrong)
+## Decisions taken
+
+Decisions 2 to 6 were reviewed and confirmed on 2026-09-19. Decision 1 stands; whether the demo session moves from M5 into this milestone is still open.
 
 1. **The auth seam is the real cookie scheme, with nothing issuing the cookie yet.** Endpoints, `ICurrentUser` and the isolation tests are written against the production pipeline, and M5 only adds issuers. The alternative, a dev-login endpoint, is ruled out by CLAUDE.md. Until M5 the API is reachable only from tests.
 2. **Another user's id is `404`, never `403`.** The tenant filter makes the row not exist; saying `403` would confirm that it does.
 3. **`400` for request shape, `422` for domain rules, `409` only for a lost race the server could not recover from.**
 4. **Demo caps are `422`, not `429`.** Retrying later will not help, which is what `429` promises. The design allows either.
 5. **Feature classes, not one class per use case and no mediator.** About twenty routes of load, call the domain, save; a handler type and a registration per route would be most of the code.
-6. **`POST /api/sync` covers transactions only.** Section 7 says "mutations" but only names queued transactions, and adding a transaction is the one thing worth doing on a train. Budget and category edits need a connection. The batch item carries a `type`, so widening it later is additive.
+6. **`POST /api/sync` carries transaction creates, edits and deletes, plus category and budget edits. Adding or removing a category is online only** (confirmed). An edit is idempotent and last-write-wins, so it replays safely with no schema change. A new category has a server-generated id and no `ClientId`, so a replay would duplicate it and a queued transaction could not reference it; a removal depends on "no transactions", which the queue can invalidate. **For M6:** the UI must make this plain while offline: the add and remove controls are disabled with a visible reason, not hidden and not left to fail. Recorded in design section 7.
 7. **`Budget.Api.Tests` gets its own container fixture** rather than a shared test-support project. It is fifteen lines; a third project to share them is not worth the reference.
 8. **No `/auth/*` rate-limit policy until there is an `/auth/*` endpoint.**
