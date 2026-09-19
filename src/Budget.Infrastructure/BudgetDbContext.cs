@@ -55,6 +55,7 @@ public sealed class BudgetDbContext(DbContextOptions<BudgetDbContext> options, I
 
     // The domain entities have no setters for identity fields and create their own Guid keys,
     // so every get-only property is mapped explicitly (EF writes the backing field) and no key is store-generated.
+    // Foreign keys carry UserId, so the database itself refuses a row that points at another user's parent.
     protected override void OnModelCreating(ModelBuilder model)
     {
         model.Entity<User>(b =>
@@ -67,6 +68,7 @@ public sealed class BudgetDbContext(DbContextOptions<BudgetDbContext> options, I
             b.Property(x => x.TimeZone).HasMaxLength(64);
             b.Property(x => x.Currency).HasMaxLength(3);
             b.Property(x => x.CreatedAt);
+            b.HasIndex(x => x.ExternalId).IsUnique();
         });
 
         model.Entity<Cycle>(b =>
@@ -76,6 +78,7 @@ public sealed class BudgetDbContext(DbContextOptions<BudgetDbContext> options, I
             b.Property(x => x.Id).ValueGeneratedNever();
             b.Property(x => x.UserId);
             b.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+            b.HasIndex(x => new { x.UserId, x.StartDate }).IsUnique();
         });
 
         model.Entity<Category>(b =>
@@ -100,6 +103,12 @@ public sealed class BudgetDbContext(DbContextOptions<BudgetDbContext> options, I
             b.Property(x => x.Name).HasMaxLength(60);
             b.Property(x => x.Icon).HasMaxLength(40);
             b.Property(x => x.Colour).HasMaxLength(20);
+            b.HasOne<Cycle>().WithMany()
+                .HasForeignKey(x => new { x.UserId, x.CycleId }).HasPrincipalKey(x => new { x.UserId, x.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<Category>().WithMany()
+                .HasForeignKey(x => new { x.UserId, x.CategoryId }).HasPrincipalKey(x => new { x.UserId, x.Id })
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         model.Entity<Transaction>(b =>
@@ -112,6 +121,15 @@ public sealed class BudgetDbContext(DbContextOptions<BudgetDbContext> options, I
             b.Property(x => x.ClientId);
             b.Property(x => x.CreatedAt);
             b.Property(x => x.Note).HasMaxLength(280);
+
+            // One key does three jobs: the category must be in the transaction's cycle, a CycleCategory
+            // with transactions cannot be removed, and the index serves "transactions for this cycle and category".
+            b.HasOne<CycleCategory>().WithMany()
+                .HasForeignKey(x => new { x.UserId, x.CycleId, x.CategoryId })
+                .HasPrincipalKey(x => new { x.UserId, x.CycleId, x.CategoryId })
+                .OnDelete(DeleteBehavior.Restrict);
+            b.HasIndex(x => new { x.UserId, x.OccurredOn });
+            b.HasIndex(x => new { x.UserId, x.ClientId }).IsUnique();
         });
     }
 }

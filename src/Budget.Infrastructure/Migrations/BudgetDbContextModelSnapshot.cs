@@ -38,8 +38,6 @@ namespace Budget.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId");
-
                     b.ToTable("Category", (string)null);
                 });
 
@@ -67,7 +65,8 @@ namespace Budget.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId", "StartDate")
+                        .IsUnique();
 
                     b.ToTable("Cycle", (string)null);
                 });
@@ -110,6 +109,8 @@ namespace Budget.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("UserId", "CategoryId");
+
                     b.ToTable("CycleCategory", (string)null);
                 });
 
@@ -149,6 +150,13 @@ namespace Budget.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("UserId", "ClientId")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "OccurredOn");
+
+                    b.HasIndex("UserId", "CycleId", "CategoryId");
+
                     b.ToTable("Transaction", (string)null);
                 });
 
@@ -184,6 +192,10 @@ namespace Budget.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ExternalId")
+                        .IsUnique()
+                        .HasFilter("[ExternalId] IS NOT NULL");
+
                     b.ToTable("User", (string)null);
                 });
 
@@ -201,6 +213,33 @@ namespace Budget.Infrastructure.Migrations
                     b.HasOne("Budget.Domain.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Budget.Domain.CycleCategory", b =>
+                {
+                    b.HasOne("Budget.Domain.Category", null)
+                        .WithMany()
+                        .HasForeignKey("UserId", "CategoryId")
+                        .HasPrincipalKey("UserId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Budget.Domain.Cycle", null)
+                        .WithMany()
+                        .HasForeignKey("UserId", "CycleId")
+                        .HasPrincipalKey("UserId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Budget.Domain.Transaction", b =>
+                {
+                    b.HasOne("Budget.Domain.CycleCategory", null)
+                        .WithMany()
+                        .HasForeignKey("UserId", "CycleId", "CategoryId")
+                        .HasPrincipalKey("UserId", "CycleId", "CategoryId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
