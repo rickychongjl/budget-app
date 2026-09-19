@@ -81,6 +81,7 @@ One parameterised test per cell of the table in section 3.2:
 - Every future cycle is re-dated to keep the 30-day chain; past cycles are untouched.
 - Transactions are not touched (asserted by the absence of any transaction parameter, plus one test).
 - Works on a `Draft` first cycle (onboarding).
+- A new start whose `EndDate` would be before today throws; `EndDate == today` passes.
 
 ### 7. Rollover
 - Nothing due: returns no new cycles (idempotent).
@@ -89,7 +90,7 @@ One parameterised test per cell of the table in section 3.2:
 - If future cycles already exist and cover today, nothing is created.
 - Each new cycle gets a copy of the previous cycle's `CycleCategory` rows, including categories added mid-cycle.
 - New cycle's `OpeningBalance` equals the previous `ClosingBalance`, or null when that is not entered yet.
-- Setting a closing balance later pushes it into the next cycle's opening balance (see decision 2).
+- Setting a closing balance later pushes it into the next cycle's opening balance (see decision 1).
 
 ### 8. Rollup
 - Per category: `budgeted`, `actual` (sum, reversals subtract), `remaining = budgeted - actual`, `percentUsed`.
@@ -108,13 +109,16 @@ One parameterised test per cell of the table in section 3.2:
 2. Merge or close the five open Dependabot PRs before starting: three of them touch `Budget.Domain.Tests.csproj`, and the `coverlet.collector` one becomes moot after step 1.
 3. Update the CLAUDE.md commands block with the coverage command.
 
+## Decided
+
+- **Assertion library: FluentAssertions 8.** The Xceed licence is free for non-commercial use, and this is a personal site with one user. If the project ever becomes commercial, revisit (AwesomeAssertions is a drop-in fork). Add the package in slice 1; existing `Assert` calls in `ArchitectureTests` can stay.
+- **Moving the start date cannot make the current cycle past.** `MoveCurrentStart` rejects a new start whose `EndDate` would fall before today. Add this case to slice 6.
+
 ## Decisions needed
 
-Each has a recommendation, and work can start on slices 1 to 4 without any of them.
+Each has a recommendation, and none of them blocks slices 1 to 4.
 
-1. **Assertion library.** CLAUDE.md says FluentAssertions, but version 8 and later needs a paid licence for commercial use, and Dependabot will propose it. Options: pin FluentAssertions 7.x and ignore the major in `dependabot.yml`; use the AwesomeAssertions fork (same API, Apache 2.0); or stay on xUnit `Assert`, which M1 already uses. **Recommend AwesomeAssertions**: no licence question in a public portfolio repo and no pinning to maintain.
-2. **Opening balance "follows" the previous closing balance.** Store and push, or derive on read? **Recommend store and push**: `SetClosingBalance` on cycle N writes cycle N+1's `OpeningBalance`. It is a system write, so the past-cycle read-only rule does not block it. Consequence to accept: correcting a past closing balance overwrites an opening balance the user typed into the current cycle.
-3. **Can moving the start date turn the current cycle into a past one?** Moving the start far enough back puts `EndDate` before today. **Recommend rejecting it** (`EndDate` must stay `>= today`); otherwise one edit silently triggers a rollover.
-4. **Zero amounts.** **Recommend**: a zero transaction is rejected, a zero budget is allowed (a category you track but do not plan for).
-5. **`percentUsed` precision.** **Recommend** returning the unrounded ratio times 100 and letting the UI format it; rounding in the domain would only need undoing later.
-6. **Gaps and rollover.** After a start-date move leaves a gap, rollover still chains from the latest cycle (`StartDate + 30`), so the gap is permanent history and never back-filled. **Recommend accepting that**; it matches user story Settings 4.
+1. **Opening balance "follows" the previous closing balance.** Store and push, or derive on read? **Recommend store and push**: `SetClosingBalance` on cycle N writes cycle N+1's `OpeningBalance`. It is a system write, so the past-cycle read-only rule does not block it. Consequence to accept: correcting a past closing balance overwrites an opening balance the user typed into the current cycle.
+2. **Zero amounts.** **Recommend**: a zero transaction is rejected, a zero budget is allowed (a category you track but do not plan for).
+3. **`percentUsed` precision.** **Recommend** returning the unrounded ratio times 100 and letting the UI format it; rounding in the domain would only need undoing later.
+4. **Gaps and rollover.** After a start-date move leaves a gap, rollover still chains from the latest cycle (`StartDate + 30`), so the gap is permanent history and never back-filled. **Recommend accepting that**; it matches user story Settings 4.
