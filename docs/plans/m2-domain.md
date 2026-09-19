@@ -3,6 +3,19 @@
 Source: `docs/solution-design.md` section 3.2 and section 17 item 2. No UI, no DB, no EF, no Application code.
 Everything lands in `src/Budget.Domain` and `tests/Budget.Domain.Tests`, test first.
 
+## Status: implemented
+
+All eight slices and the coverage gate are in, one commit each. 117 tests, 99.65% line coverage on `Budget.Domain`.
+
+Where the code differs from the plan below:
+
+- `MoveCurrentStart(newStart, today)` became `MoveStart(cycle, newStart, today)`, so "past and future cycles throw" goes through the same `EnsureCanEdit` guard as everything else.
+- The editability guards are one method, `EnsureCanEdit(cycle, CycleEdit, today)`, with a `CycleEdit` enum for the rows of the table.
+- `Money.Validate` became three guards: `Money.Amount` (non-zero), `Money.Budget` (zero or more) and `Money.Balance` (any sign; overdrafts are real).
+- A `Draft` cycle skips the phase rules: it is freely editable during onboarding (including backdating its start) but takes no transactions. The "cannot end before today" rule applies to `Confirmed` cycles only.
+- The coverage gate lives in `Budget.Domain.Tests.csproj`, not on the command line, so plain `dotnet test` enforces it locally and in CI with no workflow change.
+- The four open decisions at the bottom were implemented as recommended.
+
 ## Done when
 
 - Every rule in section 3.2 that can be expressed without a database has a failing-then-passing unit test.
