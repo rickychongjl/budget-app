@@ -1,0 +1,6 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Budget.Application\Budget.Application.csproj" />
+  </ItemGroup>
+</Project>
