@@ -4,9 +4,15 @@ namespace Budget.Domain;
 public sealed class CycleCategory
 {
     public CycleCategory(Cycle cycle, Guid categoryId, string name, string icon, string colour, int sortOrder, decimal budgetAmount)
+        : this(cycle.UserId, cycle.Id, categoryId, name, icon, colour, sortOrder, budgetAmount)
     {
-        UserId = cycle.UserId;
-        CycleId = cycle.Id;
+    }
+
+    // Persistence rebuilds a row without its Cycle in hand.
+    private CycleCategory(Guid userId, Guid cycleId, Guid categoryId, string name, string icon, string colour, int sortOrder, decimal budgetAmount)
+    {
+        UserId = userId;
+        CycleId = cycleId;
         CategoryId = categoryId;
         Name = name;
         Icon = icon;

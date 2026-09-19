@@ -20,6 +20,11 @@ public sealed class Transaction
         UpdatedAt = now;
     }
 
+    // Persistence rebuilds a row without its Cycle in hand, then sets every property.
+    private Transaction()
+    {
+    }
+
     public Guid Id { get; } = Guid.NewGuid();
     public Guid UserId { get; }
 
