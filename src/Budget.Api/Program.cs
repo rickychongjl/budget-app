@@ -31,12 +31,13 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     o.Cookie.HttpOnly = true;
     // Always Secure, except in Development: curl and Safari will not send a Secure cookie back over http://localhost,
     // which is what docker compose and the Vite proxy use. There it follows the request, so https still gets Secure.
-    o.Cookie.SecurePolicy = builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
+    o.Cookie.SecurePolicy = Csrf.SecurePolicy(builder.Environment);
     o.Cookie.SameSite = SameSiteMode.Strict;
     o.Events.OnRedirectToLogin = context => Status(context.Response, StatusCodes.Status401Unauthorized);
     o.Events.OnRedirectToAccessDenied = context => Status(context.Response, StatusCodes.Status403Forbidden);
 }).AddEntraSignIn(builder.Configuration);
 builder.Services.AddAuthorization();
+builder.Services.AddCsrf(builder.Environment);
 builder.Services.AddBudgetRateLimiting(builder.Configuration);
 
 var app = builder.Build();
@@ -53,9 +54,10 @@ app.MapGet("/health", () => Results.Ok());
 app.MapGet("/health/ready", async (BudgetDbContext db, CancellationToken ct) =>
     await db.Database.CanConnectAsync(ct) ? Results.Ok() : Results.StatusCode(StatusCodes.Status503ServiceUnavailable));
 
+app.MapCsrf();
 app.MapAuth(app.Configuration);
 
-var api = app.MapGroup("/api").RequireAuthorization();
+var api = app.MapGroup("/api").RequireAuthorization().RequireCsrfToken();
 api.MapMe();
 api.MapCycles();
 api.MapCategories();

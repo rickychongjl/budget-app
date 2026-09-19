@@ -12,7 +12,7 @@ internal static class AuthEndpoints
     // /auth/callback is not here: the OpenID Connect middleware answers it before routing, under the global limit only.
     public static void MapAuth(this IEndpointRouteBuilder app, IConfiguration configuration)
     {
-        var auth = app.MapGroup("/auth").RequireRateLimiting(RateLimiting.AuthPolicy);
+        var auth = app.MapGroup("/auth").RequireRateLimiting(RateLimiting.AuthPolicy).RequireCsrfToken();
 
         if (EntraSignIn.IsConfigured(configuration))
         {

@@ -25,7 +25,7 @@ public sealed class DemoSessionTests(ApiFactory api)
     public async Task A_demo_session_signs_in_with_a_hardened_cookie_and_logout_ends_it()
     {
         await EnsureDemoUserAsync();
-        var client = api.CreateClient(Https);
+        var client = api.CsrfClient(Https);
 
         var signIn = await client.PostAsync("/auth/demo", null);
 
@@ -43,18 +43,37 @@ public sealed class DemoSessionTests(ApiFactory api)
     // Clients will not send a Secure cookie back over plain http, which is what local development uses.
     // So Development follows the request scheme, and everything else is Secure no matter how the request arrived.
     [Theory]
-    [InlineData("Production", true)]
-    [InlineData("Development", false)]
-    public async Task Over_plain_http_the_cookie_is_secure_everywhere_except_development(string environment, bool secure)
+    [InlineData("Production", "https://localhost", true)]
+    [InlineData("Development", "https://localhost", true)]
+    [InlineData("Development", "http://localhost", false)]
+    public async Task The_cookie_is_secure_except_over_plain_http_in_development(string environment, string address, bool secure)
     {
         await EnsureDemoUserAsync();
         await using var host = api.WithWebHostBuilder(b => b.UseEnvironment(environment));
 
-        var signIn = await host.CreateClient().PostAsync("/auth/demo", null);
+        var signIn = await host.CsrfClient(new() { BaseAddress = new Uri(address) }).PostAsync("/auth/demo", null);
 
         var cookie = signIn.Headers.GetValues("Set-Cookie").Single().ToLowerInvariant();
         cookie.Contains("; secure").Should().Be(secure);
         cookie.Should().Contain("httponly").And.Contain("samesite=strict");
+    }
+
+    // Outside Development the antiforgery system refuses to work without TLS, so a session cannot even be started.
+    // Behind a proxy that terminates TLS this is what a missing forwarded-headers setup looks like: loud, not insecure.
+    [Fact]
+    public async Task In_production_plain_http_gets_no_token_and_no_session()
+    {
+        await EnsureDemoUserAsync();
+        await using var host = api.WithWebHostBuilder(b => b.UseEnvironment("Production"));
+        var client = host.CreateClient();
+
+        var csrf = await client.GetAsync("/auth/csrf");
+        var signIn = await client.PostAsync("/auth/demo", null);
+
+        csrf.IsSuccessStatusCode.Should().BeFalse();
+        csrf.Headers.Contains("Set-Cookie").Should().BeFalse();
+        signIn.IsSuccessStatusCode.Should().BeFalse();
+        signIn.Headers.Contains("Set-Cookie").Should().BeFalse();
     }
 
     [Fact]
@@ -62,7 +81,7 @@ public sealed class DemoSessionTests(ApiFactory api)
     {
         await EnsureDemoUserAsync();
 
-        var signIn = await api.CreateClient(Https).PostAsync("/auth/demo", null);
+        var signIn = await api.CsrfClient(Https).PostAsync("/auth/demo", null);
 
         var expires = signIn.Headers.GetValues("Set-Cookie").Single().Split(';').Select(p => p.Trim()).Single(p => p.StartsWith("expires=", StringComparison.OrdinalIgnoreCase));
         var at = DateTimeOffset.Parse(expires["expires=".Length..]);
@@ -74,7 +93,7 @@ public sealed class DemoSessionTests(ApiFactory api)
     {
         await EnsureDemoUserAsync();
         await using var strict = api.WithWebHostBuilder(b => b.UseSetting("RateLimiting:AuthPermitLimit", "2"));
-        var client = strict.CreateClient(Https);
+        var client = strict.CsrfClient(Https);
 
         (await client.PostAsync("/auth/demo", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
         (await client.PostAsync("/auth/demo", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);

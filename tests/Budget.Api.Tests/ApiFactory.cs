@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Mvc.Testing.Handlers;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -42,6 +43,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("ConnectionStrings:Budget", connectionString.ConnectionString);
         // Every test shares one address, so the production limit would trip halfway through the run. RateLimitTests lowers it again.
         builder.UseSetting("RateLimiting:PermitLimit", "1000000");
+        builder.UseSetting("RateLimiting:AuthPermitLimit", "1000000");
 
         builder.ConfigureTestServices(services => services
             .AddAuthentication(TestAuth.SchemeName)
@@ -73,10 +75,49 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     public HttpClient ClientFor(User user)
     {
-        var client = CreateClient();
+        var client = this.CsrfClient();
         client.DefaultRequestHeaders.Add(TestAuth.Header, user.Id.ToString());
         return client;
     }
+}
+
+// Does what the SPA's fetch wrapper does: gets an antiforgery token for whoever the client currently is and sends it with a write.
+// It fetches before every write rather than caching, so a test can sign in or out and carry on. CsrfTests use plain clients instead.
+internal sealed class CsrfHandler : DelegatingHandler
+{
+    public const string Header = "X-XSRF-TOKEN";
+
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+    {
+        if (request.Method != HttpMethod.Get && !request.Headers.Contains(Header))
+        {
+            var fetch = new HttpRequestMessage(HttpMethod.Get, new Uri(request.RequestUri!, "/auth/csrf"));
+            if (request.Headers.TryGetValues(TestAuth.Header, out var user))
+            {
+                fetch.Headers.Add(TestAuth.Header, user);
+            }
+
+            if (RequestToken(await base.SendAsync(fetch, ct)) is { } token)
+            {
+                request.Headers.Add(Header, token);
+            }
+        }
+
+        return await base.SendAsync(request, ct);
+    }
+
+    public static string? RequestToken(HttpResponseMessage response) =>
+        response.Headers.TryGetValues("Set-Cookie", out var cookies)
+            && cookies.FirstOrDefault(c => c.StartsWith("XSRF-TOKEN=", StringComparison.Ordinal)) is { } cookie
+            ? Uri.UnescapeDataString(cookie["XSRF-TOKEN=".Length..cookie.IndexOf(';')])
+            : null;
+}
+
+internal static class CsrfClientExtensions
+{
+    // The token fetch has to pass through the cookie handler too, so the antiforgery cookie is kept and sent back.
+    public static HttpClient CsrfClient(this WebApplicationFactory<Program> host, WebApplicationFactoryClientOptions? options = null) =>
+        host.CreateDefaultClient((options ?? new()).BaseAddress, new CsrfHandler(), new CookieContainerHandler());
 }
 
 // Lets a test act as any user without signing in: only the demo user can get a real cookie until Entra arrives in M5.
