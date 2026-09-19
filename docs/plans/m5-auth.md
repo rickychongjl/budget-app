@@ -1,5 +1,24 @@
 # M5 plan: Auth (Entra BFF login, `oid` allowlist, Data Protection, demo fixture, jobs)
 
+## Status: implemented, except the manual Entra steps
+
+All slices are in. 303 tests: Domain 119, Application 82, Infrastructure 34, API 68 (the last two against a SQL Server 2022 container). Line coverage: Application 95.23%, Domain 98.66%. `docker compose up -d --build` was run for real: `migrate` applied the migrations, ensured the users and seeded the demo; a curl session got `404` from `/auth/login` (Entra unconfigured), `400` from `/auth/demo` without an antiforgery token and `204` with one, read the seeded current cycle, added a transaction (11 to 12), and `reset-demo` put it back to 11; `rollover` ran per user with no failures.
+
+Not done, and not doable from here: the Entra tenant and app registration (see "Manual steps" at the end). Until then the real sign-in is proven only by the tests, which run the real OpenID Connect middleware against an in-memory tenant.
+
+Where the code differs from the plan below:
+
+- **Plain `AddOpenIdConnect`, not `Microsoft.Identity.Web`** (decision 7's fallback, taken before writing code rather than after a fight). `Microsoft.Identity.Web`'s issuer validator fetches Entra metadata over the network with its own HTTP client, so the no-network callback test would have had to swap the production validator out, which is the thing under test. For one tenant the plain handler is the same flow: code + PKCE by default, issuer pinned by the tenant authority's metadata. It also drops MSAL from the dependency tree.
+- **Outside Development, antiforgery refuses to work without TLS**, so over plain http there is no token and no session at all (it throws, which is a `500`). The M4 test that pinned "Production is `Secure` even over http" became "Production over http gets nothing". **This makes M9's forwarded headers mandatory, not optional:** behind the Container Apps ingress the app sees http until `X-Forwarded-Proto` is honoured, and every write would fail.
+- Sign-in failures are two codes, both `403`: `auth.not-allowed` (the `oid` is not on the allowlist, or has no row) and `auth.failed` (anything else in the round trip: bad signature, cancelled, replayed state).
+- `/auth/callback` is answered by the OpenID Connect middleware, not an endpoint, so it is under the global rate limit but not the strict `/auth` policy, and it is not antiforgery-checked (it is protected by the handler's own state and nonce cookies).
+- `Auth:AllowedOids` is one comma-separated setting (`Auth__AllowedOids`), so the API and the jobs read the same variable the same way. Oids are compared and stored lower-case.
+- Data Protection: the blob test was written, then removed. A host with `DataProtection:BlobUri` set warms the key ring at startup with a real call to Azure (40 seconds and a real network call per run). Only "unset means local" is tested; the `ponytail:` note in `DataProtectionTests` names Azurite as the upgrade.
+- The API tests keep the real antiforgery check on for the whole suite: `ClientFor` and `CsrfClient` fetch a token before each write, like the SPA wrapper will. `CsrfTests` use plain clients. The shared host's `/auth` limit is raised like the global one, because every test shares an address.
+- The fixture places a transaction by day offset, not by cycle index: it lands in whichever cycle covers its day.
+- Slices 1-2 and 7-8 were committed as pairs (they share the DI registration and the job host). Red-first was seen for slice 3 (the five sign-in tests failed on a metadata fetch until the test used a static configuration manager) and slice 4 (rate limit and TLS findings above); the rest could not compile until the code existed.
+- The https launch profile moved from port 7148 to 5001 to match the redirect URI in the design, and `Budget.Api` has a `UserSecretsId`.
+
 ## Context
 
 M4 left the API reachable only through the demo session: the production cookie scheme is registered (`src/Budget.Api/Program.cs`), `/auth/demo` and `/auth/logout` issue and clear it, but nothing signs the real user in. M5 (design section 17 item 5, sections 5 and 6 "Auth" row) adds the real issuer, and picks up what M4 explicitly deferred to it: `/auth/login` + `/auth/callback`, the `oid` allowlist, anti-forgery, Data Protection keys in Blob Storage, `demo-seed.json`, the `reset-demo` job and the `rollover` job entry point.
@@ -89,9 +108,11 @@ First implementation step is to commit this plan as `docs/plans/m5-auth.md` (sam
 
 ### 9. Docs
 - `docs/plans/m5-auth.md` status section; CLAUDE.md commands (`rollover`, `reset-demo`, user-secrets for Entra); design doc deltas (anti-forgery mechanism, `RealUsers`, `/auth/login` `404` when unconfigured); `.env.example` gains the optional `AUTH_ALLOWED_OIDS`.
-- Manual steps for Ricky: Entra tenant, single-tenant app registration, redirect URIs `https://localhost:5001/auth/callback` and the production one, ID tokens only, client secret into `dotnet user-secrets`, own `oid` into `Auth:AllowedOids`.
+- Manual steps: see the end of this document.
 
-## Decisions to confirm
+## Decisions taken
+
+Reviewed on 2026-09-20. Decision 1 changed on review from a constant custom header to antiforgery tokens; decision 7 took its fallback (see Status).
 
 1. **Anti-forgery is ASP.NET Core's antiforgery tokens** (changed on review, 2026-09-20; first draft was a constant custom header). The header relies only on the browser's CORS rules and silently stops protecting if a permissive CORS policy is ever added; the token does not. Cost is one `GET /auth/csrf` per app load and a refetch-and-retry in the M6 fetch wrapper, which the offline replay shares.
 2. **The real `User` row is created by `migrate` from the allowlist**, keeping "the app never creates users". The alternative, creating it on first login, is a registration path by another name. `migrate` runs every deploy and is idempotent: it creates the demo row and one row per allowlisted `oid` only when missing. Login only looks up, so a sign-in needs both the allowlist entry and the row. Adding a person later is a config change plus a deploy.
@@ -106,3 +127,21 @@ First implementation step is to commit this plan as `docs/plans/m5-auth.md` (sam
 - `dotnet build -warnaserror`; `dotnet test` (Docker running); coverage gate in the Domain and Application csproj.
 - `docker compose up -d --build` and the curl session in slice 8.
 - After Ricky's app registration: `dotnet run --project src/Budget.Api` on `https://localhost:5001`, browse `/auth/login`, sign in, `GET /api/me` shows `isDemo: false`; a second Entra account (or an emptied allowlist) gets `403`.
+
+## Manual steps (Ricky, once)
+
+Nothing in the repo can do these, and nothing else in M5 waits on them.
+
+1. Create the free Entra ID tenant (design 5.1), one user in it, Security Defaults on, passkey registered.
+2. App registration: single tenant, platform **Web**, redirect URIs `https://localhost:5001/auth/callback` and `https://<domain>/auth/callback`. Leave both implicit-grant boxes unticked: the code flow gets the ID token from the token endpoint. No API permissions beyond the default `openid profile` sign-in (the `oid` claim comes with `profile`).
+3. Create a client secret. Locally everything goes in user-secrets, never in a file:
+   ```
+   dotnet user-secrets set "Entra:TenantId" "<tenant id>" --project src/Budget.Api
+   dotnet user-secrets set "Entra:ClientId" "<application id>" --project src/Budget.Api
+   dotnet user-secrets set "Entra:ClientSecret" "<secret>" --project src/Budget.Api
+   dotnet user-secrets set "Auth:AllowedOids" "<your object id>" --project src/Budget.Api
+   dotnet user-secrets set "ConnectionStrings:Budget" "Server=localhost;Database=budget;User Id=sa;Password=<from .env>;TrustServerCertificate=true" --project src/Budget.Api
+   ```
+   Your object id is on your user's page in the Entra portal. In production these are Container Apps secrets (M9).
+4. Put the same object id in `.env` as `AUTH_ALLOWED_OIDS`, then `docker compose up -d --build` so `migrate` creates your `User` row.
+5. `dotnet run --project src/Budget.Api --launch-profile https`, browse `https://localhost:5001/auth/login`, sign in, then `https://localhost:5001/api/me` shows `isDemo: false`. With the allowlist emptied the callback is `403 auth.not-allowed`.

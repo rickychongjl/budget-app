@@ -54,6 +54,8 @@ Domain  <-  Application  <-  Infrastructure  <-  Api
 - Transactions carry a `ClientId` (idempotency key for offline sync); `(UserId, ClientId)` is unique.
 - Migrations must be backward-compatible with the previous app version (expand, migrate, contract): the migration job runs before the new revision goes live.
 - Errors are RFC 9457 `application/problem+json`. Validation lives in Application.
+- Users are never created at request time. `migrate` ensures the demo row and one row per `oid` in `Auth:AllowedOids`; an Entra sign-in needs both the allowlist entry and the row (`Login`), otherwise `403`.
+- Every non-GET under `/api` and the `/auth` POSTs is antiforgery-checked (`RequireCsrfToken`): the client gets a token from `GET /auth/csrf` (again after signing in or out) and sends it as `X-XSRF-TOKEN`. A new route group for writes must opt in. Outside Development antiforgery needs the request to be https.
 - No PII in logs.
 
 ## UI work
@@ -117,13 +119,17 @@ npm run dev                                   # Vite; proxies /api and /auth to 
 docker compose up -d --build                  # sql, then migrate (runs once), then api on http://localhost:8080; needs .env (see .env.example)
 docker compose down
 
+# Jobs (same image; migrate also seeds the demo from tests/e2e/fixtures/demo-seed.json when it is empty)
+docker compose run --rm --entrypoint "dotnet jobs/Budget.Jobs.dll reset-demo" migrate
+docker compose run --rm --entrypoint "dotnet jobs/Budget.Jobs.dll rollover" migrate
+
 # E2E (against docker compose)
 npx playwright test --config tests/e2e/playwright.config.ts
 ```
 
 Planned convenience targets (`make`/`just` or npm scripts; not yet created, check before assuming they exist): `up`, `test`, `test:e2e`, `migrate`, `rollover`, `reset-demo`. No scheduler runs locally; rollover happens through the request-time fallback.
 
-Local auth: use the demo session (`POST /auth/demo`). There is deliberately no dev-login endpoint.
+Local auth: use the demo session (`GET /auth/csrf`, then `POST /auth/demo` with the token). There is deliberately no dev-login endpoint. Entra sign-in works locally on `https://localhost:5001` once `Entra:*` and `Auth:AllowedOids` are in user-secrets (`docs/plans/m5-auth.md`, "Manual steps"); without them `/auth/login` is `404`.
 
 ## Decisions not to re-litigate
 

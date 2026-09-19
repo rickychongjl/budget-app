@@ -184,8 +184,9 @@ All endpoints under `/api`, JSON, cookie-authenticated, versioned via URL prefix
 | `DELETE` | `/api/transactions/{id}` | Delete |
 | `POST` | `/api/sync` | Batch of offline mutations, applied in order, returns per-item result |
 | `GET` | `/api/reports/cycles` | Per cycle: total spend, spend per category, opening, closing, accrued. The client filters the line graph |
-| `GET` | `/auth/login` | Redirect to Entra (OIDC) |
-| `GET` | `/auth/callback` | OIDC redirect URI |
+| `GET` | `/auth/login` | Redirect to Entra (OIDC). `404` when Entra is not configured (local compose, tests) |
+| `POST` | `/auth/callback` | OIDC redirect URI (`form_post`), answered by the OpenID Connect middleware |
+| `GET` | `/auth/csrf` | Issue the antiforgery token pair for the current caller; the request token is in a readable `XSRF-TOKEN` cookie |
 | `POST` | `/auth/logout` | Clear session |
 | `POST` | `/auth/demo` | Issue a demo session (rate-limited) |
 | `GET` | `/health` | Liveness (no DB touch) |
@@ -208,7 +209,7 @@ Errors use RFC 9457 `application/problem+json`. Validation via FluentValidation 
 
 The server, not the browser, performs OpenID Connect:
 
-1. `/auth/login` redirects to Entra with authorization-code flow + PKCE (`Microsoft.Identity.Web`).
+1. `/auth/login` redirects to Entra with authorization-code flow + PKCE (ASP.NET Core's OpenID Connect handler against the tenant's own authority; `Microsoft.Identity.Web` was dropped in M5 because its issuer validation cannot run without the network, see `docs/plans/m5-auth.md`).
 2. Entra redirects to `/auth/callback` with a one-time code.
 3. The API exchanges the code for tokens server-to-server, validates the ID token, maps `oid` → `User.Id`.
 4. The API issues an ASP.NET cookie: `HttpOnly`, `Secure`, `SameSite=Strict`, sliding expiry 30 days, encrypted/signed with Data Protection.
@@ -235,9 +236,9 @@ Key ring persisted to Azure Blob Storage (`PersistKeysToAzureBlobStorage`) so co
 | Layer | Control |
 |---|---|
 | Edge | Cloudflare proxied DNS: WAF managed rules, bot fight mode, DDoS, origin IP hidden. ACA ingress restricted to Cloudflare IP ranges. |
-| Transport | HTTPS only, HSTS (preload after first month), TLS 1.2+. |
+| Transport | HTTPS only, HSTS (preload after first month), TLS 1.2+. TLS ends at the ingress, so the app must honour `X-Forwarded-Proto` (M9): outside Development antiforgery refuses requests it sees as plain http, and every write would fail. |
 | Headers | CSP (self + inline hashes for Vite), `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `frame-ancestors 'none'`. |
-| Auth | Single-tenant Entra + `oid` allowlist, MFA, passkey, BFF cookie, anti-forgery on state-changing requests. |
+| Auth | Single-tenant Entra + `oid` allowlist, MFA, passkey, BFF cookie, anti-forgery on state-changing requests (ASP.NET Core antiforgery: token from `GET /auth/csrf`, sent back as `X-XSRF-TOKEN` on every non-GET; bound to the signed-in user, so it is fetched again after sign-in and sign-out). |
 | Rate limiting | ASP.NET `RateLimiter`: global per-IP sliding window; stricter on `/auth/*`. |
 | Data | Tenant filter on every query; parameterised queries via EF; `decimal` money; no PII in logs. |
 | Database | Not publicly reachable; firewall = "Allow Azure services" only; TDE at rest (default); 7-day PITR (Basic). |
