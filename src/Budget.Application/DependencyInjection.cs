@@ -9,6 +9,7 @@ public static class DependencyInjection
         .AddScoped<UserToday>()
         .AddScoped<CycleFinder>()
         .AddScoped<CycleCategories>()
+        .AddScoped<Transactions>()
         .AddScoped<Me>()
         .AddScoped<RolloverCycles>()
         .AddScoped<Cycles>();
