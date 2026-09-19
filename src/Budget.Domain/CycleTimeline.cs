@@ -24,4 +24,48 @@ public sealed class CycleTimeline
 
         return cycle.StartDate == current.StartDate ? CyclePhase.Current : CyclePhase.Future;
     }
+
+    public void EnsureCanEdit(Cycle cycle, CycleEdit edit, DateOnly today)
+    {
+        // Onboarding: the draft is set up freely, wherever its dates fall, but takes no transactions.
+        if (cycle.Status == CycleStatus.Draft)
+        {
+            if (edit == CycleEdit.Transactions)
+            {
+                throw new DomainException("cycle.draft", "Transactions need a confirmed cycle.");
+            }
+
+            return;
+        }
+
+        var phase = PhaseOf(cycle, today);
+        var allowed = phase switch
+        {
+            CyclePhase.Past => edit is CycleEdit.ClosingBalance or CycleEdit.Transactions,
+            CyclePhase.Future => edit is CycleEdit.Categories,
+            _ => true,
+        };
+
+        if (!allowed)
+        {
+            throw new DomainException(
+                phase == CyclePhase.Past ? "cycle.past.readonly" : "cycle.future.readonly",
+                $"{edit} cannot be changed on a {phase.ToString().ToLowerInvariant()} cycle.");
+        }
+    }
+
+    // A past-cycle transaction write is allowed, but the UI should prompt for a closing balance update.
+    public bool RequiresClosingBalanceReview(Cycle cycle, DateOnly today) => PhaseOf(cycle, today) == CyclePhase.Past;
+
+    public void SetOpeningBalance(Cycle cycle, decimal amount, DateOnly today)
+    {
+        EnsureCanEdit(cycle, CycleEdit.OpeningBalance, today);
+        cycle.SetOpeningBalance(Money.Balance(amount));
+    }
+
+    public void SetClosingBalance(Cycle cycle, decimal amount, DateOnly today)
+    {
+        EnsureCanEdit(cycle, CycleEdit.ClosingBalance, today);
+        cycle.SetClosingBalance(Money.Balance(amount));
+    }
 }
