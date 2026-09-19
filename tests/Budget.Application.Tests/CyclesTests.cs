@@ -13,7 +13,7 @@ public sealed class CyclesTests
     {
         var clock = new FixedClock(new DateTimeOffset(year, month, day, 1, 0, 0, TimeSpan.Zero));
         var today = new UserToday(_store, _store, clock);
-        return new Cycles(_store, _store, _store, _store, _store, today, new RolloverCycles(_store, _store, today, _store), _log);
+        return new Cycles(_store, _store, _store, _store, _store, new CycleFinder(_store, today), new RolloverCycles(_store, _store, today, _store), _log);
     }
 
     private Cycle Confirmed(User user, DateOnly start)

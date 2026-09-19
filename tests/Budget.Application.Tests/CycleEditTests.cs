@@ -12,7 +12,7 @@ public sealed class CycleEditTests
     private Cycles Sut()
     {
         var today = new UserToday(_store, _store, new FixedClock(new DateTimeOffset(2026, 2, 10, 1, 0, 0, TimeSpan.Zero)));
-        return new Cycles(_store, _store, _store, _store, _store, today, new RolloverCycles(_store, _store, today, _store), new ListLogger<Cycles>());
+        return new Cycles(_store, _store, _store, _store, _store, new CycleFinder(_store, today), new RolloverCycles(_store, _store, today, _store), new ListLogger<Cycles>());
     }
 
     private (Cycle Past, Cycle Current, Cycle Future) Chain()

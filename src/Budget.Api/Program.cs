@@ -47,6 +47,7 @@ app.MapGet("/health/ready", async (BudgetDbContext db, CancellationToken ct) =>
 var api = app.MapGroup("/api").RequireAuthorization();
 api.MapMe();
 api.MapCycles();
+api.MapCategories();
 // An unmatched /api path is a 404 for a signed-in caller and a 401 for anyone else, never the SPA's index.html.
 api.MapFallback(() => Results.NotFound());
 

@@ -21,21 +21,20 @@ public sealed class Cycles(
     ICycleRepository cycles,
     ICategoryRepository categories,
     ITransactionRepository transactions,
-    UserToday today,
+    CycleFinder finder,
     RolloverCycles rollover,
     ILogger<Cycles> logger)
 {
     public async Task<IReadOnlyList<CycleDto>> ListAsync(CancellationToken ct = default)
     {
-        var now = await today.GetAsync(ct);
-        var timeline = new CycleTimeline(await cycles.ListAsync(ct));
-        return [.. timeline.Cycles.Select(c => ToDto(c, timeline, now))];
+        var (timeline, today) = await finder.TimelineAsync(ct);
+        return [.. timeline.Cycles.Select(c => ToDto(c, timeline, today))];
     }
 
     public async Task<CycleSummaryDto> GetAsync(Guid id, CancellationToken ct = default)
     {
-        var (cycle, timeline, now) = await FindAsync(id, ct);
-        return await SummaryAsync(cycle, timeline, now, ct);
+        var (cycle, timeline, today) = await finder.FindAsync(id, ct);
+        return await SummaryAsync(cycle, timeline, today, ct);
     }
 
     // The fallback rollover trigger: a late or failed job must never leave the app without a current cycle.
@@ -47,10 +46,9 @@ public sealed class Cycles(
             logger.LogWarning("Rollover fallback created {Count} cycle(s) at request time; the rollover job is behind.", created);
         }
 
-        var now = await today.GetAsync(ct);
-        var timeline = new CycleTimeline(await cycles.ListAsync(ct));
-        var current = timeline.Current(now) ?? throw new NotFoundException("cycle.none", "There is no current cycle yet.");
-        return await SummaryAsync(current, timeline, now, ct);
+        var (timeline, today) = await finder.TimelineAsync(ct);
+        var current = timeline.Current(today) ?? throw new NotFoundException("cycle.none", "There is no current cycle yet.");
+        return await SummaryAsync(current, timeline, today, ct);
     }
 
     // Onboarding only. Every later cycle comes from RolloverCycles.
@@ -58,10 +56,10 @@ public sealed class Cycles(
     {
         CreateCycleValidator.Instance.ValidateAndThrow(request);
 
-        var now = await today.GetAsync(ct);
+        var (existing, today) = await finder.TimelineAsync(ct);
         // ponytail: two simultaneous first requests with different start dates would both pass this check.
         // One person onboarding once does not do that; a filtered unique index on Draft would close it.
-        if ((await cycles.ListAsync(ct)).Count > 0)
+        if (existing.Cycles.Count > 0)
         {
             throw new DomainException("cycle.exists", "The first cycle already exists; later cycles are created automatically.");
         }
@@ -70,64 +68,56 @@ public sealed class Cycles(
         var timeline = new CycleTimeline([cycle]);
         if (request.OpeningBalance is { } opening)
         {
-            timeline.SetOpeningBalance(cycle, opening, now);
+            timeline.SetOpeningBalance(cycle, opening, today);
         }
 
         cycles.Add(cycle);
         await unitOfWork.SaveChangesAsync(ct);
-        return ToDto(cycle, timeline, now);
+        return ToDto(cycle, timeline, today);
     }
 
     public async Task<CycleDto> ConfirmAsync(Guid id, CancellationToken ct = default)
     {
-        var (cycle, timeline, now) = await FindAsync(id, ct);
+        var (cycle, timeline, today) = await finder.FindAsync(id, ct);
         cycle.Confirm();
         await unitOfWork.SaveChangesAsync(ct);
-        return ToDto(cycle, timeline, now);
+        return ToDto(cycle, timeline, today);
     }
 
     public async Task<CycleDto> UpdateAsync(Guid id, UpdateCycleRequest request, CancellationToken ct = default)
     {
         UpdateCycleValidator.Instance.ValidateAndThrow(request);
 
-        var (cycle, timeline, now) = await FindAsync(id, ct);
+        var (cycle, timeline, today) = await finder.FindAsync(id, ct);
         if (request.StartDate is { } start)
         {
-            timeline.MoveStart(cycle, start, now);
+            timeline.MoveStart(cycle, start, today);
         }
 
         if (request.OpeningBalance is { } opening)
         {
-            timeline.SetOpeningBalance(cycle, opening, now);
+            timeline.SetOpeningBalance(cycle, opening, today);
         }
 
         if (request.ClosingBalance is { } closing)
         {
-            timeline.SetClosingBalance(cycle, closing, now);
+            timeline.SetClosingBalance(cycle, closing, today);
         }
 
         await unitOfWork.SaveChangesAsync(ct);
-        return ToDto(cycle, timeline, now);
+        return ToDto(cycle, timeline, today);
     }
 
-    private async Task<(Cycle Cycle, CycleTimeline Timeline, DateOnly Today)> FindAsync(Guid id, CancellationToken ct)
-    {
-        var now = await today.GetAsync(ct);
-        var timeline = new CycleTimeline(await cycles.ListAsync(ct));
-        var cycle = timeline.Cycles.SingleOrDefault(c => c.Id == id) ?? throw new NotFoundException("cycle.not-found", "Cycle not found.");
-        return (cycle, timeline, now);
-    }
-
-    private async Task<CycleSummaryDto> SummaryAsync(Cycle cycle, CycleTimeline timeline, DateOnly now, CancellationToken ct)
+    private async Task<CycleSummaryDto> SummaryAsync(Cycle cycle, CycleTimeline timeline, DateOnly today, CancellationToken ct)
     {
         var rollup = CycleRollup.Calculate(
             cycle,
             await categories.ListForCycleAsync(cycle.Id, ct),
             await categories.ListAsync(ct),
             await transactions.ListForCycleAsync(cycle.Id, null, ct));
-        return new CycleSummaryDto(ToDto(cycle, timeline, now), rollup);
+        return new CycleSummaryDto(ToDto(cycle, timeline, today), rollup);
     }
 
-    private static CycleDto ToDto(Cycle cycle, CycleTimeline timeline, DateOnly now) =>
-        new(cycle.Id, cycle.StartDate, cycle.EndDate, cycle.Status, timeline.PhaseOf(cycle, now), cycle.OpeningBalance, cycle.ClosingBalance);
+    private static CycleDto ToDto(Cycle cycle, CycleTimeline timeline, DateOnly today) =>
+        new(cycle.Id, cycle.StartDate, cycle.EndDate, cycle.Status, timeline.PhaseOf(cycle, today), cycle.OpeningBalance, cycle.ClosingBalance);
 }
