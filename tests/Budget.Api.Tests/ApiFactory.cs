@@ -39,6 +39,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     {
         var connectionString = new SqlConnectionStringBuilder(_container.GetConnectionString()) { InitialCatalog = "budget" };
         builder.UseSetting("ConnectionStrings:Budget", connectionString.ConnectionString);
+        // Every test shares one address, so the production limit would trip halfway through the run. RateLimitTests lowers it again.
+        builder.UseSetting("RateLimiting:PermitLimit", "1000000");
 
         builder.ConfigureTestServices(services => services
             .AddAuthentication(TestAuth.SchemeName)

@@ -31,11 +31,14 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     o.Events.OnRedirectToAccessDenied = context => Status(context.Response, StatusCodes.Status403Forbidden);
 });
 builder.Services.AddAuthorization();
+builder.Services.AddBudgetRateLimiting(builder.Configuration);
 
 var app = builder.Build();
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+// Before authentication, so a flood of anonymous requests is limited too.
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
