@@ -14,6 +14,7 @@ public sealed class CycleCategories(
     ICategoryRepository categories,
     ITransactionRepository transactions,
     CycleFinder finder,
+    DemoCaps demoCaps,
     TimeProvider clock)
 {
     public async Task<CycleCategoryDto> AddAsync(Guid cycleId, AddCategoryRequest request, CancellationToken ct = default)
@@ -34,6 +35,7 @@ public sealed class CycleCategories(
         }
         else
         {
+            await demoCaps.EnsureCanAddCategoryAsync(ct);
             category = new Category(currentUser.Id, request.Type!.Value, clock.GetUtcNow());
             categories.Add(category);
         }

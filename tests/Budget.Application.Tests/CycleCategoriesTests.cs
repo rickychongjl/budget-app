@@ -13,7 +13,7 @@ public sealed class CycleCategoriesTests
     private CycleCategories Sut()
     {
         var clock = new FixedClock(Now);
-        return new CycleCategories(_store, _store, _store, _store, new CycleFinder(_store, new UserToday(_store, _store, clock)), clock);
+        return new CycleCategories(_store, _store, _store, _store, new CycleFinder(_store, new UserToday(_store, _store, clock)), new DemoCaps(_store, _store, _store, _store), clock);
     }
 
     private (Cycle Past, Cycle Current, Cycle Future) Chain()

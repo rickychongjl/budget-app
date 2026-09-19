@@ -18,6 +18,8 @@ public sealed class TransactionRepository(BudgetDbContext db) : ITransactionRepo
     public Task<Transaction?> GetByClientIdAsync(Guid clientId, CancellationToken ct = default) =>
         db.Transactions.SingleOrDefaultAsync(t => t.ClientId == clientId, ct);
 
+    public Task<int> CountAsync(CancellationToken ct = default) => db.Transactions.CountAsync(ct);
+
     public Task<bool> AnyForCategoryAsync(Guid cycleId, Guid categoryId, CancellationToken ct = default) =>
         db.Transactions.AnyAsync(t => t.CycleId == cycleId && t.CategoryId == categoryId, ct);
 

@@ -9,7 +9,7 @@ public sealed class TransactionsTests
     private readonly FakeStore _store = new();
     private FixedClock _clock = new(Now);
 
-    private Transactions Sut() => new(_store, _store, _store, new CycleFinder(_store, new UserToday(_store, _store, _clock)), _clock);
+    private Transactions Sut() => new(_store, _store, _store, new CycleFinder(_store, new UserToday(_store, _store, _clock)), new DemoCaps(_store, _store, _store, _store), _clock);
 
     // 10 Feb 2026 in Sydney: past (1 Jan), current (31 Jan) and future (2 Mar), each with the same Groceries category.
     private (Cycle Past, Cycle Current, Cycle Future, Guid CategoryId) Chain()

@@ -65,6 +65,7 @@ internal sealed class FakeStore : ICurrentUser, IUnitOfWork, IUserRepository, IC
     Task<Transaction?> ITransactionRepository.GetAsync(Guid id, CancellationToken ct) => Task.FromResult(Transactions.SingleOrDefault(t => t.UserId == Id && t.Id == id));
     Task<Transaction?> ITransactionRepository.GetByClientIdAsync(Guid clientId, CancellationToken ct) =>
         Task.FromResult(Transactions.SingleOrDefault(t => t.UserId == Id && t.ClientId == clientId));
+    Task<int> ITransactionRepository.CountAsync(CancellationToken ct) => Task.FromResult(Transactions.Count(t => t.UserId == Id));
     Task<bool> ITransactionRepository.AnyForCategoryAsync(Guid cycleId, Guid categoryId, CancellationToken ct) =>
         Task.FromResult(Transactions.Any(t => t.UserId == Id && t.CycleId == cycleId && t.CategoryId == categoryId));
     public void Add(Transaction transaction) => Transactions.Add(transaction);

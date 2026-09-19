@@ -8,6 +8,7 @@ public static class DependencyInjection
         .AddSingleton(TimeProvider.System)
         .AddScoped<UserToday>()
         .AddScoped<CycleFinder>()
+        .AddScoped<DemoCaps>()
         .AddScoped<CycleCategories>()
         .AddScoped<Transactions>()
         .AddScoped<Me>()

@@ -25,6 +25,7 @@ public sealed class Transactions(
     ICategoryRepository categories,
     ITransactionRepository transactions,
     CycleFinder finder,
+    DemoCaps demoCaps,
     TimeProvider clock)
 {
     public async Task<IReadOnlyList<TransactionDto>> ListAsync(Guid cycleId, Guid? categoryId, CancellationToken ct = default)
@@ -46,6 +47,8 @@ public sealed class Transactions(
         var (cycle, timeline, today) = await finder.FindAsync(request.CycleId, ct);
         timeline.EnsureCanEdit(cycle, CycleEdit.Transactions, today);
         await EnsureInCycleAsync(cycle.Id, request.CategoryId, ct);
+        await demoCaps.EnsureCanAddTransactionAsync(ct);
+        await demoCaps.EnsureNoteAllowedAsync(request.Note, ct);
 
         var transaction = new Transaction(cycle, request.CategoryId, request.Amount, request.OccurredOn, Clean(request.Note), request.ClientId, clock.GetUtcNow());
         transactions.Add(transaction);
@@ -70,6 +73,8 @@ public sealed class Transactions(
         var transaction = await transactions.GetAsync(id, ct) ?? throw NotFound();
         var (cycle, timeline, today) = await finder.FindAsync(transaction.CycleId, ct);
         timeline.EnsureCanEdit(cycle, CycleEdit.Transactions, today);
+
+        await demoCaps.EnsureNoteAllowedAsync(request.Note, ct);
 
         var categoryId = request.CategoryId ?? transaction.CategoryId;
         if (categoryId != transaction.CategoryId)
