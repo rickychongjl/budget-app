@@ -4,6 +4,7 @@ import { lazy, Suspense, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { NetworkError, ProblemError } from './api/client'
 import { SessionGate } from './features/auth/SessionGate'
+import { Home } from './features/home/Home'
 import { Settings } from './features/settings/Settings'
 import { AppShell } from './shell/AppShell'
 import { Screen } from './shell/Screen'
@@ -44,11 +45,12 @@ export default function App() {
           <BrowserRouter>
             <Routes>
               <Route element={<AppShell />}>
-                <Route index element={<ComingSoon title="Home" />} />
+                <Route index element={<Home />} />
                 <Route path="cycles" element={<ComingSoon title="Cycles" />} />
                 <Route path="cycles/:id" element={<ComingSoon title="Cycle" />} />
                 <Route path="settings" element={<Settings />} />
                 <Route path="settings/categories" element={<ComingSoon title="Categories" />} />
+                <Route path="onboarding" element={<ComingSoon title="Set up" />} />
               </Route>
               {/* /signin once signed in, and anything unknown, goes Home. The server has already answered /api and /auth. */}
               <Route path="*" element={<Navigate to="/" replace />} />

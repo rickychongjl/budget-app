@@ -10,6 +10,8 @@
   border-radius: var(--radius-md);
   font: var(--text-label);
   font-weight: 600;
+  /* For when the same look is worn by a link. */
+  text-decoration: none;
   /* Press feedback is a transform and a colour, so it never shifts the layout. */
   transition:
     transform var(--dur-press),

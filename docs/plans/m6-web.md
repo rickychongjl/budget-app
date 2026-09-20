@@ -3,7 +3,9 @@
 Source: `docs/solution-design.md` section 7 and section 17 item 6, `docs/user-stories.md`, `design-system/budget/MASTER.md`. Picks up what M4 and M5 deferred here: SPA static files and `index.html` fallback, the Node stage in the Dockerfile, the login button, the `403` screen, the antiforgery fetch wrapper.
 Code lands in a new `src/web`, plus a few lines in `src/Budget.Api` (static files, fallback, sign-in failure redirect), the Dockerfile and `ci.yml`. One new route, `GET /auth/options`; no new `/api` routes.
 
-## Status: in progress (slices 1 and 2 of 14 done)
+## Status: in progress (slices 1 to 6 of 14 done)
+
+Checked against a real stack, not only mocks: this branch's image on its own port with a throwaway SQL container, `migrate` seeding the demo, Vite proxying to it, and headless Edge at 390px. "Try the demo" fetched the token, got the cookie and rendered the seeded Home in light and dark; no sideways scroll at 360 or 390.
 
 Where the code differs from the plan below:
 
@@ -14,6 +16,13 @@ Where the code differs from the plan below:
 - **Grid tracks must be `minmax(0, 1fr)` wherever a child truncates.** Found by measuring `/kit` at 390px: one long `nowrap` category name made the page 672px wide, because a grid track is `auto` by default and grows instead of letting the text truncate. The kit is fixed; the shell (slice 5) and the category row (slice 6) must do the same, and the check is `scrollWidth === clientWidth` at 360 and 390.
 - **What slice 2's unit tests do not cover:** jsdom has no `showModal`, so the focus trap, Escape, focus return and `::backdrop` of `Sheet` and `Dialog` are the browser's and were checked by screenshot (open state, scrim, layout), not by test. The M8 Playwright specs are where they get an automated check. Red-first was seen for the UI kit tests and for the raw-colour guard (a planted `#FFF` fails it); `theme.ts` was written straight after its tests without a separate red run.
 - **Vitest runs with `css: true`.** Off, it blanks `?raw` stylesheet imports and the raw-colour guard passed while checking nothing; the guard now also asserts each stylesheet is non-empty.
+- **Slice 4 leaves the outbox-by-user rule to slice 7.** Sign-out already clears the query cache and the token; "keep the outbox only for the same user id" has nothing to act on until the outbox exists.
+- **`API_TARGET` points the Vite proxy at another port** (default `http://localhost:8080`), so a second stack can run beside the compose one.
+- **Settings arrived early and small** (slice 5, not 13): the theme control and sign out, because the shell needs somewhere to sign out from. Slice 13 adds the profile and the cycle start date.
+- **Tabs do not keep their own scroll position and history** (MASTER 9). Marked `ponytail:` in `AppShell.tsx`; every screen so far is one short list.
+- **The row's status word is coloured text with its icon, not a pill.** MASTER 9 says "the status word, with its icon when not Normal"; the pill (`StatusBadge`) is kept for the cycle list.
+- **To raise, not changed:** by MASTER 3.3 a debit at exactly 100% is Warning, so a fixed bill paid in full (the demo's Rent, $2,200 of $2,200) shows amber "$0.00 left". It is what the table says; whether "spent exactly the limit" should read as Normal is a MASTER question.
+- **Red-first was not seen for slices 3 to 6 beyond "the module does not exist"**: each test file was written and run before its code, failed on the missing import, and passed once the code was written.
 - **The shared API test host blanks `Entra:ClientId` and `Auth:AllowedOids`.** It runs as Development and so loads user-secrets; once the Entra setup was done on this machine, `Without_entra_settings_there_is_no_login_route` got a real challenge (`302`). CI never saw it.
 
 ## Context
