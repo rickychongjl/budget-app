@@ -9,10 +9,12 @@
 }
 
 .name {
+  display: block;
   font: var(--text-heading);
 }
 
 .detail {
+  display: block;
   font: var(--text-label);
   color: var(--color-text-muted);
 }

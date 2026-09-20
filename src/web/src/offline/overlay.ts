@@ -40,6 +40,9 @@ export function overlaySummary(summary: CycleSummary, outbox: OutboxRow[], snaps
   }
 
   const categories = new Map(summary.rollup.categories.map((row) => [row.categoryId, { ...row }]))
+  // The rollup is already in sort order but does not carry the numbers, so a row's place starts as its index and a
+  // queued sortOrder replaces it. The categories screen renumbers every row on a move, which makes this exact.
+  const position = new Map(summary.rollup.categories.map((row, index) => [row.categoryId, index]))
   const spend = (categoryId: string, amount: number) => {
     const row = categories.get(categoryId)
     if (row) {
@@ -53,7 +56,10 @@ export function overlaySummary(summary: CycleSummary, outbox: OutboxRow[], snaps
     } else if (item.type === 'category.edit') {
       const row = categories.get(item.categoryId)
       if (row) {
-        const { budgetAmount, name, icon, colour } = item.category
+        const { budgetAmount, name, icon, colour, sortOrder } = item.category
+        if (sortOrder !== undefined) {
+          position.set(item.categoryId, sortOrder)
+        }
         Object.assign(row, { name: name ?? row.name, icon: icon ?? row.icon, colour: colour ?? row.colour, budgeted: budgetAmount ?? row.budgeted })
       }
     } else if (before) {
@@ -65,7 +71,10 @@ export function overlaySummary(summary: CycleSummary, outbox: OutboxRow[], snaps
     }
   }
 
-  const lines = summary.rollup.categories.map((row) => judge(categories.get(row.categoryId)!))
+  const lines = summary.rollup.categories
+    .map((row) => judge(categories.get(row.categoryId)!))
+    // Stable, so rows with the same position keep the server's order.
+    .sort((a, b) => position.get(a.categoryId)! - position.get(b.categoryId)!)
   const total = (type: CategoryRollup['type'], pick: (row: CategoryRollup) => number) => cents(lines.filter((row) => row.type === type).reduce((sum, row) => sum + pick(row), 0))
   const debitsActual = total('Debit', (row) => row.actual)
   const creditsActual = total('Credit', (row) => row.actual)

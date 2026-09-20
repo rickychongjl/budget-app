@@ -1,5 +1,6 @@
 import { LogOut } from 'lucide-react'
 import { useState } from 'react'
+import { useNavigate } from 'react-router'
 import { Screen } from '../../shell/Screen'
 import { getPreference, setPreference, type ThemePreference } from '../../theme/theme'
 import { Button } from '../../ui/Button'
@@ -19,6 +20,7 @@ const THEMES = [
 export function Settings() {
   const { me, signOut } = useSession()
   const toast = useToast()
+  const navigate = useNavigate()
   const [theme, setTheme] = useState<ThemePreference>(getPreference)
   const [leaving, setLeaving] = useState(false)
 
@@ -45,6 +47,15 @@ export function Settings() {
             setPreference(next)
           }}
         />
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.heading}>Budget</h2>
+        <Card onClick={() => void navigate('/settings/categories')}>
+          {/* Spans: the tappable card is a button, which may only hold phrasing content. */}
+          <span className={styles.name}>Categories and budgets</span>
+          <span className={styles.detail}>For the current cycle and the ones after it.</span>
+        </Card>
       </section>
 
       <section className={styles.section}>

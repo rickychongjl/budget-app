@@ -136,6 +136,18 @@ describe('overlaySummary', () => {
     expect(food(overlaySummary(SUMMARY, [row], 0))).toMatchObject({ budgeted: 0, percentUsed: null, status: 'Over' })
   })
 
+  // The rollup arrives in sort order but without the numbers, so a reorder renumbers every row to its new position.
+  test('queued sort orders reorder the rows; a row nobody renumbered keeps its place', () => {
+    const order = (categoryId: string, sortOrder: number): OutboxRow => ({ seq: ++seq, userId: 'u1', item: { type: 'category.edit', cycleId: CYCLE, categoryId, category: { sortOrder } } })
+
+    const moved = overlaySummary(SUMMARY, [order(FOOD, 1), order(RENT, 0), order(PAY, 2)], 0)
+    expect(moved.rollup.categories.map((row) => row.categoryId)).toEqual([RENT, FOOD, PAY])
+
+    // Renumbered twice: the later one wins.
+    const again = overlaySummary(SUMMARY, [order(FOOD, 1), order(RENT, 0), order(PAY, 2), order(FOOD, 2), order(PAY, 1)], 0)
+    expect(again.rollup.categories.map((row) => row.categoryId)).toEqual([RENT, PAY, FOOD])
+  })
+
   // After a sync the rows stay until a fresh snapshot arrives, so a saved transaction never flickers out. Once the
   // snapshot is newer than the sync, the server's numbers already include them and counting them again would double up.
   test('a synced row still counts while the snapshot is older than the sync', () => {

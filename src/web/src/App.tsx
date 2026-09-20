@@ -4,6 +4,7 @@ import { lazy, Suspense, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { NetworkError, ProblemError } from './api/client'
 import { SessionGate } from './features/auth/SessionGate'
+import { Categories } from './features/categories/Categories'
 import { CycleDetail } from './features/cycles/CycleDetail'
 import { Cycles } from './features/cycles/Cycles'
 import { Home } from './features/home/Home'
@@ -55,7 +56,7 @@ export default function App() {
                 <Route path="cycles/:id" element={<CycleDetail />} />
                 <Route path="cycles/:cycleId/categories/:categoryId" element={<CategoryTransactions />} />
                 <Route path="settings" element={<Settings />} />
-                <Route path="settings/categories" element={<ComingSoon title="Categories" />} />
+                <Route path="settings/categories" element={<Categories />} />
                 <Route path="onboarding" element={<ComingSoon title="Set up" />} />
               </Route>
               {/* /signin once signed in, and anything unknown, goes Home. The server has already answered /api and /auth. */}
