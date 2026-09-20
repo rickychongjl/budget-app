@@ -1,6 +1,7 @@
 import { CalendarOff, ChevronRight, CloudOff } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
-import type { Cycle } from '../../api/types'
+import type { Cycle, CycleSummary } from '../../api/types'
 import { formatRange, todayIn } from '../../format/dates'
 import { formatMoney } from '../../format/money'
 import { Screen } from '../../shell/Screen'
@@ -11,7 +12,36 @@ import { StatusBadge } from '../../ui/StatusBadge'
 import { useSession } from '../auth/useSession'
 import { Accrued } from './Accrued'
 import styles from './Cycles.module.css'
+import { categoriesOf, toSeries, type TrendFilter } from './trend'
+import { readFilter, SPENDING, writeFilter } from './chartFilter'
+import { TrendFilterControl } from './TrendFilter'
+import { TrendSection } from './TrendSection'
 import { useCycleReport } from './useCycleReport'
+
+// The trend across cycles (story "Reporting 3"): the filter, then the chart or the table, from the same report the
+// list below is drawn from.
+function Trend({ report, currency, today }: { report: CycleSummary[]; currency: string; today: string }) {
+  const categories = useMemo(() => categoriesOf(report), [report])
+  // Read once, when the categories are first known, so a later refetch cannot pull the choice back.
+  const [filter, setFilter] = useState<TrendFilter | null>(null)
+  const chosen = filter ?? (categories.length > 0 ? readFilter(categories) : SPENDING)
+  const series = useMemo(() => toSeries(report, chosen, today), [report, chosen, today])
+  const colour = chosen.kind === 'category' ? (categories.find((one) => one.id === chosen.categoryId)?.colour ?? 'primary') : 'primary'
+
+  return (
+    <>
+      <TrendFilterControl
+        filter={chosen}
+        categories={categories}
+        onChange={(next) => {
+          setFilter(next)
+          writeFilter(next)
+        }}
+      />
+      <TrendSection series={series} filter={chosen} currency={currency} today={today} colour={colour} />
+    </>
+  )
+}
 
 // Draft wins over the phase: a first cycle that has not been confirmed is not really "current" yet.
 const badge = (cycle: Cycle) =>
@@ -52,6 +82,9 @@ export function Cycles() {
 
   return (
     <Screen title="Cycles">
+      {/* The chart is above the list, which grows for ever and would otherwise push it off the screen. */}
+      {newestFirst.length > 0 && <Trend report={report.data} currency={me.currency} today={today} />}
+
       {newestFirst.length === 0 ? (
         <EmptyState icon={CalendarOff}>No cycles yet.</EmptyState>
       ) : (

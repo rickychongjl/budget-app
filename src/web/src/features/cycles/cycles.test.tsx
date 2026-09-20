@@ -86,6 +86,7 @@ beforeEach(async () => {
   vi.useFakeTimers({ toFake: ['Date'] })
   resetCsrf()
   stopOutbox()
+  localStorage.clear()
   await db.outbox.clear()
   await db.cache.clear()
   server.use(
@@ -152,6 +153,56 @@ describe('Cycles', () => {
     const rows = await screen.findAllByRole('link')
     expect(within(rows[1]).getByText('$150.00 of $700.00 spent')).toBeInTheDocument()
     expect(within(rows[2]).getByText('$640.00 of $700.00 spent')).toBeInTheDocument()
+  })
+
+  test('the trend can be filtered to total spending, one category or money accrued (story Reporting 3)', async () => {
+    renderAt('/cycles')
+    await screen.findAllByRole('link')
+    const filter = screen.getByRole('radiogroup', { name: 'What the chart shows' })
+
+    // Total spending across the three finished cycles, read as a table so the figures are assertable.
+    await userEvent.click(screen.getByRole('button', { name: 'View as table' }))
+    let rows = within(screen.getByRole('table')).getAllByRole('row').slice(1)
+    expect(rows.map((r) => within(r).getByRole('cell').textContent)).toEqual(['$500.00', '$640.00', '$120.00 so far'])
+
+    await userEvent.click(within(filter).getByRole('radio', { name: 'Accrued' }))
+
+    rows = within(screen.getByRole('table')).getAllByRole('row').slice(1)
+    expect(rows.map((r) => within(r).getByRole('cell').textContent)).toEqual(['+$120.00', '−$50.00', '—'])
+  })
+
+  test('the categories are chips, and only when a category is what the chart shows', async () => {
+    renderAt('/cycles')
+    await screen.findAllByRole('link')
+    const filter = screen.getByRole('radiogroup', { name: 'What the chart shows' })
+
+    expect(screen.queryByRole('radiogroup', { name: 'Category' })).not.toBeInTheDocument()
+
+    await userEvent.click(within(filter).getByRole('radio', { name: 'Category' }))
+
+    const chips = within(screen.getByRole('radiogroup', { name: 'Category' }))
+    expect(chips.getByRole('radio', { name: 'Groceries' })).toBeChecked()
+    expect(chips.getByRole('radio', { name: 'Salary' })).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'View as table' }))
+    const rows = within(screen.getByRole('table')).getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent('$500.00')
+  })
+
+  test('the choice is remembered, like the theme', async () => {
+    localStorage.setItem('budget.chartFilter', JSON.stringify({ kind: 'accrued' }))
+    renderAt('/cycles')
+    await screen.findAllByRole('link')
+
+    expect(within(screen.getByRole('radiogroup', { name: 'What the chart shows' })).getByRole('radio', { name: 'Accrued' })).toBeChecked()
+  })
+
+  test('a remembered category that no longer exists falls back to total spending', async () => {
+    localStorage.setItem('budget.chartFilter', JSON.stringify({ kind: 'category', categoryId: 'deleted' }))
+    renderAt('/cycles')
+    await screen.findAllByRole('link')
+
+    expect(within(screen.getByRole('radiogroup', { name: 'What the chart shows' })).getByRole('radio', { name: 'Spending' })).toBeChecked()
   })
 
   test('the last report renders before the network answers', async () => {

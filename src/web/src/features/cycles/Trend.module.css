@@ -13,6 +13,71 @@
   color: var(--color-text-muted);
 }
 
+.filter {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+/* Its own scroller: the row may be wider than the screen, the page never is. */
+.chips {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: var(--space-1);
+  scrollbar-width: none;
+}
+
+.chip {
+  position: relative;
+  display: grid;
+  flex: none;
+  min-height: var(--target-min);
+}
+
+/* Fills its box with no border of its own, so the target stays the full 44px. */
+.chipInput {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+}
+
+.chipText {
+  display: grid;
+  place-items: center;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  font: var(--text-label);
+  white-space: nowrap;
+}
+
+/* The category's own slot colour, so the chip matches the line it draws. */
+.chipInput:checked + .chipText {
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 2px var(--chip-colour);
+}
+
+.chipInput:focus-visible + .chipText {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.chip[data-slot='blue'] { --chip-colour: var(--cat-blue); }
+.chip[data-slot='orange'] { --chip-colour: var(--cat-orange); }
+.chip[data-slot='violet'] { --chip-colour: var(--cat-violet); }
+.chip[data-slot='cyan'] { --chip-colour: var(--cat-cyan); }
+.chip[data-slot='pink'] { --chip-colour: var(--cat-pink); }
+.chip[data-slot='teal'] { --chip-colour: var(--cat-teal); }
+.chip[data-slot='ochre'] { --chip-colour: var(--cat-ochre); }
+.chip[data-slot='slate'] { --chip-colour: var(--cat-slate); }
+
 .chart {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
