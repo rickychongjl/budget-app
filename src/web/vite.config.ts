@@ -12,5 +12,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
     restoreMocks: true,
+    // Off by default, which also blanks `?raw` stylesheet imports; tokens.test.ts reads them as text.
+    css: true,
   },
 })
