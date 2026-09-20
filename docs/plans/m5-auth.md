@@ -4,7 +4,7 @@
 
 All slices are in. 303 tests: Domain 119, Application 82, Infrastructure 34, API 68 (the last two against a SQL Server 2022 container). Line coverage: Application 95.23%, Domain 98.66%. `docker compose up -d --build` was run for real: `migrate` applied the migrations, ensured the users and seeded the demo; a curl session got `404` from `/auth/login` (Entra unconfigured), `400` from `/auth/demo` without an antiforgery token and `204` with one, read the seeded current cycle, added a transaction (11 to 12), and `reset-demo` put it back to 11; `rollover` ran per user with no failures.
 
-Not done, and not doable from here: the Entra tenant and app registration (see "Manual steps" at the end). Until then the real sign-in is proven only by the tests, which run the real OpenID Connect middleware against an in-memory tenant.
+Not done, and not doable from here: the Entra tenant and app registration (one-time guide: `docs/tenant_app_registration_setup.md`). Until then the real sign-in is proven only by the tests, which run the real OpenID Connect middleware against an in-memory tenant.
 
 Where the code differs from the plan below:
 
@@ -130,18 +130,5 @@ Reviewed on 2026-09-20. Decision 1 changed on review from a constant custom head
 
 ## Manual steps (Ricky, once)
 
-Nothing in the repo can do these, and nothing else in M5 waits on them.
+Nothing in the repo can do these, and nothing else in M5 waits on them. The one-time guide is `docs/tenant_app_registration_setup.md`: create the tenant, register the app, put the ids and the secret in user-secrets, and put your object id in `.env` so `migrate` creates your `User` row.
 
-1. Create the free Entra ID tenant (design 5.1), one user in it, Security Defaults on, passkey registered.
-2. App registration: single tenant, platform **Web**, redirect URIs `https://localhost:5001/auth/callback` and `https://<domain>/auth/callback`. Leave both implicit-grant boxes unticked: the code flow gets the ID token from the token endpoint. No API permissions beyond the default `openid profile` sign-in (the `oid` claim comes with `profile`).
-3. Create a client secret. Locally everything goes in user-secrets, never in a file:
-   ```
-   dotnet user-secrets set "Entra:TenantId" "<tenant id>" --project src/Budget.Api
-   dotnet user-secrets set "Entra:ClientId" "<application id>" --project src/Budget.Api
-   dotnet user-secrets set "Entra:ClientSecret" "<secret>" --project src/Budget.Api
-   dotnet user-secrets set "Auth:AllowedOids" "<your object id>" --project src/Budget.Api
-   dotnet user-secrets set "ConnectionStrings:Budget" "Server=localhost;Database=budget;User Id=sa;Password=<from .env>;TrustServerCertificate=true" --project src/Budget.Api
-   ```
-   Your object id is on your user's page in the Entra portal. In production these are Container Apps secrets (M9).
-4. Put the same object id in `.env` as `AUTH_ALLOWED_OIDS`, then `docker compose up -d --build` so `migrate` creates your `User` row.
-5. `dotnet run --project src/Budget.Api --launch-profile https`, browse `https://localhost:5001/auth/login`, sign in, then `https://localhost:5001/api/me` shows `isDemo: false`. With the allowlist emptied the callback is `403 auth.not-allowed`.

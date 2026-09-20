@@ -129,7 +129,7 @@ npx playwright test --config tests/e2e/playwright.config.ts
 
 Planned convenience targets (`make`/`just` or npm scripts; not yet created, check before assuming they exist): `up`, `test`, `test:e2e`, `migrate`, `rollover`, `reset-demo`. No scheduler runs locally; rollover happens through the request-time fallback.
 
-Local auth: use the demo session (`GET /auth/csrf`, then `POST /auth/demo` with the token). There is deliberately no dev-login endpoint. Entra sign-in works locally on `https://localhost:5001` once `Entra:*` and `Auth:AllowedOids` are in user-secrets (`docs/plans/m5-auth.md`, "Manual steps"); without them `/auth/login` is `404`.
+Local auth: use the demo session (`GET /auth/csrf`, then `POST /auth/demo` with the token). There is deliberately no dev-login endpoint. Entra sign-in works locally on `https://localhost:5001` once `Entra:*` and `Auth:AllowedOids` are in user-secrets (one-time setup: `docs/tenant_app_registration_setup.md`); without them `/auth/login` is `404`.
 
 ## Decisions not to re-litigate
 
