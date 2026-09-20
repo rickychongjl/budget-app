@@ -54,7 +54,7 @@ Domain  <-  Application  <-  Infrastructure  <-  Api
 - Transactions carry a `ClientId` (idempotency key for offline sync); `(UserId, ClientId)` is unique.
 - Migrations must be backward-compatible with the previous app version (expand, migrate, contract): the migration job runs before the new revision goes live.
 - Errors are RFC 9457 `application/problem+json`. Validation lives in Application.
-- Users are never created at request time. `migrate` ensures the demo row and one row per `oid` in `Auth:AllowedOids`; an Entra sign-in needs both the allowlist entry and the row (`Login`), otherwise `403`.
+- Users are never created at request time. `migrate` ensures the demo row and one row per `oid` in `Auth:AllowedOids`; an Entra sign-in needs both the allowlist entry and the row (`Login`). A refused sign-in issues no session and redirects to `/signin?error=<code>`, because the callback is a top-level navigation. `GET /auth/options` tells the SPA which sign-ins exist.
 - Every non-GET under `/api` and the `/auth` POSTs is antiforgery-checked (`RequireCsrfToken`): the client gets a token from the JSON body of `GET /auth/csrf`, keeps it in memory (again after signing in or out) and sends it as `X-XSRF-TOKEN`. A new route group for writes must opt in. Outside Development antiforgery needs the request to be https.
 - No PII in logs.
 
@@ -77,6 +77,17 @@ Hard rules (details in MASTER):
 - Inter is self-hosted. No CDN fonts (CSP and offline). No animation library, no glass or blur, no pie charts.
 - Do not change MASTER to fit a component. If a rule is wrong, raise it.
 
+### Web app rules (`src/web`, full reasoning in `docs/plans/m6-web.md`)
+
+- `api/client.ts` is the only caller of `fetch`. It holds the antiforgery token in memory and retries once on `csrf.invalid`. Errors are `ProblemError` (the server refused; switch on `code`) or `NetworkError` (no answer; keep and retry).
+- **What a screen shows is `overlay(server snapshot, outbox)`.** Reads go through `useCachedQuery` (TanStack Query, with each answer also kept whole in Dexie). A write that must work offline (transaction create, edit, delete; category edit and reorder) never calls its own endpoint: it goes through `enqueue`, and `drain()` posts the queue to `/api/sync`. `offline/overlay.ts` is the only place the front end does rollup maths, and only for rows the server has not counted; it must stay in step with `CycleRollup.Line`.
+- A write that needs the server to decide something (onboarding, category add and remove, start date, balances, profile) calls its endpoint directly, is disabled offline, and says "needs a connection" on screen.
+- Whether a write landed in a past cycle is the server's call (`requiresClosingBalanceReview`); never work it out from dates. "Today" is `todayIn(me.timeZone)`, never the device's date. Dates are `YYYY-MM-DD` strings and are never passed to `new Date(string)`.
+- A CSS grid whose child truncates needs `grid-template-columns: minmax(0, 1fr)`, or one long name makes the page scroll sideways. A hidden radio that takes the tap must fill its box with no border on the box, or the target drops under 44px.
+- No two files in a folder may differ only by case (`Keypad.tsx` and `keypad.ts`): Windows resolves them to the same file and the import breaks there but not on CI.
+- `tokens.test.ts` fails on a raw colour outside `tokens.css`, and on a token missing from one theme.
+- `/kit` (dev server only, dropped from the production build) shows every `ui/` component in every state.
+
 ## TDD loop
 
 Failing test, minimal code, refactor. Write the test first, watch it fail for the right reason, then implement.
@@ -87,7 +98,7 @@ Failing test, minimal code, refactor. Write the test first, watch it fail for th
 | Application unit | `tests/Budget.Application.Tests` | xUnit + NSubstitute + in-memory fakes. Use cases, validation, demo caps. |
 | Infrastructure integration | `tests/Budget.Infrastructure.Tests` | Testcontainers, `mcr.microsoft.com/mssql/server:2022-latest`. Repositories, query filters, migrations apply from empty. |
 | API integration | `tests/Budget.Api.Tests` | `WebApplicationFactory` + Testcontainers. Auth, cookies, **tenant isolation (user A cannot touch user B via any endpoint)**, rate limits, problem-details shape. |
-| Web unit | `src/web` | Vitest + React Testing Library + MSW. |
+| Web unit | `src/web` | Vitest + React Testing Library + MSW + `fake-indexeddb`. An undeclared request fails the test. jsdom has no `showModal` or `matchMedia` (stand-ins in `src/test/setup.ts`), so focus trap, Escape and focus return on sheets and dialogs are not covered here. |
 | E2E | `tests/e2e` | Playwright, iPhone 15 profile, local on demand. One spec per story in `docs/user-stories.md`; seeds from `fixtures/demo-seed.json`. |
 
 Any red test fails the PR. Coverage on Domain and Application must stay at or above 90%.
@@ -111,12 +122,13 @@ dotnet ef migrations add <Name> --project src/Budget.Infrastructure
 
 # Web (in src/web)
 npm ci
-npm run lint
+npm run lint                                  # oxlint; warnings fail
 npm run test
-npm run dev                                   # Vite; proxies /api and /auth to the API
+npm run build                                 # tsc -b, then vite build
+npm run dev                                   # Vite; proxies /api and /auth to http://localhost:8080 (API_TARGET=... to point elsewhere). /kit shows the UI kit
 
 # Local stack
-docker compose up -d --build                  # sql, then migrate (runs once), then api on http://localhost:8080; needs .env (see .env.example)
+docker compose up -d --build                  # sql, then migrate (runs once), then api + the built SPA on http://localhost:8080; needs .env (see .env.example)
 docker compose down
 
 # Jobs (same image; migrate also seeds the demo from tests/e2e/fixtures/demo-seed.json when it is empty)
