@@ -1,8 +1,8 @@
 import { CalendarRange, House, Plus, Settings } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router'
+import { AddTransactionSheet } from '../features/transactions/AddTransactionSheet'
 import { countWaiting, useOutbox } from '../offline/useOutbox'
-import { Sheet } from '../ui/Sheet'
 import styles from './AppShell.module.css'
 import { ConnectivityBanner } from './ConnectivityBanner'
 
@@ -44,9 +44,7 @@ export function AppShell() {
         </NavLink>
       </nav>
 
-      <Sheet open={adding} title="Add transaction" onClose={() => setAdding(false)}>
-        <p className={styles.placeholder}>The keypad and category picker arrive in M6 slice 8.</p>
-      </Sheet>
+      <AddTransactionSheet open={adding} onClose={() => setAdding(false)} />
     </div>
   )
 }

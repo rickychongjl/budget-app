@@ -67,7 +67,3 @@
 .active svg {
   background: var(--color-primary-soft);
 }
-
-.placeholder {
-  color: var(--color-text-muted);
-}

@@ -1,8 +1,12 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { http, HttpResponse } from 'msw'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { SessionContext } from '../features/auth/useSession'
+import { server } from '../test/server'
+import { ToastProvider } from '../ui/Toast'
 import { AppShell } from './AppShell'
 import { ConnectivityBanner } from './ConnectivityBanner'
 import { Screen } from './Screen'
@@ -17,7 +21,11 @@ const SESSION = {
 }
 
 function renderShell(path = '/') {
+  // The Add sheet reads the current cycle; the shell does not care what it says.
+  server.use(http.get('/api/cycles/current', () => HttpResponse.json({ status: 404, code: 'cycle.none' }, { status: 404 })))
   render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <ToastProvider>
     <SessionContext value={SESSION}>
     <MemoryRouter initialEntries={[path]}>
       <Routes>
@@ -28,7 +36,9 @@ function renderShell(path = '/') {
         </Route>
       </Routes>
     </MemoryRouter>
-    </SessionContext>,
+    </SessionContext>
+    </ToastProvider>
+    </QueryClientProvider>,
   )
   return within(screen.getByRole('navigation', { name: 'Main' }))
 }
