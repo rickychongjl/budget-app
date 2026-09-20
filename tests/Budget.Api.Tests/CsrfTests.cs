@@ -23,8 +23,8 @@ public sealed class CsrfTests(ApiFactory api)
     private static async Task<string> FetchTokenAsync(HttpClient client)
     {
         var response = await client.GetAsync("/auth/csrf");
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
-        return CsrfHandler.RequestToken(response)!;
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        return (await CsrfHandler.RequestTokenAsync(response))!;
     }
 
     private static HttpRequestMessage Write(HttpMethod method, string path, string? token, object? body = null)
@@ -60,15 +60,13 @@ public sealed class CsrfTests(ApiFactory api)
     }
 
     [Fact]
-    public async Task The_request_token_is_readable_by_the_page_and_the_cookie_token_is_not()
+    public async Task The_request_token_is_in_the_body_and_the_only_cookie_is_the_httponly_one()
     {
         var response = await api.CreateClient(Https).GetAsync("/auth/csrf");
 
-        var cookies = response.Headers.GetValues("Set-Cookie").Select(c => c.ToLowerInvariant()).ToList();
-        cookies.Should().ContainSingle(c => c.StartsWith("xsrf-token="))
-            .Which.Should().NotContain("httponly").And.Contain("; secure").And.Contain("samesite=strict");
-        cookies.Should().ContainSingle(c => c.StartsWith("budget.csrf="))
-            .Which.Should().Contain("httponly").And.Contain("; secure").And.Contain("samesite=strict");
+        (await CsrfHandler.RequestTokenAsync(response)).Should().NotBeNullOrEmpty();
+        var cookie = response.Headers.GetValues("Set-Cookie").Should().ContainSingle().Which.ToLowerInvariant();
+        cookie.Should().StartWith("budget.csrf=").And.Contain("httponly").And.Contain("; secure").And.Contain("samesite=strict");
     }
 
     [Fact]

@@ -55,7 +55,7 @@ Domain  <-  Application  <-  Infrastructure  <-  Api
 - Migrations must be backward-compatible with the previous app version (expand, migrate, contract): the migration job runs before the new revision goes live.
 - Errors are RFC 9457 `application/problem+json`. Validation lives in Application.
 - Users are never created at request time. `migrate` ensures the demo row and one row per `oid` in `Auth:AllowedOids`; an Entra sign-in needs both the allowlist entry and the row (`Login`), otherwise `403`.
-- Every non-GET under `/api` and the `/auth` POSTs is antiforgery-checked (`RequireCsrfToken`): the client gets a token from `GET /auth/csrf` (again after signing in or out) and sends it as `X-XSRF-TOKEN`. A new route group for writes must opt in. Outside Development antiforgery needs the request to be https.
+- Every non-GET under `/api` and the `/auth` POSTs is antiforgery-checked (`RequireCsrfToken`): the client gets a token from the JSON body of `GET /auth/csrf`, keeps it in memory (again after signing in or out) and sends it as `X-XSRF-TOKEN`. A new route group for writes must opt in. Outside Development antiforgery needs the request to be https.
 - No PII in logs.
 
 ## UI work

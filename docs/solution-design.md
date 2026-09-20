@@ -186,7 +186,7 @@ All endpoints under `/api`, JSON, cookie-authenticated, versioned via URL prefix
 | `GET` | `/api/reports/cycles` | Per cycle: total spend, spend per category, opening, closing, accrued. The client filters the line graph |
 | `GET` | `/auth/login` | Redirect to Entra (OIDC). `404` when Entra is not configured (local compose, tests) |
 | `POST` | `/auth/callback` | OIDC redirect URI (`form_post`), answered by the OpenID Connect middleware |
-| `GET` | `/auth/csrf` | Issue the antiforgery token pair for the current caller; the request token is in a readable `XSRF-TOKEN` cookie |
+| `GET` | `/auth/csrf` | Issue the antiforgery token pair for the current caller; the request token is returned in the JSON body (`{ "token": ... }`) for the page to hold in memory; the cookie token stays `HttpOnly` |
 | `POST` | `/auth/logout` | Clear session |
 | `POST` | `/auth/demo` | Issue a demo session (rate-limited) |
 | `GET` | `/health` | Liveness (no DB touch) |

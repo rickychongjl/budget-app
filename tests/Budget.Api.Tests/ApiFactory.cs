@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Budget.Domain;
@@ -97,7 +98,7 @@ internal sealed class CsrfHandler : DelegatingHandler
                 fetch.Headers.Add(TestAuth.Header, user);
             }
 
-            if (RequestToken(await base.SendAsync(fetch, ct)) is { } token)
+            if (await RequestTokenAsync(await base.SendAsync(fetch, ct)) is { } token)
             {
                 request.Headers.Add(Header, token);
             }
@@ -106,11 +107,12 @@ internal sealed class CsrfHandler : DelegatingHandler
         return await base.SendAsync(request, ct);
     }
 
-    public static string? RequestToken(HttpResponseMessage response) =>
-        response.Headers.TryGetValues("Set-Cookie", out var cookies)
-            && cookies.FirstOrDefault(c => c.StartsWith("XSRF-TOKEN=", StringComparison.Ordinal)) is { } cookie
-            ? Uri.UnescapeDataString(cookie["XSRF-TOKEN=".Length..cookie.IndexOf(';')])
+    public static async Task<string?> RequestTokenAsync(HttpResponseMessage response) =>
+        response.IsSuccessStatusCode
+            ? (await response.Content.ReadFromJsonAsync<TokenBody>())?.Token
             : null;
+
+    private sealed record TokenBody(string Token);
 }
 
 internal static class CsrfClientExtensions
