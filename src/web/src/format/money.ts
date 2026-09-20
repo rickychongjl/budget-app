@@ -18,3 +18,11 @@ export function formatMoney(amount: number, currency: string, { sign = false } =
   // U+2212, a true minus: a hyphen is narrower and does not line up with "+" in a column.
   return cents < 0 ? `−${text}` : sign && cents > 0 ? `+${text}` : text
 }
+
+// What someone typed into a money field, as a number, or null when it is not an amount. Forgiving about how it is
+// written ("$3,620.25", a true minus sign) and strict about what it is: at most two decimal places, because a third
+// would be silently rounded by decimal(18,2).
+export function parseMoney(text: string): number | null {
+  const cleaned = text.replace(/[\s,$]/g, '').replace('−', '-')
+  return /^-?(\d+(\.\d{0,2})?|\.\d{1,2})$/.test(cleaned) ? Number(cleaned) : null
+}

@@ -4,6 +4,8 @@ import { lazy, Suspense, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { NetworkError, ProblemError } from './api/client'
 import { SessionGate } from './features/auth/SessionGate'
+import { CycleDetail } from './features/cycles/CycleDetail'
+import { Cycles } from './features/cycles/Cycles'
 import { Home } from './features/home/Home'
 import { Settings } from './features/settings/Settings'
 import { CategoryTransactions } from './features/transactions/CategoryTransactions'
@@ -49,8 +51,8 @@ export default function App() {
             <Routes>
               <Route element={<AppShell />}>
                 <Route index element={<Home />} />
-                <Route path="cycles" element={<ComingSoon title="Cycles" />} />
-                <Route path="cycles/:id" element={<ComingSoon title="Cycle" />} />
+                <Route path="cycles" element={<Cycles />} />
+                <Route path="cycles/:id" element={<CycleDetail />} />
                 <Route path="cycles/:cycleId/categories/:categoryId" element={<CategoryTransactions />} />
                 <Route path="settings" element={<Settings />} />
                 <Route path="settings/categories" element={<ComingSoon title="Categories" />} />

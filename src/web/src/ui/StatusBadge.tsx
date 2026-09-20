@@ -18,7 +18,7 @@ export function StatusBadge({ tone = 'neutral', icon, children }: Props) {
   const Icon = icon ?? ICONS[tone]
 
   return (
-    <span className={`${styles.badge} ${styles[tone]}`}>
+    <span data-testid="badge" className={`${styles.badge} ${styles[tone]}`}>
       {Icon && <Icon aria-hidden="true" className={styles.icon} />}
       {children}
     </span>

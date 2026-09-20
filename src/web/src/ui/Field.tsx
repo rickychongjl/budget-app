@@ -1,8 +1,9 @@
 import { CircleAlert } from 'lucide-react'
-import { useId, type InputHTMLAttributes } from 'react'
+import { useId, type ComponentProps } from 'react'
 import styles from './Field.module.css'
 
-type Props = InputHTMLAttributes<HTMLInputElement> & {
+// ComponentProps, not InputHTMLAttributes: it includes `ref`, which a form needs to move focus to an invalid field.
+type Props = ComponentProps<'input'> & {
   // Always visible, above the input. A placeholder is never the label (MASTER 9).
   label: string
   hint?: string
