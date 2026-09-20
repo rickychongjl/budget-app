@@ -86,9 +86,6 @@ export function overlaySummary(summary: CycleSummary, outbox: OutboxRow[], snaps
 
 export function overlayTransactions(transactions: Transaction[], cycleId: string, outbox: OutboxRow[], snapshotAt: number): Transaction[] {
   const rows = live(outbox, snapshotAt).filter(({ item, before }) => (item.type === 'transaction.create' ? item.create.cycleId === cycleId : before?.cycleId === cycleId))
-  if (rows.length === 0) {
-    return transactions
-  }
 
   const byClientId = new Map(transactions.map((transaction) => [transaction.clientId, transaction]))
   // Stands in for createdAt on a row the server has not stamped yet, so the latest entry of a day sorts first.

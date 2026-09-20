@@ -12,7 +12,27 @@
   background: var(--color-bg);
 }
 
+.back {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--target-min);
+  height: var(--target-min);
+  /* Pulls the icon out to the gutter while keeping the full 44px target. */
+  margin-left: calc(-1 * var(--space-3));
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  transition: background var(--dur-press);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.back:active {
+  background: var(--color-surface-2);
+}
+
 .title {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   font: var(--text-title);

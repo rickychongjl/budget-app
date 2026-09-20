@@ -11,8 +11,9 @@ import { db, type Before, type OutboxRow } from './db'
 export type OutboxEvent =
   // The server said no, and would say no again: a demo cap, a category deleted elsewhere. The item is gone from the queue.
   | { type: 'refused'; item: SyncItem; code: string; detail: string }
-  // `result` is the body the item's own endpoint would have returned (e.g. TransactionResult).
-  | { type: 'synced'; item: SyncItem; result: unknown }
+  // `result` is the body the item's own endpoint would have returned (e.g. TransactionResult). `before` is the local
+  // context the change was queued with, which is how a listener knows which cycle an edit or delete belonged to.
+  | { type: 'synced'; item: SyncItem; before?: Before; result: unknown }
 
 type Config = {
   userId: string
@@ -139,7 +140,7 @@ async function run() {
       const result = results.find((candidate) => candidate.index === index)
       if (result?.ok) {
         accepted.push({ ...row, syncedAt })
-        emit({ type: 'synced', item: row.item, result: result.result })
+        emit({ type: 'synced', item: row.item, before: row.before, result: result.result })
       } else {
         await db.outbox.delete(row.seq!)
         emit({ type: 'refused', item: row.item, code: result?.code ?? 'sync.no-result', detail: result?.detail ?? 'The change could not be saved.' })

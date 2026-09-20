@@ -6,6 +6,7 @@ import { NetworkError, ProblemError } from './api/client'
 import { SessionGate } from './features/auth/SessionGate'
 import { Home } from './features/home/Home'
 import { Settings } from './features/settings/Settings'
+import { CategoryTransactions } from './features/transactions/CategoryTransactions'
 import { OutboxSync } from './offline/OutboxSync'
 import { AppShell } from './shell/AppShell'
 import { Screen } from './shell/Screen'
@@ -50,6 +51,7 @@ export default function App() {
                 <Route index element={<Home />} />
                 <Route path="cycles" element={<ComingSoon title="Cycles" />} />
                 <Route path="cycles/:id" element={<ComingSoon title="Cycle" />} />
+                <Route path="cycles/:cycleId/categories/:categoryId" element={<CategoryTransactions />} />
                 <Route path="settings" element={<Settings />} />
                 <Route path="settings/categories" element={<ComingSoon title="Categories" />} />
                 <Route path="onboarding" element={<ComingSoon title="Set up" />} />

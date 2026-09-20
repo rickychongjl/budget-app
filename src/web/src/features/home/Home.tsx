@@ -90,13 +90,13 @@ export function Home() {
       </header>
 
       {rollup.categories.length === 0 && <EmptyState icon={Shapes}>This cycle has no categories yet.</EmptyState>}
-      <CategorySection id="spending" title="Spending" rows={spending} currency={me.currency} />
-      <CategorySection id="income" title="Income" rows={income} currency={me.currency} />
+      <CategorySection id="spending" title="Spending" rows={spending} currency={me.currency} cycleId={cycle.id} />
+      <CategorySection id="income" title="Income" rows={income} currency={me.currency} cycleId={cycle.id} />
     </Screen>
   )
 }
 
-function CategorySection({ id, title, rows, currency }: { id: string; title: string; rows: CategoryRollup[]; currency: string }) {
+export function CategorySection({ id, title, rows, currency, cycleId }: { id: string; title: string; rows: CategoryRollup[]; currency: string; cycleId: string }) {
   if (rows.length === 0) {
     return null
   }
@@ -109,7 +109,7 @@ function CategorySection({ id, title, rows, currency }: { id: string; title: str
       <Card>
         <ul className={styles.rows}>
           {rows.map((row) => (
-            <CategoryRow key={row.categoryId} row={row} currency={currency} />
+            <CategoryRow key={row.categoryId} row={row} currency={currency} to={`/cycles/${cycleId}/categories/${row.categoryId}`} />
           ))}
         </ul>
       </Card>

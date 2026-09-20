@@ -1,0 +1,60 @@
+.list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list > li + li {
+  border-top: 1px solid var(--color-border);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--space-2) 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  transition: background var(--dur-press);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.row:active {
+  background: var(--color-surface-2);
+}
+
+.text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.date {
+  font: var(--text-heading);
+}
+
+/* A long note truncates; the amount beside it never does. */
+.note {
+  overflow: hidden;
+  font: var(--text-label);
+  color: var(--color-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.amount {
+  flex: none;
+  font: var(--text-heading);
+}
+
+.chevron {
+  flex: none;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  color: var(--color-text-muted);
+}

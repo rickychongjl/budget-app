@@ -187,6 +187,10 @@ describe('overlayTransactions', () => {
   })
 
   test('another cycle is left alone', () => {
-    expect(overlayTransactions(server, CYCLE, [create(FOOD, 30, 'tx-x', 'cycle-0')], 0)).toBe(server)
+    expect(overlayTransactions(server, CYCLE, [create(FOOD, 30, 'tx-x', 'cycle-0')], 0)).toEqual(server)
+  })
+
+  test('the list is newest first even with nothing queued, whatever order the server used', () => {
+    expect(overlayTransactions([...server].reverse(), CYCLE, [], 0).map((t) => t.clientId)).toEqual(['tx-s1', 'tx-s2'])
   })
 })

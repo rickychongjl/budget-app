@@ -2,6 +2,7 @@ import { CalendarRange, House, Plus, Settings } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router'
 import { AddTransactionSheet } from '../features/transactions/AddTransactionSheet'
+import { ClosingBalancePrompt } from '../features/transactions/ClosingBalancePrompt'
 import { countWaiting, useOutbox } from '../offline/useOutbox'
 import styles from './AppShell.module.css'
 import { ConnectivityBanner } from './ConnectivityBanner'
@@ -45,6 +46,7 @@ export function AppShell() {
       </nav>
 
       <AddTransactionSheet open={adding} onClose={() => setAdding(false)} />
+      <ClosingBalancePrompt />
     </div>
   )
 }
