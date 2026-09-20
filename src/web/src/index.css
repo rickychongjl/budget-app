@@ -1,0 +1,10 @@
+/* Tokens, themes and the font arrive in M6 slice 2 (design-system/budget/MASTER.md). */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}

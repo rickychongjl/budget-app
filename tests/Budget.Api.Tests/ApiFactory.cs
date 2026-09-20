@@ -45,6 +45,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         // Every test shares one address, so the production limit would trip halfway through the run. RateLimitTests lowers it again.
         builder.UseSetting("RateLimiting:PermitLimit", "1000000");
         builder.UseSetting("RateLimiting:AuthPermitLimit", "1000000");
+        // The host runs as Development, which loads the developer's user-secrets. Without these a machine that has done the
+        // Entra setup would run the suite against the real tenant and allowlist. EntraSignInTests set their own.
+        builder.UseSetting("Entra:ClientId", "");
+        builder.UseSetting("Auth:AllowedOids", "");
 
         builder.ConfigureTestServices(services => services
             .AddAuthentication(TestAuth.SchemeName)

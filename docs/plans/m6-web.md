@@ -3,7 +3,14 @@
 Source: `docs/solution-design.md` section 7 and section 17 item 6, `docs/user-stories.md`, `design-system/budget/MASTER.md`. Picks up what M4 and M5 deferred here: SPA static files and `index.html` fallback, the Node stage in the Dockerfile, the login button, the `403` screen, the antiforgery fetch wrapper.
 Code lands in a new `src/web`, plus a few lines in `src/Budget.Api` (static files, fallback, sign-in failure redirect), the Dockerfile and `ci.yml`. One new route, `GET /auth/options`; no new `/api` routes.
 
-## Status: decisions agreed 2026-09-20, not started
+## Status: in progress (slice 1 of 14 done)
+
+Where the code differs from the plan below:
+
+- **Lint is `oxlint`, not ESLint.** It is what the current Vite `react-ts` template ships, with the React hooks rules on; `npm run lint` fails on warnings.
+- **The image's entry point passes `--contentRoot /app/api`.** Found by running the container: the working directory is `/app` (so a job is `dotnet jobs/Budget.Jobs.dll <name>`), and the API looked for `wwwroot` in `/app` and answered `404` for `/`. It had been missing `appsettings.json` the same way since M4, which only cost the log levels.
+- **`UseStaticFiles` sits ahead of the rate limiter**, so the files of one page load do not spend the API's allowance.
+- **The shared API test host blanks `Entra:ClientId` and `Auth:AllowedOids`.** It runs as Development and so loads user-secrets; once the Entra setup was done on this machine, `Without_entra_settings_there_is_no_login_route` got a real challenge (`302`). CI never saw it.
 
 ## Context
 
