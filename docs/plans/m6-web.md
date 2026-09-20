@@ -3,7 +3,7 @@
 Source: `docs/solution-design.md` section 7 and section 17 item 6, `docs/user-stories.md`, `design-system/budget/MASTER.md`. Picks up what M4 and M5 deferred here: SPA static files and `index.html` fallback, the Node stage in the Dockerfile, the login button, the `403` screen, the antiforgery fetch wrapper.
 Code lands in a new `src/web`, plus a few lines in `src/Budget.Api` (static files, fallback, sign-in failure redirect), the Dockerfile and `ci.yml`. One new route, `GET /auth/options`; no new `/api` routes.
 
-## Status: draft, not started
+## Status: decisions agreed 2026-09-20, not started
 
 ## Context
 
@@ -75,7 +75,7 @@ Online state is `navigator.onLine` plus the `online`/`offline` events, corrected
 
 ## Slices (TDD order, one commit each)
 
-First commit is this plan. Each UI slice ends with MASTER section 14.
+First commit is this plan. Each UI slice ends with MASTER section 14. Home comes before the offline store (agreed 2026-09-20) so there is something to look at early.
 
 ### 1. Scaffold, host wiring, CI
 - `npm create vite` (react-ts) into `src/web`; strict TS; ESLint; Vitest + RTL + MSW + `fake-indexeddb` wired with one passing test. Vite dev proxy for `/api` and `/auth` to `http://localhost:8080`. `.nvmrc` = 22.
@@ -107,13 +107,14 @@ First commit is this plan. Each UI slice ends with MASTER section 14.
 - `AppShell`: top bar, scroll container (`100dvh`, safe areas, `scroll-padding`, `overscroll-behavior-y: contain`), tab bar with `aria-current`, 480px column from 600px up. `ConnectivityBanner` (offline / N waiting). One `Toast` host, `aria-live="polite"`.
 - Tests: active tab announced; Add opens the sheet without a route change; banner text for offline and for a non-empty outbox.
 
-### 6. Offline store and overlay (no UI)
+### 6. Home (first real look)
+- `useCurrentCycle()` is the one hook Home reads. In this slice it is the TanStack query alone, straight from `GET /api/cycles/current`; slice 7 puts the Dexie cache and the overlay behind the same hook, so Home does not change. Cycle header, "Spending" and "Income" sections of category rows with `ProgressBar` (`scaleX`, `role="progressbar"`, `aria-valuetext`), status per 3.3 (80% warning threshold is presentation and lives here; Over/Ahead come from `status`). Skeletons of final size. Empty state routes to onboarding.
+- Tests: each row of table 3.3 renders its fill token, icon and word; long names truncate, amounts do not. After this slice: `docker compose up -d --build`, `npm run dev`, "Try the demo", and the seeded Home is on screen in both themes.
+
+### 7. Offline store and overlay
 - `db.ts`: Dexie `cache` (key, json, userId) and `outbox` (++seq, userId, item). `outbox.ts`: `enqueue`, `drain` as described above. `overlay.ts`: pure.
 - Tests first, against `fake-indexeddb` and MSW: overlay of create/edit/delete on a summary (debit crosses 100% becomes `Over`, credit becomes `Ahead`, zero budget gives null percent, a delete of a queued create cancels both); edit-then-delete of the same `clientId`; category edit overlay; drain removes `ok` and refused items, keeps all on network failure, keeps all on `401`; two concurrent drains post once; a failed drain retries on the timer and the timer stops when the outbox empties (fake timers); becoming visible triggers a drain; replaying the same batch is harmless.
-
-### 7. Home
-- `useCurrentCycle()` = query + cache + overlay. Cycle header, "Spending" and "Income" sections of category rows with `ProgressBar` (`scaleX`, `role="progressbar"`, `aria-valuetext`), status per 3.3 (80% warning threshold is presentation and lives here; Over/Ahead come from `status`). Skeletons of final size. Empty state routes to onboarding.
-- Tests: each row of table 3.3 renders its fill token, icon and word; long names truncate, amounts do not; cached data renders before the network answers.
+- Wire-in: `useCurrentCycle()` gains the cache (`initialData`) and the overlay; the connectivity banner reads the outbox count. Test: cached data renders before the network answers.
 
 ### 8. Add-transaction sheet
 - Keypad amount entry (pure reducer: digits, one decimal point, two places, backspace, max 18,2), Spending / Income control, picker (search, last-used first from `localStorage`, filtered by type), `type="date"` defaulting to the user's today, "Add note" with `aria-expanded`, sticky Save. Save = `enqueue(transaction.create)` with `crypto.randomUUID()`, haptic, close, toast with Undo (Undo enqueues the delete; overlay cancels the pair if not yet sent).
@@ -144,17 +145,17 @@ First commit is this plan. Each UI slice ends with MASTER section 14.
 ### 14. Docs and verification
 - Plan status; CLAUDE.md (web commands, the `overlay` rule, `/signin?error=`); design doc deltas (decisions below); `docker compose up -d --build` walked through on a phone-sized viewport in both themes, network toggled off and on in devtools.
 
-## Decisions to review
+## Decisions taken
 
 1. **Save is written once, the queued way, in M6** (agreed 2026-09-20). Save appends to the outbox and `drain()` posts the outbox to `/api/sync`; both are ordinary page code and both land in M6. Section 17 lists "offline store" under M6 and "offline sync" under M8; read literally that means either building Save as a direct `POST` now and rebuilding it on a queue later, or shipping a queue that nothing sends. M8 keeps the service worker, manifest and install hint. **The service worker only caches** (app shell, `GET /api/cycles/*`, `/api/categories`) so the app can open with no signal; it never syncs. Background Sync is not used: iOS Safari does not support it.
 2. **The screen is `overlay(server snapshot, outbox)`, not a second local database of entities** (agreed 2026-09-20). No Dexie copy of cycles, categories and transactions to keep in step with the server, no merge logic: the server's response is cached whole, and the queue is laid over it until it drains. Cost: one pure function repeats `CycleRollup.Line`'s arithmetic for unsynced rows. MASTER 3.3 says the front end does not recompute status; this is the one exception and it is temporary by construction.
-3. **Plain CSS with tokens and CSS Modules.** No Tailwind or component library. MASTER is token-first and bans palette classes; a utility framework would need configuring down to the same tokens for no gain.
-4. **Native `<dialog>` for sheets and dialogs.** Focus trap, Escape, focus return and the scrim come from the platform. Drag-to-dismiss is left out (see out of scope).
+3. **Plain CSS with tokens and CSS Modules** (agreed 2026-09-20). No Tailwind or component library. MASTER is token-first and bans palette classes; a utility framework would need configuring down to the same tokens for no gain.
+4. **Native `<dialog>` for sheets and dialogs** (agreed 2026-09-20). Focus trap, Escape, focus return and the scrim come from the platform. Drag-to-dismiss is left out (see out of scope).
 5. **A failed Entra sign-in redirects to `/signin?error=<code>`** (agreed 2026-09-20) instead of answering `403` problem details. The callback is a top-level browser navigation, so JSON there is a dead end for a person. The status code is lost; the code, the log line and "no cookie" are kept. This changes M5 behaviour and its tests.
 6. **`GET /auth/options` says which sign-ins exist** (agreed 2026-09-20; first draft put the field on `/auth/csrf`, rejected so that endpoint keeps one job). The SPA needs to know whether to draw the Microsoft button, and probing `/auth/login` would start a real challenge. Cost: one more route and one more request per load.
 7. **Cycles list and detail are in M6, the chart in M7** (agreed 2026-09-20). Past-cycle transactions and closing balances (stories Transactions 4, Settings 11 and 13) need a screen to live on, and the detail page is Home's body with another id.
-8. **Types are hand-written.** About ten records. `ponytail:` generate from OpenAPI if the API grows or drifts.
-9. **A refused sync item is dropped with an error toast**, not kept for retry. A `422` will be `422` for ever and would block everything queued behind it.
+8. **Types are hand-written** (agreed 2026-09-20). About ten records. `ponytail:` generate from OpenAPI if the API grows or drifts.
+9. **A refused sync item is dropped with an error toast** (agreed 2026-09-20), not kept for retry. A `422` will be `422` for ever and would block everything queued behind it.
 
 ## Verification
 
