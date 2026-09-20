@@ -1,0 +1,69 @@
+/* One column, capped at 480 and centred from 600 up; there is no desktop layout (MASTER 6). The shell is exactly the
+   viewport tall and only .scroll moves, so the tab bar never rides up with the content. */
+.shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
+  height: 100dvh;
+  max-width: var(--column-max);
+  margin: 0 auto;
+  padding-top: env(safe-area-inset-top);
+  background: var(--color-bg);
+}
+
+.scroll {
+  overflow-y: auto;
+  /* Pull-down must not trigger the browser's refresh in standalone mode. */
+  overscroll-behavior-y: contain;
+  /* A focused element is scrolled clear of the sticky top bar. The tab bar is outside this container. */
+  scroll-padding-top: var(--top-bar-height);
+}
+
+.tabBar {
+  z-index: var(--z-tab-bar);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 0 var(--space-2) env(safe-area-inset-bottom);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.tab {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--space-1);
+  height: var(--tab-bar-height);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The pill sits behind the icon only, so the label never reflows when the active tab changes. */
+.tab svg {
+  box-sizing: content-box;
+  width: var(--icon-md);
+  height: var(--icon-md);
+  padding: var(--space-1) var(--space-4);
+  border-radius: var(--radius-full);
+  transition: background var(--dur-fast);
+}
+
+.tab:active svg {
+  background: var(--color-surface-2);
+}
+
+/* Selected is colour, the pill and a heavier label, and aria-current says it to a screen reader. */
+.active {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.active svg {
+  background: var(--color-primary-soft);
+}

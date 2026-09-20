@@ -1,0 +1,16 @@
+.chip {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  /* MASTER 8: the slot colour at 15% behind, the slot colour itself for the icon. */
+  background: color-mix(in srgb, var(--chip) 15%, transparent);
+  color: var(--chip);
+}
+
+.chip svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}

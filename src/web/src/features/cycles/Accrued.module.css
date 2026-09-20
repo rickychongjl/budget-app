@@ -1,0 +1,24 @@
+.accrued {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font: var(--text-label);
+}
+
+.icon {
+  flex: none;
+  width: var(--space-4);
+  height: var(--space-4);
+}
+
+.positive {
+  color: var(--color-positive);
+}
+
+.negative {
+  color: var(--color-negative);
+}
+
+.level {
+  color: var(--color-text-muted);
+}

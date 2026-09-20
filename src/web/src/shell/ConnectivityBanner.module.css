@@ -1,0 +1,16 @@
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+}
+
+.icon {
+  flex: none;
+  width: var(--space-4);
+  height: var(--space-4);
+}

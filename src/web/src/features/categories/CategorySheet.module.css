@@ -1,0 +1,102 @@
+.form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.problem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-negative-soft);
+  color: var(--color-negative);
+  font: var(--text-label);
+}
+
+.problemIcon {
+  flex: none;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
+.group {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.legend {
+  padding: 0;
+  font: var(--text-label);
+  color: var(--color-text-muted);
+}
+
+/* Eight slots in one row of 44px targets at 360px: (360 - 32) / 8 = 41, so they wrap to two rows there and that is fine. */
+.swatches,
+.icons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--target-min), 1fr));
+  gap: var(--space-2);
+}
+
+.swatch,
+.iconChoice {
+  position: relative;
+  display: grid;
+  place-items: center;
+  /* No border: the hidden radio fills this box and is what takes the tap, so a border would shrink the target
+     below 44px (measured at 40). The selection ring is an inset shadow instead. */
+  height: var(--target-min);
+  border-radius: var(--radius-sm);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.iconChoice {
+  color: var(--color-text-muted);
+}
+
+.iconChoice svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
+/* Still focusable and announced by its slot or icon name; only the paint is replaced. */
+.radio {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+}
+
+.dot {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  border-radius: var(--radius-full);
+  background: var(--chip);
+}
+
+/* Selected is a ring and a tint as well as the colour itself, so it reads without telling the colours apart. */
+.swatch:has(.radio:checked),
+.iconChoice:has(.radio:checked) {
+  box-shadow: inset 0 0 0 2px var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-text);
+}
+
+.swatch:has(.radio:focus-visible),
+.iconChoice:has(.radio:focus-visible) {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.reason {
+  font: var(--text-label);
+  color: var(--color-text-muted);
+}

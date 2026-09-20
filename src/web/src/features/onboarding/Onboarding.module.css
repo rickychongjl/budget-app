@@ -1,0 +1,48 @@
+.section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.heading {
+  font: var(--text-heading);
+}
+
+.lead,
+.reason {
+  font: var(--text-label);
+  color: var(--color-text-muted);
+}
+
+.summary {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-negative-soft);
+  color: var(--color-negative);
+  font: var(--text-label);
+}
+
+.summaryIcon {
+  flex: none;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
+.summaryList {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A link in running text: underlined, so it does not rely on colour, and tall enough to tap. */
+.summaryList a {
+  display: inline-block;
+  min-height: var(--target-min);
+  color: inherit;
+  line-height: var(--target-min);
+}

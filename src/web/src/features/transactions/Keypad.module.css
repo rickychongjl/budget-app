@@ -1,0 +1,32 @@
+.keypad {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+/* At least 56px tall, 8px apart (MASTER 9). */
+.key {
+  display: grid;
+  place-items: center;
+  height: 56px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  font: var(--text-title);
+  font-variant-numeric: tabular-nums;
+  transition: transform var(--dur-press);
+  -webkit-tap-highlight-color: transparent;
+  /* Fast repeated taps must not zoom the page. */
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.key:active {
+  transform: scale(0.98);
+  background: var(--color-border);
+}
+
+.key svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}

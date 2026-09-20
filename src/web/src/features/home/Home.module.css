@@ -1,0 +1,39 @@
+.header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-1);
+}
+
+.caption {
+  font: var(--text-caption);
+  color: var(--color-text-muted);
+}
+
+.hero {
+  font: var(--text-display);
+  letter-spacing: var(--tracking-display);
+}
+
+.sub {
+  font: var(--text-label);
+  color: var(--color-text-muted);
+}
+
+.section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.sectionTitle {
+  font: var(--text-heading);
+}
+
+.rows {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

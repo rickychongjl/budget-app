@@ -1,0 +1,103 @@
+/* The dialog element is the full-width strip at the bottom; taps outside .panel land on ::backdrop. */
+.sheet {
+  position: fixed;
+  inset: auto 0 0 0;
+  width: 100%;
+  max-width: var(--column-max);
+  max-height: 90dvh;
+  margin: 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-float);
+  overflow: hidden;
+  animation: rise var(--dur-base) var(--ease-out);
+}
+
+.sheet::backdrop {
+  background: var(--color-overlay);
+  animation: fade var(--dur-base) var(--ease-out);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  max-height: 90dvh;
+}
+
+.handle {
+  width: 36px;
+  height: 4px;
+  margin: var(--space-2) auto 0;
+  border-radius: var(--radius-full);
+  background: var(--color-border-strong);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+}
+
+.title {
+  font: var(--text-heading);
+}
+
+.close {
+  display: grid;
+  place-items: center;
+  width: var(--target-min);
+  height: var(--target-min);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-muted);
+  transition: background var(--dur-press);
+}
+
+.close:active {
+  background: var(--color-surface-2);
+}
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+/* With no footer the body is the last thing above the home indicator. */
+.body:last-child {
+  padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+}
+
+.footer {
+  padding: var(--space-3) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+/* ponytail: enter is animated, exit is instant (the element unmounts). MASTER's --dur-exit needs the close to be delayed
+   until a transition ends; add it with `transition-behavior: allow-discrete` once Safari 17.4 is the floor. */
+@keyframes rise {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* MASTER 7: no transform, a 100ms fade instead. */
+@media (prefers-reduced-motion: reduce) {
+  .sheet {
+    animation: fade var(--dur-press) linear !important;
+  }
+}

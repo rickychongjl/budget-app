@@ -12,6 +12,12 @@ internal static class AuthEndpoints
     // /auth/callback is not here: the OpenID Connect middleware answers it before routing, under the global limit only.
     public static void MapAuth(this IEndpointRouteBuilder app, IConfiguration configuration)
     {
+        // Which sign-ins this deployment offers, so the SPA draws the Microsoft button only when it leads somewhere.
+        // Asking /auth/login instead would start a real challenge. Like /auth/csrf it is outside the strict limit:
+        // every page load calls it.
+        string[] signIn = EntraSignIn.IsConfigured(configuration) ? ["demo", "entra"] : ["demo"];
+        app.MapGet("/auth/options", () => Results.Ok(new { signIn }));
+
         var auth = app.MapGroup("/auth").RequireRateLimiting(RateLimiting.AuthPolicy).RequireCsrfToken();
 
         if (EntraSignIn.IsConfigured(configuration))

@@ -54,6 +54,8 @@ var app = builder.Build();
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+// The built SPA. Ahead of the rate limiter, so the files of one page load do not spend the API's allowance.
+app.UseStaticFiles(Spa.Files);
 // Before authentication, so a flood of anonymous requests is limited too.
 app.UseRateLimiter();
 app.UseAuthentication();
@@ -74,6 +76,8 @@ api.MapCategories();
 api.MapTransactions();
 // An unmatched /api path is a 404 for a signed-in caller and a 401 for anyone else, never the SPA's index.html.
 api.MapFallback(() => Results.NotFound());
+
+app.MapSpaFallback();
 
 app.Run();
 

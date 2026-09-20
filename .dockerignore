@@ -1,6 +1,7 @@
 **/bin
 **/obj
 **/node_modules
+**/dist
 .git
 .github
 .claude

@@ -1,0 +1,78 @@
+/* Primary actions sit in the bottom half (MASTER 1.1): the header takes the slack, the buttons stay in thumb reach. */
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-height: 100dvh;
+  max-width: var(--column-max);
+  margin: 0 auto;
+  padding: calc(var(--space-12) + env(safe-area-inset-top)) var(--space-4) calc(var(--space-8) + env(safe-area-inset-bottom));
+}
+
+/* Auto margins take all the free height, which centres the header in it and pushes the actions to the bottom. */
+.header {
+  display: grid;
+  gap: var(--space-2);
+  margin-block: auto;
+}
+
+.title {
+  font: var(--text-display);
+  letter-spacing: var(--tracking-display);
+}
+
+.lead {
+  color: var(--color-text-muted);
+}
+
+.problem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-negative-soft);
+  color: var(--color-negative);
+  font: var(--text-label);
+}
+
+.problemIcon {
+  flex: none;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
+.actions {
+  display: grid;
+  gap: var(--space-3);
+}
+
+/* Shaped like the secondary Button, but a link: it navigates to the server. */
+.microsoft {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  height: var(--control-height);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  font: var(--text-label);
+  font-weight: 600;
+  color: var(--color-text);
+  text-decoration: none;
+  transition:
+    transform var(--dur-press),
+    background var(--dur-press);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.microsoft:active {
+  transform: scale(0.98);
+  background: var(--color-surface-2);
+}
+
+.note {
+  font: var(--text-caption);
+  color: var(--color-text-muted);
+  text-align: center;
+}

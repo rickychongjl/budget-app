@@ -1,0 +1,105 @@
+/* A grid track is `auto` wide by default, which grows to fit a nowrap child instead of letting it truncate: one long
+   category name made the whole page scroll sideways. minmax(0, 1fr) lets the track shrink. */
+.page,
+.section,
+.rows,
+.categoryBody {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.page {
+  display: grid;
+  gap: var(--space-6);
+  max-width: var(--column-max);
+  margin: 0 auto;
+  padding: calc(var(--space-4) + env(safe-area-inset-top)) var(--space-4) calc(var(--space-12) + env(safe-area-inset-bottom));
+}
+
+.title,
+.textTitle {
+  font: var(--text-title);
+}
+
+.section {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.sectionTitle {
+  font: var(--text-caption);
+  color: var(--color-text-muted);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.rows {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.display {
+  font: var(--text-display);
+  letter-spacing: var(--tracking-display);
+}
+
+.heading {
+  font: var(--text-heading);
+}
+
+.label {
+  font: var(--text-label);
+  color: var(--color-text-muted);
+}
+
+.caption {
+  font: var(--text-caption);
+  color: var(--color-text-muted);
+}
+
+.categoryRow {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.categoryBody {
+  display: grid;
+  flex: 1;
+  gap: var(--space-2);
+  min-width: 0;
+  justify-items: start;
+}
+
+.categoryBody > [role='progressbar'] {
+  width: 100%;
+}
+
+.categoryTop {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+/* Long names truncate; amounts never do (MASTER 6). */
+.categoryName {
+  min-width: 0;
+  overflow: hidden;
+  font: var(--text-heading);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.amount {
+  flex: none;
+  font: var(--text-label);
+  color: var(--color-text-muted);
+}
+
+.statusNormal {
+  font: var(--text-label);
+  color: var(--color-text-muted);
+}
