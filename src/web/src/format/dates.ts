@@ -12,6 +12,9 @@ const toUtc = (date: string) => {
   return Date.UTC(year, month - 1, day)
 }
 
+// Whole days from a date, through UTC so that daylight saving cannot lose or gain one. A cycle ends addDays(start, 29).
+export const addDays = (date: string, days: number) => new Date(toUtc(date) + days * DAY_MS).toISOString().slice(0, 10)
+
 // "1 Sep" inside today's year, "1 Sep 2025" otherwise.
 export function formatDate(date: string, today: string) {
   const [year, month, day] = parts(date)

@@ -80,6 +80,16 @@ export function Categories() {
 }
 
 function CycleCategories({ cycleId, online, picker }: { cycleId: string; online: boolean; picker: React.ReactNode }) {
+  return (
+    <Screen title="Categories" back>
+      {picker}
+      <CategoryList cycleId={cycleId} online={online} />
+    </Screen>
+  )
+}
+
+// One cycle's categories: edit, reorder, add, remove. Onboarding uses it too, against the draft cycle.
+export function CategoryList({ cycleId, online }: { cycleId: string; online: boolean }) {
   const { me } = useSession()
   const cycle = useCycle(cycleId)
   const [editing, setEditing] = useState<CategoryRollup | 'new' | null>(null)
@@ -101,18 +111,8 @@ function CycleCategories({ cycleId, online, picker }: { cycleId: string; online:
     }
   }
 
-  const add = (
-    <Button variant="ghost" icon={Plus} aria-label="Add category" disabled={!online} onClick={() => setEditing('new')}>
-      Add
-    </Button>
-  )
-
   return (
-    <Screen title="Categories" back action={add}>
-      {picker}
-      {/* Said plainly, not hidden and not left to fail on tap (design section 7). */}
-      {!online && <p className={styles.reason}>Adding or removing a category needs a connection.</p>}
-
+    <>
       {cycle.isError && (
         <EmptyState icon={CloudOff} action={<Button onClick={() => cycle.refetch()}>Try again</Button>}>
           Couldn't load this cycle's categories.
@@ -157,7 +157,15 @@ function CycleCategories({ cycleId, online, picker }: { cycleId: string; online:
         )
       })}
 
+      {cycle.data && (
+        <Button variant="secondary" icon={Plus} disabled={!online} onClick={() => setEditing('new')}>
+          Add category
+        </Button>
+      )}
+      {/* Said plainly, not hidden and not left to fail on tap (design section 7). */}
+      {!online && <p className={styles.reason}>Adding or removing a category needs a connection.</p>}
+
       {editing && <CategorySheet cycleId={cycleId} rows={rows} editing={editing === 'new' ? undefined : editing} online={online} onClose={() => setEditing(null)} />}
-    </Screen>
+    </>
   )
 }

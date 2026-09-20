@@ -1,5 +1,4 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Hammer } from 'lucide-react'
 import { lazy, Suspense, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { NetworkError, ProblemError } from './api/client'
@@ -8,12 +7,11 @@ import { Categories } from './features/categories/Categories'
 import { CycleDetail } from './features/cycles/CycleDetail'
 import { Cycles } from './features/cycles/Cycles'
 import { Home } from './features/home/Home'
+import { Onboarding } from './features/onboarding/Onboarding'
 import { Settings } from './features/settings/Settings'
 import { CategoryTransactions } from './features/transactions/CategoryTransactions'
 import { OutboxSync } from './offline/OutboxSync'
 import { AppShell } from './shell/AppShell'
-import { Screen } from './shell/Screen'
-import { EmptyState } from './ui/EmptyState'
 import { ToastProvider } from './ui/Toast'
 
 // Dev only. import.meta.env.DEV is replaced with `false` in a production build, so the page and everything only it
@@ -57,7 +55,7 @@ export default function App() {
                 <Route path="cycles/:cycleId/categories/:categoryId" element={<CategoryTransactions />} />
                 <Route path="settings" element={<Settings />} />
                 <Route path="settings/categories" element={<Categories />} />
-                <Route path="onboarding" element={<ComingSoon title="Set up" />} />
+                <Route path="onboarding" element={<Onboarding />} />
               </Route>
               {/* /signin once signed in, and anything unknown, goes Home. The server has already answered /api and /auth. */}
               <Route path="*" element={<Navigate to="/" replace />} />
@@ -66,14 +64,5 @@ export default function App() {
         </SessionGate>
       </ToastProvider>
     </QueryClientProvider>
-  )
-}
-
-// A routed screen that a later M6 slice fills in.
-function ComingSoon({ title }: { title: string }) {
-  return (
-    <Screen title={title}>
-      <EmptyState icon={Hammer}>This screen is still being built.</EmptyState>
-    </Screen>
   )
 }
