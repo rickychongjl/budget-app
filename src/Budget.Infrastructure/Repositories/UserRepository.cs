@@ -19,4 +19,13 @@ public sealed class UserRepository(BudgetDbContext db) : IUserRepository
         await db.Users.OrderBy(u => u.CreatedAt).ToListAsync(ct);
 
     public void Add(User user) => db.Users.Add(user);
+
+    // Children first: every foreign key is Restrict. The explicit UserId is on top of the query filter, not instead of it.
+    public async Task DeleteDataAsync(Guid userId, CancellationToken ct = default)
+    {
+        await db.Transactions.Where(t => t.UserId == userId).ExecuteDeleteAsync(ct);
+        await db.CycleCategories.Where(c => c.UserId == userId).ExecuteDeleteAsync(ct);
+        await db.Cycles.Where(c => c.UserId == userId).ExecuteDeleteAsync(ct);
+        await db.Categories.Where(c => c.UserId == userId).ExecuteDeleteAsync(ct);
+    }
 }

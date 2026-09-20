@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Budget.Infrastructure\Budget.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Budget.Jobs\Budget.Jobs.csproj" />
   </ItemGroup>
 
 </Project>

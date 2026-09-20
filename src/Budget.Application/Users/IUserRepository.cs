@@ -12,4 +12,8 @@ public interface IUserRepository
     Task<User?> GetDemoAsync(CancellationToken ct = default);
     Task<IReadOnlyList<User>> ListAsync(CancellationToken ct = default);
     void Add(User user);
+
+    // Deletes every tenant row of this user at once, not through the unit of work; the User row stays.
+    // The tenant filter still applies, so it only does anything when the scope is running as that user.
+    Task DeleteDataAsync(Guid userId, CancellationToken ct = default);
 }
