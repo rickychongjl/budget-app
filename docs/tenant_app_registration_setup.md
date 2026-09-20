@@ -60,6 +60,9 @@ You are the tenant's first user and its Global Administrator. That is the one us
      from the token endpoint, server to server.
 7. **Certificates & secrets** > **Client secrets** > **New client secret**. Description `budget-local`, expiry 12 months or less.
    **Copy the Value now**; it is never shown again. (The Secret ID next to it is not the secret.)
+   This secret is for local use only. Production gets its own, `budget-prod`, on this same app registration in M9 (an app
+   registration holds several secrets at once): each can then be revoked or rotated without touching the other, and the
+   production value never sits on a laptop. A second app registration is not needed.
 8. **API permissions**: leave the default (`User.Read`, delegated). The app asks only for `openid profile`; the `oid` claim the
    allowlist checks comes with `profile`. No admin consent is needed.
 
@@ -108,8 +111,10 @@ run `docker compose up -d --build` again so `migrate` runs.
 
 ## What is not one-time
 
-- **The client secret expires** (at most 24 months; 12 recommended). Create a new one in step 3.7 and update it where it is
-  stored. Put the expiry date in a calendar.
-- **Production** (M9) stores the same four values as Container Apps secrets and settings, and adds the production redirect URI
-  in step 3.6. Microsoft recommends against client secrets in production; M9 may replace the secret with the Container App's
-  managed identity as a federated credential on this app registration, which leaves nothing to rotate.
+- **Client secrets expire** (at most 24 months; 12 recommended). Create a new one as in step 3.7, update it where it is stored,
+  then delete the old one. Put each expiry date in a calendar. `budget-local` and `budget-prod` expire and rotate separately.
+- **Production** (M9) adds the production redirect URI in step 3.6 and a second secret, `budget-prod`, created the same way as
+  step 3.7 and pasted straight into the Container Apps secret, never into user-secrets or a file. The tenant id, client id and
+  allowlist are the same values as local. Microsoft recommends against client secrets in production; M9 may instead use the
+  Container App's managed identity as a federated credential on this app registration, in which case `budget-prod` is never
+  created and there is nothing to rotate.
