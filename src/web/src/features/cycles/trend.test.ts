@@ -92,12 +92,12 @@ describe('summarise', () => {
     summarise(values.map((value, index) => ({ cycleId: `c${index}`, label: '', start: '', end: '', value, partial: false })), filter, 'AUD')
 
   test('compares the first finished cycle with the last', () => {
-    expect(at([500, 400, 460])).toBe('Spending fell 8% over the last 3 cycles.')
-    expect(at([400, 500])).toBe('Spending rose 25% over the last 2 cycles.')
+    expect(at([500, 400, 460])).toBe('Spending fell 8% over the last 3 finished cycles.')
+    expect(at([400, 500])).toBe('Spending rose 25% over the last 2 finished cycles.')
   })
 
   test('says so plainly when nothing much changed', () => {
-    expect(at([500, 500])).toBe('Spending held steady over the last 2 cycles.')
+    expect(at([500, 500])).toBe('Spending held steady over the last 2 finished cycles.')
   })
 
   test('the cycle still being spent is left out, so a part-spent cycle is never a crash', () => {
@@ -107,7 +107,17 @@ describe('summarise', () => {
       { cycleId: 'c', label: '', start: '', end: '', value: 12, partial: true },
     ]
 
-    expect(summarise(series, SPENDING, 'AUD')).toBe('Spending fell 20% over the last 2 cycles.')
+    expect(summarise(series, SPENDING, 'AUD')).toBe('Spending fell 20% over the last 2 finished cycles, and is at $12.00 so far.')
+  })
+
+  // The demo's Transport: 100, 115, 100, 125 finished, then 62.40 three days into the current cycle. The sentence
+  // said "rose 25%" under a line that visibly plunged, and read as a bug. It must account for the low last point.
+  test('a rise is not claimed under a plunging line without explaining the plunge', () => {
+    const series = [100, 115, 100, 125].map((value, index) => ({ cycleId: `c${index}`, label: '', start: '', end: '', value, partial: false }))
+    series.push({ cycleId: 'now', label: '', start: '', end: '', value: 62.4, partial: true })
+
+    expect(summarise(series, { kind: 'category', categoryId: 't', name: 'Transport' }, 'AUD'))
+      .toBe('Transport rose 25% over the last 4 finished cycles, and is at $62.40 so far.')
   })
 
   test('with fewer than two finished cycles there is nothing to compare', () => {
@@ -116,18 +126,18 @@ describe('summarise', () => {
   })
 
   test('money accrued is compared in money, because a percentage across zero is nonsense', () => {
-    expect(at([-50, 120], ACCRUED)).toBe('Money accrued rose $170.00 over the last 2 cycles.')
-    expect(at([120, -50], ACCRUED)).toBe('Money accrued fell $170.00 over the last 2 cycles.')
+    expect(at([-50, 120], ACCRUED)).toBe('Money accrued rose $170.00 over the last 2 finished cycles.')
+    expect(at([120, -50], ACCRUED)).toBe('Money accrued fell $170.00 over the last 2 finished cycles.')
   })
 
   test('a category is named', () => {
     const filter: TrendFilter = { kind: 'category', categoryId: 'food', name: 'Groceries' }
 
-    expect(at([500, 250], filter)).toBe('Groceries fell 50% over the last 2 cycles.')
+    expect(at([500, 250], filter)).toBe('Groceries fell 50% over the last 2 finished cycles.')
   })
 
   test('from nothing to something is money, not a division by zero', () => {
-    expect(at([0, 250])).toBe('Spending rose $250.00 over the last 2 cycles.')
+    expect(at([0, 250])).toBe('Spending rose $250.00 over the last 2 finished cycles.')
   })
 
   test('gaps are not compared', () => {
@@ -137,7 +147,7 @@ describe('summarise', () => {
       { cycleId: 'c', label: '', start: '', end: '', value: 300, partial: false },
     ]
 
-    expect(summarise(series, SPENDING, 'AUD')).toBe('Spending fell 25% over the last 2 cycles.')
+    expect(summarise(series, SPENDING, 'AUD')).toBe('Spending fell 25% over the last 2 finished cycles.')
   })
 })
 

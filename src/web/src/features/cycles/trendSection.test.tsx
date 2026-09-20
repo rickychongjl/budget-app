@@ -30,7 +30,7 @@ describe('TrendSection', () => {
   test('says in one sentence what the chart shows (MASTER 10)', () => {
     show(SERIES)
 
-    expect(screen.getByText('Spending fell 8% over the last 3 cycles.')).toBeInTheDocument()
+    expect(screen.getByText('Spending fell 8% over the last 3 finished cycles, and is at $120.00 so far.')).toBeInTheDocument()
   })
 
   test('the chart is an image with a name, for anyone who cannot see it', async () => {

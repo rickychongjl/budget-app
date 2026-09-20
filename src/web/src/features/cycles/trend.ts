@@ -69,18 +69,28 @@ export function categoriesOf(report: CycleSummary[]): TrendCategory[] {
 
 const noun = (filter: TrendFilter) => (filter.kind === 'spending' ? 'Spending' : filter.kind === 'accrued' ? 'Money accrued' : (filter.name ?? 'This category'))
 
-// MASTER 10: every chart has a one-sentence summary above it. Finished cycles only.
+// MASTER 10: every chart has a one-sentence summary above it.
+//
+// The comparison is between finished cycles only, because a cycle three days in would read as a crash. But that
+// cycle is still the last point on the chart, and it is usually the lowest one, so a sentence that quietly ignored
+// it contradicted the picture: four cycles of transport rising 100 to 125 read as "rose 25%" under a line that
+// visibly plunged. So the sentence says the cycles it counted were finished, and then accounts for the one it did
+// not count. Every point on the chart is spoken for.
 export function summarise(series: TrendPoint[], filter: TrendFilter, currency: string): string {
+  const sign = filter.kind === 'accrued'
+  const current = series.find((point) => point.partial && point.value !== null)
+  const soFar = current ? `, and is at ${formatMoney(current.value!, currency, { sign })} so far` : ''
+
   const finished = series.filter((point) => !point.partial && point.value !== null).map((point) => point.value!)
   if (finished.length < 2) {
-    return 'Not enough finished cycles to compare yet.'
+    return `Not enough finished cycles to compare yet${soFar}.`
   }
 
   const first = finished[0]
   const last = finished[finished.length - 1]
   const change = last - first
   if (Math.abs(change) < 0.005) {
-    return `${noun(filter)} held steady over the last ${finished.length} cycles.`
+    return `${noun(filter)} held steady over the last ${finished.length} finished cycles${soFar}.`
   }
 
   const direction = change > 0 ? 'rose' : 'fell'
@@ -88,7 +98,7 @@ export function summarise(series: TrendPoint[], filter: TrendFilter, currency: s
   const percent = filter.kind !== 'accrued' && first > 0 ? Math.round((change / first) * 100) : null
   const size = percent !== null && percent !== 0 ? `${Math.abs(percent)}%` : formatMoney(Math.abs(change), currency)
 
-  return `${noun(filter)} ${direction} ${size} over the last ${finished.length} cycles.`
+  return `${noun(filter)} ${direction} ${size} over the last ${finished.length} finished cycles${soFar}.`
 }
 
 // A step people read easily: 1, 2, 2.5 or 5 times a power of ten.
