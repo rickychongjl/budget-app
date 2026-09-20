@@ -49,6 +49,11 @@
   font: var(--text-heading);
 }
 
+.spent {
+  font: var(--text-label);
+  color: var(--color-text-muted);
+}
+
 .chevron {
   flex: none;
   width: var(--icon-sm);

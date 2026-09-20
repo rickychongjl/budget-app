@@ -8,7 +8,7 @@ import { resetCsrf } from '../../api/client'
 import type { CategoryRollup, Cycle, CycleSummary, Me } from '../../api/types'
 import { parseMoney } from '../../format/money'
 import { db } from '../../offline/db'
-import { stopOutbox } from '../../offline/outbox'
+import { configureOutbox, enqueue, stopOutbox } from '../../offline/outbox'
 import { server } from '../../test/server'
 import { ToastProvider } from '../../ui/Toast'
 import { SessionContext } from '../auth/useSession'
@@ -47,14 +47,22 @@ const row = (categoryId: string, name: string, type: 'Debit' | 'Credit', budgete
   categoryId, name, icon: 'tag', colour: 'blue', type, budgeted, actual, remaining: budgeted - actual, percentUsed: (actual / budgeted) * 100, status: actual > budgeted ? (type === 'Debit' ? 'Over' : 'Ahead') : 'OnTrack',
 })
 
-const summaryOf = (of: Cycle): CycleSummary => ({
-  cycle: of,
-  rollup: {
-    categories: [row('food', 'Groceries', 'Debit', 700, 640), row('pay', 'Salary', 'Credit', 5200, 5200)],
-    debitsBudgeted: 700, debitsActual: 640, creditsBudgeted: 5200, creditsActual: 5200, net: 4560,
-    accrued: of.openingBalance !== null && of.closingBalance !== null ? of.closingBalance - of.openingBalance : null,
-  },
-})
+// What each cycle spent of the same $700 budget, so a row's own figures can be told apart from its neighbour's.
+const SPENT: Record<string, number> = { p1: 500, p2: 640, cur: 120, fut: 0 }
+
+const summaryOf = (of: Cycle): CycleSummary => {
+  const spent = SPENT[of.id]
+  return {
+    cycle: of,
+    rollup: {
+      categories: [row('food', 'Groceries', 'Debit', 700, spent), row('pay', 'Salary', 'Credit', 5200, 5200)],
+      debitsBudgeted: 700, debitsActual: spent, creditsBudgeted: 5200, creditsActual: 5200, net: 5200 - spent,
+      accrued: of.openingBalance !== null && of.closingBalance !== null ? of.closingBalance - of.openingBalance : null,
+    },
+  }
+}
+
+const REPORT = CYCLES.map(summaryOf)
 
 function renderAt(path: string) {
   vi.setSystemTime(new Date('2026-09-20T02:00:00Z'))
@@ -82,7 +90,7 @@ beforeEach(async () => {
   await db.cache.clear()
   server.use(
     http.get('/auth/csrf', () => HttpResponse.json({ token: 't' })),
-    http.get('/api/cycles', () => HttpResponse.json(CYCLES)),
+    http.get('/api/reports/cycles', () => HttpResponse.json(REPORT)),
     http.get('/api/cycles/:id', ({ params }) => HttpResponse.json(summaryOf(CYCLES.find((c) => c.id === params.id)!))),
   )
   return () => vi.useRealTimers()
@@ -109,17 +117,50 @@ describe('Cycles', () => {
   })
 
   test('a first cycle that is not confirmed yet says Draft', async () => {
-    server.use(http.get('/api/cycles', () => HttpResponse.json([cycle('d', '2026-09-10', '2026-10-09', 'Current', null, null, 'Draft')])))
+    const draft = cycle('d', '2026-09-10', '2026-10-09', 'Current', null, null, 'Draft')
+    server.use(http.get('/api/reports/cycles', () => HttpResponse.json([{ ...summaryOf({ ...draft, id: 'cur' }), cycle: draft }])))
     renderAt('/cycles')
 
     expect(await screen.findByTestId('badge')).toHaveTextContent('Draft')
   })
 
   test('says so when there are none', async () => {
-    server.use(http.get('/api/cycles', () => HttpResponse.json([])))
+    server.use(http.get('/api/reports/cycles', () => HttpResponse.json([])))
     renderAt('/cycles')
 
     expect(await screen.findByText('No cycles yet.')).toBeInTheDocument()
+  })
+
+  test('each row says what was spent against what was budgeted (MASTER 9)', async () => {
+    renderAt('/cycles')
+    const rows = await screen.findAllByRole('link')
+
+    expect(within(rows[3]).getByText('$500.00 of $700.00 spent')).toBeInTheDocument()
+    expect(within(rows[2]).getByText('$640.00 of $700.00 spent')).toBeInTheDocument()
+    expect(within(rows[1]).getByText('$120.00 of $700.00 spent')).toBeInTheDocument()
+  })
+
+  test('a transaction waiting in the outbox counts towards its own cycle and no other', async () => {
+    renderAt('/cycles')
+    await screen.findAllByRole('link')
+
+    await configureOutbox({ userId: 'u1', refresh: async () => undefined })
+    await act(async () => {
+      await enqueue({ type: 'transaction.create', create: { clientId: 'tx-1', cycleId: 'cur', categoryId: 'food', amount: 30, occurredOn: '2026-09-20', note: null } })
+    })
+
+    const rows = await screen.findAllByRole('link')
+    expect(within(rows[1]).getByText('$150.00 of $700.00 spent')).toBeInTheDocument()
+    expect(within(rows[2]).getByText('$640.00 of $700.00 spent')).toBeInTheDocument()
+  })
+
+  test('the last report renders before the network answers', async () => {
+    const stale = [{ ...summaryOf(CYCLES[0]), cycle: { ...CYCLES[0], id: 'old' } }]
+    await db.cache.put({ key: 'u1:cycles/report', userId: 'u1', json: stale, at: 1 })
+    server.use(http.get('/api/reports/cycles', () => new Promise(() => {})))
+    renderAt('/cycles')
+
+    expect(await screen.findByRole('heading', { level: 2, name: '12 Jul to 10 Aug' })).toBeInTheDocument()
   })
 })
 
