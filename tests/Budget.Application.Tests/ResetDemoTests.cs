@@ -17,6 +17,10 @@ public sealed class ResetDemoTests
 
     private User Demo() => _store.SignIn(isDemo: true);
 
+    // Derived from the fixture, never pinned: how much history the demo carries is a demo decision, and the trend
+    // chart wants enough finished cycles to draw a line.
+    private int ExpectedCycles => -_fixture.FirstCycleStartOffset / 30 + 1;
+
     [Fact]
     public void The_fixture_stays_inside_the_demo_caps_and_the_design_system()
     {
@@ -37,16 +41,18 @@ public sealed class ResetDemoTests
 
         await Sut().RunAsync(_fixture);
 
+        _fixture.ClosingBalances.Should().HaveCount(ExpectedCycles - 1, "every cycle but the current one has closed");
+
         var cycles = _store.Cycles.OrderBy(c => c.StartDate).ToList();
-        cycles.Should().HaveCount(3).And.OnlyContain(c => c.UserId == demo.Id && c.Status == CycleStatus.Confirmed);
+        cycles.Should().HaveCount(ExpectedCycles).And.OnlyContain(c => c.UserId == demo.Id && c.Status == CycleStatus.Confirmed);
         cycles[0].StartDate.Should().Be(Today.AddDays(_fixture.FirstCycleStartOffset));
         cycles[^1].Covers(Today).Should().BeTrue();
 
-        cycles.Select(c => c.OpeningBalance).Should().Equal(_fixture.OpeningBalance, _fixture.ClosingBalances[0], _fixture.ClosingBalances[1]);
-        cycles.Select(c => c.ClosingBalance).Should().Equal(_fixture.ClosingBalances[0], _fixture.ClosingBalances[1], null);
+        cycles.Select(c => c.OpeningBalance).Should().Equal([_fixture.OpeningBalance, .. _fixture.ClosingBalances.Cast<decimal?>()]);
+        cycles.Select(c => c.ClosingBalance).Should().Equal([.. _fixture.ClosingBalances.Cast<decimal?>(), null]);
 
         _store.Categories.Should().HaveCount(_fixture.Categories.Count);
-        _store.CycleCategories.Should().HaveCount(_fixture.Categories.Count * 3);
+        _store.CycleCategories.Should().HaveCount(_fixture.Categories.Count * ExpectedCycles);
         _store.CycleCategories.Where(c => c.CycleId == cycles[0].Id).Select(c => c.SortOrder).Should().BeInAscendingOrder().And.OnlyHaveUniqueItems();
 
         _store.Transactions.Should().HaveCount(_fixture.Transactions.Count);
@@ -71,7 +77,7 @@ public sealed class ResetDemoTests
         await Sut().RunAsync(_fixture);
 
         _store.Transactions.Should().HaveCount(_fixture.Transactions.Count).And.NotContain(t => t.Note == "a visitor was here");
-        _store.Cycles.Where(c => c.UserId == demo.Id).Should().HaveCount(3);
+        _store.Cycles.Where(c => c.UserId == demo.Id).Should().HaveCount(ExpectedCycles);
         _store.Cycles.Should().Contain(theirCycle);
     }
 
@@ -84,7 +90,7 @@ public sealed class ResetDemoTests
         var saves = _store.Saves;
         await Sut().SeedIfEmptyAsync(_fixture);
 
-        _store.Cycles.Should().HaveCount(3);
+        _store.Cycles.Should().HaveCount(ExpectedCycles);
         _store.Saves.Should().Be(saves);
     }
 
