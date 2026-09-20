@@ -110,7 +110,7 @@ public sealed class EntraSignInTests(ApiFactory api)
     }
 
     [Fact]
-    public async Task An_oid_that_is_not_on_the_allowlist_is_403_with_no_session()
+    public async Task An_oid_that_is_not_on_the_allowlist_is_sent_back_to_sign_in_with_no_session()
     {
         var oid = Guid.NewGuid().ToString();
         await api.NewUserAsync(externalId: oid);
@@ -118,22 +118,22 @@ public sealed class EntraSignInTests(ApiFactory api)
         await using var host = Host(Guid.NewGuid().ToString(), tokens);
         var client = host.CreateClient(Https);
 
-        await ShouldBeRefused(await SignInAsync(client, tokens, oid), client);
+        await ShouldBeRefused(await SignInAsync(client, tokens, oid), client, "auth.not-allowed");
     }
 
     [Fact]
-    public async Task An_allowed_oid_without_a_user_row_is_403_with_no_session()
+    public async Task An_allowed_oid_without_a_user_row_is_sent_back_to_sign_in_with_no_session()
     {
         var oid = Guid.NewGuid().ToString();
         var tokens = new TokenEndpoint();
         await using var host = Host(oid, tokens);
         var client = host.CreateClient(Https);
 
-        await ShouldBeRefused(await SignInAsync(client, tokens, oid), client);
+        await ShouldBeRefused(await SignInAsync(client, tokens, oid), client, "auth.not-allowed");
     }
 
     [Fact]
-    public async Task A_token_signed_by_someone_else_is_403_with_no_session()
+    public async Task A_token_signed_by_someone_else_is_sent_back_to_sign_in_with_no_session()
     {
         var oid = Guid.NewGuid().ToString();
         await api.NewUserAsync(externalId: oid);
@@ -143,8 +143,7 @@ public sealed class EntraSignInTests(ApiFactory api)
 
         var callback = await SignInAsync(client, tokens, oid, signedWith: new RsaSecurityKey(RSA.Create(2048)) { KeyId = "test" });
 
-        await HostTests.ShouldBeProblem(callback, HttpStatusCode.Forbidden, "auth.failed");
-        (await client.GetAsync("/api/me")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        await ShouldBeRefused(callback, client, "auth.failed");
     }
 
     [Fact]
@@ -155,9 +154,30 @@ public sealed class EntraSignInTests(ApiFactory api)
         await HostTests.ShouldBeProblem(response, HttpStatusCode.NotFound, "http.404");
     }
 
-    private static async Task ShouldBeRefused(HttpResponseMessage callback, HttpClient client)
+    [Fact]
+    public async Task Options_lists_entra_when_it_is_configured()
     {
-        await HostTests.ShouldBeProblem(callback, HttpStatusCode.Forbidden, "auth.not-allowed");
+        await using var host = Host("", new TokenEndpoint());
+
+        var options = await host.CreateClient(Https).GetFromJsonAsync<JsonElement>("/auth/options");
+
+        options.GetProperty("signIn").EnumerateArray().Select(s => s.GetString()).Should().Equal("demo", "entra");
+    }
+
+    [Fact]
+    public async Task Options_lists_only_the_demo_without_entra_settings_and_needs_no_session()
+    {
+        var options = await api.CreateClient(Https).GetFromJsonAsync<JsonElement>("/auth/options");
+
+        options.GetProperty("signIn").EnumerateArray().Select(s => s.GetString()).Should().Equal("demo");
+    }
+
+    // The callback is a top-level navigation, so a refusal goes to a screen a person can read, not to problem details.
+    // What matters for security is unchanged: no session comes out of it.
+    private static async Task ShouldBeRefused(HttpResponseMessage callback, HttpClient client, string code)
+    {
+        callback.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        callback.Headers.Location!.OriginalString.Should().Be($"/signin?error={code}");
         callback.Headers.TryGetValues("Set-Cookie", out var cookies);
         (cookies ?? []).Should().NotContain(c => c.StartsWith("budget.session=", StringComparison.Ordinal) && !c.StartsWith("budget.session=;", StringComparison.Ordinal));
         (await client.GetAsync("/api/me")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);

@@ -42,24 +42,18 @@ internal static class EntraSignIn
             };
 
             // Every way the round trip can fail ends here: a refused oid, a bad signature, a cancelled sign-in.
-            o.Events.OnRemoteFailure = async context =>
+            // The callback is a top-level navigation, so problem details would leave a person looking at raw JSON with no way
+            // back. They go to the SPA's sign-in screen instead, which explains the code. No session is issued either way.
+            // The code is one of ours (never text from the request), so the redirect cannot be steered elsewhere.
+            o.Events.OnRemoteFailure = context =>
             {
                 var code = context.Failure is ForbiddenException refused ? refused.Code : "auth.failed";
                 context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(EntraSignIn))
                     .LogWarning("Sign-in refused: {Code}", code);
 
                 context.HandleResponse();
-                context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                await context.HttpContext.RequestServices.GetRequiredService<IProblemDetailsService>().TryWriteAsync(new ProblemDetailsContext
-                {
-                    HttpContext = context.HttpContext,
-                    ProblemDetails = new ProblemDetails
-                    {
-                        Status = StatusCodes.Status403Forbidden,
-                        Detail = "The sign-in was not accepted.",
-                        Extensions = { ["code"] = code },
-                    },
-                });
+                context.Response.Redirect($"/signin?error={Uri.EscapeDataString(code)}");
+                return Task.CompletedTask;
             };
         });
 }
