@@ -17,6 +17,9 @@ public sealed class CategoryRepository(BudgetDbContext db) : ICategoryRepository
     public async Task<IReadOnlyList<CycleCategory>> ListForCycleAsync(Guid cycleId, CancellationToken ct = default) =>
         await db.CycleCategories.Where(c => c.CycleId == cycleId).OrderBy(c => c.SortOrder).ToListAsync(ct);
 
+    public async Task<IReadOnlyList<CycleCategory>> ListForAllCyclesAsync(CancellationToken ct = default) =>
+        await db.CycleCategories.OrderBy(c => c.SortOrder).ToListAsync(ct);
+
     public Task<CycleCategory?> GetForCycleAsync(Guid cycleId, Guid categoryId, CancellationToken ct = default) =>
         db.CycleCategories.SingleOrDefaultAsync(c => c.CycleId == cycleId && c.CategoryId == categoryId, ct);
 

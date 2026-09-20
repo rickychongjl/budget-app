@@ -11,6 +11,10 @@ namespace Budget.Infrastructure.Tests;
 [Collection(SqlServerCollection.Name)]
 public sealed class ResetDemoJobTests(SqlServerFixture sql)
 {
+    // Follows the fixture rather than pinning a number: how much history the demo carries is a demo decision.
+    private static readonly int ExpectedCycles =
+        -DemoFixture.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "demo-seed.json"))).FirstCycleStartOffset / 30 + 1;
+
     [Fact]
     public async Task Reset_rebuilds_the_demo_from_the_fixture_and_leaves_everyone_else_alone()
     {
@@ -35,7 +39,7 @@ public sealed class ResetDemoJobTests(SqlServerFixture sql)
         int seeded;
         await using (var db = sql.ContextFor(demoId))
         {
-            (await db.Cycles.CountAsync()).Should().Be(3);
+            (await db.Cycles.CountAsync()).Should().Be(ExpectedCycles);
             seeded = await db.Transactions.CountAsync();
             seeded.Should().BeGreaterThan(20);
 
@@ -58,7 +62,7 @@ public sealed class ResetDemoJobTests(SqlServerFixture sql)
         {
             (await db.Transactions.CountAsync()).Should().Be(seeded);
             (await db.Transactions.AnyAsync(t => t.Note == "a visitor was here")).Should().BeFalse();
-            (await db.Cycles.CountAsync()).Should().Be(3);
+            (await db.Cycles.CountAsync()).Should().Be(ExpectedCycles);
             (await db.Categories.CountAsync()).Should().Be(7);
         }
 

@@ -12,6 +12,13 @@ public sealed class TransactionRepository(BudgetDbContext db) : ITransactionRepo
             .OrderByDescending(t => t.OccurredOn).ThenByDescending(t => t.CreatedAt)
             .ToListAsync(ct);
 
+    // One GROUP BY over Transaction (UserId, CycleId, CategoryId); the tenant filter applies as to any query.
+    public async Task<IReadOnlyList<CategoryTotal>> SumByCategoryAsync(CancellationToken ct = default) =>
+        await db.Transactions
+            .GroupBy(t => new { t.CycleId, t.CategoryId })
+            .Select(g => new CategoryTotal(g.Key.CycleId, g.Key.CategoryId, g.Sum(t => t.Amount)))
+            .ToListAsync(ct);
+
     public Task<Transaction?> GetAsync(Guid id, CancellationToken ct = default) =>
         db.Transactions.SingleOrDefaultAsync(t => t.Id == id, ct);
 

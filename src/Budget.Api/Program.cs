@@ -73,6 +73,7 @@ var api = app.MapGroup("/api").RequireAuthorization().RequireCsrfToken();
 api.MapMe();
 api.MapCycles();
 api.MapCategories();
+api.MapReports();
 api.MapTransactions();
 // An unmatched /api path is a 404 for a signed-in caller and a 401 for anyone else, never the SPA's index.html.
 api.MapFallback(() => Results.NotFound());

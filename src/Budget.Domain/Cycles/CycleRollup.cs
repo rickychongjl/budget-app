@@ -38,14 +38,26 @@ public sealed record CycleRollup(
         Cycle cycle,
         IEnumerable<CycleCategory> cycleCategories,
         IEnumerable<Category> categories,
-        IEnumerable<Transaction> transactions)
+        IEnumerable<Transaction> transactions) =>
+        Calculate(
+            cycle,
+            cycleCategories,
+            categories,
+            transactions
+                .Where(t => t.CycleId == cycle.Id)
+                .GroupBy(t => t.CategoryId)
+                .ToDictionary(g => g.Key, g => g.Sum(t => t.Amount)));
+
+    // The report sums in SQL rather than loading every transaction, so it hands the totals straight in.
+    // Totals are this cycle's alone: unlike the transaction overload there is no CycleId to filter on.
+    public static CycleRollup Calculate(
+        Cycle cycle,
+        IEnumerable<CycleCategory> cycleCategories,
+        IEnumerable<Category> categories,
+        IReadOnlyDictionary<Guid, decimal> actuals)
     {
         var types = categories.ToDictionary(c => c.Id, c => c.Type);
         var snapshots = cycleCategories.Where(c => c.CycleId == cycle.Id).OrderBy(c => c.SortOrder).ToList();
-        var actuals = transactions
-            .Where(t => t.CycleId == cycle.Id)
-            .GroupBy(t => t.CategoryId)
-            .ToDictionary(g => g.Key, g => g.Sum(t => t.Amount));
 
         var orphan = actuals.Keys.Except(snapshots.Select(s => s.CategoryId)).FirstOrDefault();
         if (orphan != default)

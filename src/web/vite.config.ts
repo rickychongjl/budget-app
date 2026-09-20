@@ -15,5 +15,8 @@ export default defineConfig({
     restoreMocks: true,
     // Off by default, which also blanks `?raw` stylesheet imports; tokens.test.ts reads them as text.
     css: true,
+    // One worker per core is one jsdom per core, and the chart test loads Recharts into its own. On a sixteen-core
+    // machine that ran the heap out of memory and took whole files down with it. Four is plenty for seventeen files.
+    maxWorkers: 4,
   },
 })

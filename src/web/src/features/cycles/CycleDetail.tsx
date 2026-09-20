@@ -67,7 +67,7 @@ export function CycleDetail() {
       </header>
 
       {/* Remounts when the saved value changes, so the field never shows a stale balance. */}
-      <Balances key={`${details.id}:${details.closingBalance}`} cycle={details} currency={me.currency} />
+      <Balances key={`${details.id}:${details.closingBalance}`} cycle={details} accrued={rollup.accrued} currency={me.currency} />
 
       {rollup.categories.length === 0 && <EmptyState icon={Shapes}>This cycle has no categories.</EmptyState>}
       <CategorySection id="spending" title="Spending" rows={rollup.categories.filter((row) => row.type === 'Debit')} currency={me.currency} cycleId={details.id} />
@@ -76,7 +76,7 @@ export function CycleDetail() {
   )
 }
 
-function Balances({ cycle, currency }: { cycle: Cycle; currency: string }) {
+function Balances({ cycle, accrued, currency }: { cycle: Cycle; accrued: number | null; currency: string }) {
   const client = useQueryClient()
   const toast = useToast()
   const online = useOnline()
@@ -131,7 +131,7 @@ function Balances({ cycle, currency }: { cycle: Cycle; currency: string }) {
                 hint="What is left in your account when the cycle ends."
                 onChange={(event) => setText(event.target.value)}
               />
-              <Accrued opening={cycle.openingBalance} closing={cycle.closingBalance} currency={currency} />
+              <Accrued amount={accrued} currency={currency} />
               <Button type="submit" variant="secondary" pending={save.isPending} disabled={!online}>
                 Save balance
               </Button>

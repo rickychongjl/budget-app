@@ -1,7 +1,9 @@
+using System.Data.Common;
 using Budget.Application;
 using Budget.Domain;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Testcontainers.MsSql;
 
 namespace Budget.Infrastructure.Tests;
@@ -33,6 +35,9 @@ public sealed class SqlServerFixture : IAsyncLifetime
 
     public BudgetDbContext ContextFor(User user) => ContextFor(user.Id);
 
+    public BudgetDbContext ContextFor(User user, IInterceptor interceptor) =>
+        new(new DbContextOptionsBuilder<BudgetDbContext>().UseSqlServer(ConnectionString).AddInterceptors(interceptor).Options, new TestUser(user.Id));
+
     public BudgetDbContext NoUser() => ContextFor(Guid.Empty);
 
     public async Task<User> NewUserAsync(string? externalId = null)
@@ -44,7 +49,27 @@ public sealed class SqlServerFixture : IAsyncLifetime
         return user;
     }
 
-    private sealed record TestUser(Guid Id) : ICurrentUser;
+}
+
+internal sealed record TestUser(Guid Id) : ICurrentUser;
+
+// Counts the commands a use case sends, so an N+1 shows up as a number instead of as slowness in production.
+internal sealed class CommandCounter : DbCommandInterceptor
+{
+    public int Count { get; private set; }
+
+    public override InterceptionResult<DbDataReader> ReaderExecuting(DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result)
+    {
+        Count++;
+        return base.ReaderExecuting(command, eventData, result);
+    }
+
+    public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+        DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken ct = default)
+    {
+        Count++;
+        return base.ReaderExecutingAsync(command, eventData, result, ct);
+    }
 }
 
 [CollectionDefinition(Name)]

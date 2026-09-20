@@ -64,6 +64,8 @@ internal sealed class FakeStore : ICurrentUser, IUnitOfWork, IUserRepository, IC
 
     Task<IReadOnlyList<CycleCategory>> ICategoryRepository.ListForCycleAsync(Guid cycleId, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<CycleCategory>>([.. CycleCategories.Where(c => c.UserId == Id && c.CycleId == cycleId).OrderBy(c => c.SortOrder)]);
+    Task<IReadOnlyList<CycleCategory>> ICategoryRepository.ListForAllCyclesAsync(CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<CycleCategory>>([.. CycleCategories.Where(c => c.UserId == Id).OrderBy(c => c.SortOrder)]);
     Task<CycleCategory?> ICategoryRepository.GetForCycleAsync(Guid cycleId, Guid categoryId, CancellationToken ct) =>
         Task.FromResult(CycleCategories.SingleOrDefault(c => c.UserId == Id && c.CycleId == cycleId && c.CategoryId == categoryId));
     public void Add(CycleCategory cycleCategory) => CycleCategories.Add(cycleCategory);
@@ -73,6 +75,11 @@ internal sealed class FakeStore : ICurrentUser, IUnitOfWork, IUserRepository, IC
         Task.FromResult<IReadOnlyList<Transaction>>([.. Transactions
             .Where(t => t.UserId == Id && t.CycleId == cycleId && (categoryId is null || t.CategoryId == categoryId))
             .OrderByDescending(t => t.OccurredOn).ThenByDescending(t => t.CreatedAt)]);
+    Task<IReadOnlyList<CategoryTotal>> ITransactionRepository.SumByCategoryAsync(CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<CategoryTotal>>([.. Transactions
+            .Where(t => t.UserId == Id)
+            .GroupBy(t => (t.CycleId, t.CategoryId))
+            .Select(g => new CategoryTotal(g.Key.CycleId, g.Key.CategoryId, g.Sum(t => t.Amount)))]);
     Task<Transaction?> ITransactionRepository.GetAsync(Guid id, CancellationToken ct) => Task.FromResult(Transactions.SingleOrDefault(t => t.UserId == Id && t.Id == id));
     Task<Transaction?> ITransactionRepository.GetByClientIdAsync(Guid clientId, CancellationToken ct) =>
         Task.FromResult(Transactions.SingleOrDefault(t => t.UserId == Id && t.ClientId == clientId));
