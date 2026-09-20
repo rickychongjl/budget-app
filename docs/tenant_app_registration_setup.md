@@ -80,8 +80,12 @@ dotnet user-secrets set "Entra:TenantId"     "<directory (tenant) id>"      --pr
 dotnet user-secrets set "Entra:ClientId"     "<application (client) id>"    --project src/Budget.Api
 dotnet user-secrets set "Entra:ClientSecret" "<client secret value>"        --project src/Budget.Api
 dotnet user-secrets set "Auth:AllowedOids"   "<your object id>"             --project src/Budget.Api
-dotnet user-secrets set "ConnectionStrings:Budget" "Server=localhost;Database=budget;User Id=sa;Password=<MSSQL_SA_PASSWORD from .env>;TrustServerCertificate=true" --project src/Budget.Api
+dotnet user-secrets set "ConnectionStrings:Budget" "Server=localhost,1434;Database=budget;User Id=sa;Password=<MSSQL_SA_PASSWORD from .env>;TrustServerCertificate=true" --project src/Budget.Api
 ```
+
+The SQL container is published on host port `1434` (`1434:1433` in `docker-compose.yml`), not the default `1433`, so it does not
+clash with a SQL Server already installed on the machine. That is why the connection string above says `localhost,1434`. The
+containers reach it as `Server=sql` on `1433` over the compose network and are unaffected.
 
 Then put the same object id in `.env`, so the `migrate` job creates your `User` row (the app never creates users at request time):
 
@@ -94,7 +98,7 @@ AUTH_ALLOWED_OIDS=<your object id>
 ## 6. Check that it works
 
 ```
-docker compose up -d --build                               # migrate creates your User row; sql listens on localhost:1433
+docker compose up -d --build                               # migrate creates your User row; sql listens on localhost:1434
 dotnet dev-certs https --trust                             # once per machine
 dotnet run --project src/Budget.Api --launch-profile https
 ```

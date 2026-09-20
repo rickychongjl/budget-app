@@ -15,7 +15,7 @@ services:
       MSSQL_PID: Express
       MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?copy .env.example to .env and set a password}
     ports:
-      - "1433:1433"
+      - "1434:1433"
     volumes:
       - sql-data:/var/opt/mssql
     healthcheck:
