@@ -42,6 +42,8 @@ public sealed class TenantIsolationTests(ApiFactory api)
         "POST /api/cycles",
         "GET /api/cycles/current",
         "GET /api/categories",
+        // Every cycle of the caller and nothing else; ReportTests aims one user's report at another's data.
+        "GET /api/reports/cycles",
     ];
 
     // Takes ids, but answers 200 with a refusal per item rather than 404, so its attack lives in SyncTests.

@@ -11,7 +11,11 @@ public sealed record CycleDto(
     CycleStatus Status,
     CyclePhase Phase,
     decimal? OpeningBalance,
-    decimal? ClosingBalance);
+    decimal? ClosingBalance)
+{
+    public static CycleDto From(Cycle cycle, CycleTimeline timeline, DateOnly today) =>
+        new(cycle.Id, cycle.StartDate, cycle.EndDate, cycle.Status, timeline.PhaseOf(cycle, today), cycle.OpeningBalance, cycle.ClosingBalance);
+}
 
 public sealed record CycleSummaryDto(CycleDto Cycle, CycleRollup Rollup);
 
@@ -28,7 +32,7 @@ public sealed class Cycles(
     public async Task<IReadOnlyList<CycleDto>> ListAsync(CancellationToken ct = default)
     {
         var (timeline, today) = await finder.TimelineAsync(ct);
-        return [.. timeline.Cycles.Select(c => ToDto(c, timeline, today))];
+        return [.. timeline.Cycles.Select(c => CycleDto.From(c, timeline, today))];
     }
 
     public async Task<CycleSummaryDto> GetAsync(Guid id, CancellationToken ct = default)
@@ -73,7 +77,7 @@ public sealed class Cycles(
 
         cycles.Add(cycle);
         await unitOfWork.SaveChangesAsync(ct);
-        return ToDto(cycle, timeline, today);
+        return CycleDto.From(cycle, timeline, today);
     }
 
     public async Task<CycleDto> ConfirmAsync(Guid id, CancellationToken ct = default)
@@ -81,7 +85,7 @@ public sealed class Cycles(
         var (cycle, timeline, today) = await finder.FindAsync(id, ct);
         cycle.Confirm();
         await unitOfWork.SaveChangesAsync(ct);
-        return ToDto(cycle, timeline, today);
+        return CycleDto.From(cycle, timeline, today);
     }
 
     public async Task<CycleDto> UpdateAsync(Guid id, UpdateCycleRequest request, CancellationToken ct = default)
@@ -105,7 +109,7 @@ public sealed class Cycles(
         }
 
         await unitOfWork.SaveChangesAsync(ct);
-        return ToDto(cycle, timeline, today);
+        return CycleDto.From(cycle, timeline, today);
     }
 
     private async Task<CycleSummaryDto> SummaryAsync(Cycle cycle, CycleTimeline timeline, DateOnly today, CancellationToken ct)
@@ -115,9 +119,6 @@ public sealed class Cycles(
             await categories.ListForCycleAsync(cycle.Id, ct),
             await categories.ListAsync(ct),
             await transactions.ListForCycleAsync(cycle.Id, null, ct));
-        return new CycleSummaryDto(ToDto(cycle, timeline, today), rollup);
+        return new CycleSummaryDto(CycleDto.From(cycle, timeline, today), rollup);
     }
-
-    private static CycleDto ToDto(Cycle cycle, CycleTimeline timeline, DateOnly today) =>
-        new(cycle.Id, cycle.StartDate, cycle.EndDate, cycle.Status, timeline.PhaseOf(cycle, today), cycle.OpeningBalance, cycle.ClosingBalance);
 }

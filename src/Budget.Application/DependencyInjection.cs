@@ -20,5 +20,6 @@ public static class DependencyInjection
         .AddScoped<Sync>()
         .AddScoped<Me>()
         .AddScoped<RolloverCycles>()
+        .AddScoped<Reports>()
         .AddScoped<Cycles>();
 }
