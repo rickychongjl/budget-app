@@ -19,6 +19,18 @@ export function formatMoney(amount: number, currency: string, { sign = false } =
   return cents < 0 ? `−${text}` : sign && cents > 0 ? `+${text}` : text
 }
 
+// MASTER 11: the compact form is for chart axes and nowhere else. "$1.2k", "−$450".
+const compact = new Map<string, Intl.NumberFormat>()
+
+export function formatCompactMoney(amount: number, currency: string) {
+  let format = compact.get(currency)
+  if (!format) {
+    format = new Intl.NumberFormat('en-AU', { style: 'currency', currency, notation: 'compact', maximumFractionDigits: 1 })
+    compact.set(currency, format)
+  }
+  return amount < 0 ? `−${format.format(-amount)}` : format.format(amount)
+}
+
 // What someone typed into a money field, as a number, or null when it is not an amount. Forgiving about how it is
 // written ("$3,620.25", a true minus sign) and strict about what it is: at most two decimal places, because a third
 // would be silently rounded by decimal(18,2).

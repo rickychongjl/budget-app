@@ -1,0 +1,104 @@
+.section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.title {
+  font: var(--text-heading);
+}
+
+.summary {
+  font: var(--text-label);
+  color: var(--color-text-muted);
+}
+
+.chart {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+/* Recharts measures its container, so it needs one that cannot be squeezed by a long axis label. */
+.canvas {
+  min-width: 0;
+}
+
+.tooltip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font: var(--text-label);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--text-body);
+}
+
+.table th,
+.table td {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+}
+
+.table td {
+  text-align: right;
+}
+
+.table thead th {
+  font: var(--text-label);
+  color: var(--color-text-muted);
+}
+
+.table thead th:last-child {
+  text-align: right;
+}
+
+.partial {
+  color: var(--color-text-muted);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.statLabel {
+  font: var(--text-label);
+  color: var(--color-text-muted);
+}
+
+.statValue {
+  font: var(--text-heading);
+}
+
+.toggle {
+  justify-self: start;
+  min-height: var(--target-min);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: var(--text-label);
+}
+
+.toggle[aria-pressed='true'] {
+  background: var(--color-surface-2);
+}
+
+.toggle:active {
+  background: var(--color-surface-2);
+}
