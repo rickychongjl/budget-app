@@ -1,8 +1,7 @@
 /* Primary actions sit in the bottom half (MASTER 1.1): the header takes the slack, the buttons stay in thumb reach. */
 .screen {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-content: end;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-6);
   min-height: 100dvh;
   max-width: var(--column-max);
@@ -10,10 +9,11 @@
   padding: calc(var(--space-12) + env(safe-area-inset-top)) var(--space-4) calc(var(--space-8) + env(safe-area-inset-bottom));
 }
 
+/* Auto margins take all the free height, which centres the header in it and pushes the actions to the bottom. */
 .header {
   display: grid;
   gap: var(--space-2);
-  align-self: center;
+  margin-block: auto;
 }
 
 .title {

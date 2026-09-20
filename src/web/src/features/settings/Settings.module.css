@@ -1,0 +1,18 @@
+.section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.heading {
+  font: var(--text-heading);
+}
+
+.name {
+  font: var(--text-heading);
+}
+
+.detail {
+  font: var(--text-label);
+  color: var(--color-text-muted);
+}

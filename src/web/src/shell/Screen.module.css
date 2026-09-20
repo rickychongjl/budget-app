@@ -1,0 +1,31 @@
+.topBar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--top-bar-height);
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg);
+}
+
+.title {
+  min-width: 0;
+  overflow: hidden;
+  font: var(--text-title);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* minmax(0, 1fr): a nowrap child must truncate, not widen the page (found on /kit in slice 2).
+   Gutter 16, sections 24 apart, and room at the end so the last row clears the toast. */
+.content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--space-6);
+  padding: var(--space-4) var(--space-4) var(--space-12);
+}

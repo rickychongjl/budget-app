@@ -1,9 +1,13 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { Hammer } from 'lucide-react'
 import { lazy, Suspense, useState } from 'react'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { NetworkError, ProblemError } from './api/client'
 import { SessionGate } from './features/auth/SessionGate'
-import { useSession } from './features/auth/useSession'
-import { Button } from './ui/Button'
+import { Settings } from './features/settings/Settings'
+import { AppShell } from './shell/AppShell'
+import { Screen } from './shell/Screen'
+import { EmptyState } from './ui/EmptyState'
 import { ToastProvider } from './ui/Toast'
 
 // Dev only. import.meta.env.DEV is replaced with `false` in a production build, so the page and everything only it
@@ -35,23 +39,32 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
+        {/* Signed out, every path shows the sign-in screen; the routes below exist only for someone signed in. */}
         <SessionGate>
-          <SignedIn />
+          <BrowserRouter>
+            <Routes>
+              <Route element={<AppShell />}>
+                <Route index element={<ComingSoon title="Home" />} />
+                <Route path="cycles" element={<ComingSoon title="Cycles" />} />
+                <Route path="cycles/:id" element={<ComingSoon title="Cycle" />} />
+                <Route path="settings" element={<Settings />} />
+                <Route path="settings/categories" element={<ComingSoon title="Categories" />} />
+              </Route>
+              {/* /signin once signed in, and anything unknown, goes Home. The server has already answered /api and /auth. */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </BrowserRouter>
         </SessionGate>
       </ToastProvider>
     </QueryClientProvider>
   )
 }
 
-// Placeholder until the shell arrives (M6 slice 5).
-function SignedIn() {
-  const { me, signOut } = useSession()
+// A routed screen that a later M6 slice fills in.
+function ComingSoon({ title }: { title: string }) {
   return (
-    <main>
-      <h1>Hello {me.displayName}</h1>
-      <Button variant="secondary" onClick={signOut}>
-        Sign out
-      </Button>
-    </main>
+    <Screen title={title}>
+      <EmptyState icon={Hammer}>This screen is still being built.</EmptyState>
+    </Screen>
   )
 }
