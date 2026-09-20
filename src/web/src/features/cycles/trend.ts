@@ -98,13 +98,23 @@ function step(rough: number): number {
   return (normalised <= 1 ? 1 : normalised <= 2 ? 2 : normalised <= 2.5 ? 2.5 : normalised <= 5 ? 5 : 10) * magnitude
 }
 
-// At most four ticks (MASTER 10). Zero is always one of them: a spending axis should start at nothing, and a line
-// that crosses zero needs the baseline to sit on a tick.
-export function niceTicks(min: number, max: number): number[] {
-  const low = Math.min(0, min)
-  const high = Math.max(0, max)
+// At most four ticks (MASTER 10). The axis fits the data rather than starting at zero: four cycles of household
+// spending sit in a narrow band well above nothing, and anchoring at zero squashes them into a flat line, which is
+// the one thing a trend chart must not do. Zero still appears whenever the series crosses it, and `includeZero`
+// forces it for money accrued, whose baseline MASTER 10 requires.
+export function niceTicks(min: number, max: number, { includeZero = false } = {}): number[] {
+  let low = includeZero ? Math.min(0, min) : min
+  let high = includeZero ? Math.max(0, max) : max
+
   if (low === high) {
-    return [0]
+    // A category billed the same every cycle (rent) is a flat line. With no range there is no axis, so it gets a
+    // band around itself and sits in the middle, rather than being pinned to the top of an axis that reads "$0".
+    if (low === 0) {
+      return [0]
+    }
+    const padding = Math.abs(low) / 10
+    low -= padding
+    high += padding
   }
 
   let size = step((high - low) / 3)

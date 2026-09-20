@@ -3,7 +3,37 @@
 Source: `docs/solution-design.md` section 4 (`GET /api/reports/cycles`), section 7 ("Charts") and section 17 item 7; `docs/user-stories.md` Reporting 1 to 3; `design-system/budget/MASTER.md` section 10 (Charts), section 9 ("Cycle list row", "Segmented control") and 3.4 (line styles). Picks up what M2, M3, M4 and M6 deferred here: the report endpoint and its repository methods, the trend chart with its filter and "View as table", and "spent against budgeted" on the cycle list row.
 Code lands in every layer but it is small: one Domain overload, one Application use case, one grouped query, one route, one web feature folder. One new dependency: Recharts.
 
-## Status: draft, decisions 1 to 7 need review
+## Status: implemented
+
+All eight slices are in, with decisions 1 to 7 taken as recommended. Web: 319 tests (Vitest), `oxlint` clean, `tsc -b` and `vite build` green. .NET: 336 tests (Domain 124, Application 89, Infrastructure 39, API 84), `dotnet build -warnaserror` clean. Recharts is a 321 kB chunk of its own; the entry chunk grew by 6 kB.
+
+Checked against a real stack, not only mocks: this branch's production image on port 8097 with its own SQL container, `migrate` seeding the demo, and headless Edge driven over the DevTools protocol at 390px (360 for overflow). Seventeen checks, all passing, against the **built SPA served by the API**:
+
+- `GET /api/reports/cycles` answered five cycles: four Past with accrued (one of them −$219.25) and the Current one partial.
+- The chart drew a line across all five with the summary "Spending fell 5% over the last 4 cycles.", and each point is a 44px target named with its own amount ("13 May: $3,506.85").
+- Tapping a point showed "13 May to 11 Jun $3,506.85".
+- Accrued drew its zero baseline with the first cycle below it, and stopped at the cycle with no closing balance instead of dropping to zero.
+- The category chips scrolled without the page scrolling; Rent drew in slate with its dash-dot style.
+- Switching theme redrew the line from `#cbd5e1` to `#475569`, so the tokens are being re-read.
+- "View as table" gave five rows with the current cycle marked "so far".
+- No sideways scroll at 390 or 360, and no tap target under 44px.
+
+Not checked, and why: a real phone, a screen reader, and 200% text. Playwright specs for story Reporting 3 are M8's.
+
+Where the code differs from the plan below:
+
+- **The y axis fits the data instead of starting at zero** (`includeZero` only for accrued). Found by screenshot, not by test: with the axis anchored at zero, four cycles of household spending sat in the top fifth of the chart and a 5% fall read as a flat line, which is the one thing a trend chart must not do. MASTER 10 asks for a zero baseline for accrued specifically, and that is where it is kept; zero still appears whenever a series crosses it.
+- **A flat series gets a band around itself.** Also found by screenshot: Rent is $2,200 every cycle, so min equalled max, and the first version returned a single `[0]` tick, pinning the line to the top of an axis labelled "$0". It now pads by a tenth and the line sits in the middle.
+- **The current cycle's point is drawn hollow.** The part-spent total dives at the right-hand end and read as a crash at a glance. It is never colour alone: the tooltip and the table both say "so far", and the summary sentence ignores the cycle entirely.
+- **Each point's accessible name carries its amount** ("13 May: $3,506.85"), not just its date, so the value can be read without waiting for the tooltip's live region.
+- **`vitest` is capped at four workers.** One jsdom per core, with Recharts loaded into one of them, ran the heap out of memory on a sixteen-core machine and took five whole test files down with it (they were reported as "passed" because they never ran).
+- **The storage helpers live in `chartFilter.ts`**, not beside the control, because `oxlint`'s fast-refresh rule fails a component file that also exports functions.
+- **Components are `TrendChart.tsx`, `TrendSection.tsx`, `TrendFilter.tsx`, never `Trend.tsx`**, which on a case-insensitive disk would resolve to `trend.ts` (the CLAUDE.md rule from M6).
+- **`CycleDto.From` replaced the private mapper in `Cycles`**, so the report and the single-cycle endpoint map a cycle the one way. An API test asserts the two return byte-identical JSON for the same cycle.
+- **`Accrued` takes the server's number** instead of subtracting the two balances in the page, which removes the M6 compromise noted in that plan.
+- **The N+1 guard is an Infrastructure test with a command-counting interceptor**, not an API test: it runs `Reports` against real SQL for two cycles and for six and asserts the count is equal *and* within 1 to 8, so a counter that counts nothing cannot pass it at zero.
+- **Red-first, honestly:** every test file was written and run before its code. Real failing assertions (not just a missing import) were seen for `niceTicks` (the top tick fell below the maximum, because the loop stopped before covering the range), and the seed change made three tests fail that had pinned the demo to three cycles; those now derive the count from the fixture. The Infrastructure report tests first failed on a foreign key, which was the schema correctly refusing a transaction whose category was not in its cycle: the test data was wrong, not the code.
+- **The demo seed grew to 130 days** (decision 7), and `ResetDemoTests`/`ResetDemoJobTests` no longer hardcode the cycle count.
 
 ## Context
 
@@ -104,7 +134,7 @@ First commit is this plan. Slices 4 to 7 end with MASTER section 14.
 ### 8. Docs and verification
 - Plan status and deltas; CLAUDE.md (the report is `CycleSummary[]`, chart rules worth keeping); design doc section 4 and 7 deltas; the demo seed gets more history. Today it is `firstCycleStartOffset: -70` with two closing balances: three points for spending, but only two for accrued, so the demo would show stat cards under Accrued and never the line with its zero baseline. Move the offset to about -130 (four past cycles plus the current one) with four closing balances, one of them below its opening so accrued goes negative. This changes what `migrate` seeds and `reset-demo` restores; any test that counts seeded cycles moves with it. Decision 7.
 
-## Decisions to take
+## Decisions taken (all as recommended, 2026-09-20)
 
 1. **The report is `CycleSummaryDto[]`**, not a purpose-built slim DTO. Recommended, for the reasons above. Cost: the payload carries fields the chart ignores (icon, remaining, percent), a few hundred bytes per cycle.
 2. **Recharts, as MASTER 10 and design section 7 say, lazy-loaded.** The alternative is about a hundred lines of hand-written SVG for one line, dots, four ticks and a baseline, with no dependency and nothing to lazy-load. Recommended: Recharts. It is the written decision, it is what a reviewer of a portfolio piece expects to see used well, and the custom-dot and theme work is needed either way. If the lazy chunk turns out to be large for what it draws, that is a MASTER question to raise, not to settle inside a slice.

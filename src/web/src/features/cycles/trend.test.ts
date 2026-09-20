@@ -151,12 +151,31 @@ describe('niceTicks', () => {
     }
   })
 
-  test('zero is a tick, so a spending axis starts at nothing and a crossing line gets its baseline', () => {
-    expect(niceTicks(120, 640)).toContain(0)
+  test('the axis fits the data, so a narrow band of spending is not squashed flat against zero', () => {
+    const ticks = niceTicks(2996.8, 3506.85)
+
+    expect(ticks).not.toContain(0)
+    expect(ticks[0]).toBeGreaterThan(2000)
+  })
+
+  test('zero is a tick whenever the line crosses it', () => {
     expect(niceTicks(-50, 120)).toContain(0)
+  })
+
+  test('money accrued gets its zero baseline even when every cycle was positive (MASTER 10)', () => {
+    expect(niceTicks(120, 640, { includeZero: true })).toContain(0)
   })
 
   test('a flat line at zero is still an axis', () => {
     expect(niceTicks(0, 0)).toEqual([0])
+  })
+
+  // Rent is the same every cycle, and an axis of one tick would pin it to the top of a chart reading "$0".
+  test('a category billed the same every cycle gets an axis around it', () => {
+    const ticks = niceTicks(2200, 2200)
+
+    expect(ticks.length).toBeGreaterThan(1)
+    expect(Math.min(...ticks)).toBeLessThan(2200)
+    expect(Math.max(...ticks)).toBeGreaterThan(2200)
   })
 })

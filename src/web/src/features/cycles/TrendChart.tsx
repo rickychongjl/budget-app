@@ -33,10 +33,16 @@ export default function TrendChart({ series, filter, currency, today, label, col
   useThemeChange()
 
   const values = series.map((point) => point.value).filter((value): value is number => value !== null)
-  const ticks = niceTicks(Math.min(...values), Math.max(...values))
+  const ticks = niceTicks(Math.min(...values), Math.max(...values), { includeZero: filter.kind === 'accrued' })
   const stroke = colour === 'primary' ? cssColour('--color-primary') : cssColour(`--cat-${toSlot(colour)}`)
   const muted = cssColour('--color-text-muted')
   const selected = series.find((point) => point.cycleId === open)
+
+  // A point's name says what it is worth, so it can be read without waiting for the tooltip to be announced.
+  const name = (point: TrendPoint) =>
+    point.value === null
+      ? `${point.label}: not known yet`
+      : `${point.label}: ${formatMoney(point.value, currency, { sign: filter.kind === 'accrued' })}${point.partial ? ' so far' : ''}`
 
   return (
     <div className={styles.chart}>
@@ -66,7 +72,9 @@ export default function TrendChart({ series, filter, currency, today, label, col
               // A gap is a gap: joining across it would invent a cycle's worth of data.
               connectNulls={false}
               isAnimationActive={false}
-              dot={({ key, cx, cy, payload }) => <Dot key={key} cx={cx} cy={cy} point={payload as TrendPoint} colour={stroke} onPick={setOpen} />}
+              dot={({ key, cx, cy, payload }) => (
+                <Dot key={key} cx={cx} cy={cy} point={payload as TrendPoint} colour={stroke} name={name(payload as TrendPoint)} onPick={setOpen} />
+              )}
               activeDot={false}
             />
           </LineChart>
@@ -87,14 +95,20 @@ export default function TrendChart({ series, filter, currency, today, label, col
 }
 
 // 4px of ink inside a 44px target (MASTER 10), and a real button so a keyboard reaches every point.
-function Dot({ cx, cy, point, colour, onPick }: { cx?: number; cy?: number; point?: TrendPoint; colour: string; onPick: (id?: string) => void }) {
+function Dot({ cx, cy, point, colour, name, onPick }: { cx?: number; cy?: number; point?: TrendPoint; colour: string; name: string; onPick: (id?: string) => void }) {
   if (cx === undefined || cy === undefined || !point || point.value === null) {
     return null
   }
 
   return (
     <g>
-      <circle cx={cx} cy={cy} r={4} fill={colour} />
+      {/* The cycle still being spent is drawn hollow, so a part-spent total does not read as a crash at a glance.
+          It is never colour alone: the tooltip and the table both say "so far". */}
+      {point.partial ? (
+        <circle cx={cx} cy={cy} r={4} fill={cssColour('--color-bg')} stroke={colour} strokeWidth={2} />
+      ) : (
+        <circle cx={cx} cy={cy} r={4} fill={colour} />
+      )}
       <circle
         cx={cx}
         cy={cy}
@@ -102,7 +116,7 @@ function Dot({ cx, cy, point, colour, onPick }: { cx?: number; cy?: number; poin
         fill="transparent"
         role="button"
         tabIndex={0}
-        aria-label={point.label}
+        aria-label={name}
         onClick={() => onPick(point.cycleId)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {

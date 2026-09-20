@@ -84,7 +84,9 @@ Hard rules (details in MASTER):
 - A write that needs the server to decide something (onboarding, category add and remove, start date, balances, profile) calls its endpoint directly, is disabled offline, and says "needs a connection" on screen.
 - Whether a write landed in a past cycle is the server's call (`requiresClosingBalanceReview`); never work it out from dates. "Today" is `todayIn(me.timeZone)`, never the device's date. Dates are `YYYY-MM-DD` strings and are never passed to `new Date(string)`.
 - A CSS grid whose child truncates needs `grid-template-columns: minmax(0, 1fr)`, or one long name makes the page scroll sideways. A hidden radio that takes the tap must fill its box with no border on the box, or the target drops under 44px.
-- No two files in a folder may differ only by case (`Keypad.tsx` and `keypad.ts`): Windows resolves them to the same file and the import breaks there but not on CI.
+- `GET /api/reports/cycles` is `CycleSummary[]`, the same record as one cycle. The Cycles page reads only that: the chart and the list are drawn from one answer, and `overlaySummary` maps over it so a queued transaction moves both. Do not add a slimmer report DTO.
+- Chart rules live in `features/cycles/trend.ts` and are tested there, not in a component: what is plotted, the summary sentence and the axis ticks. Recharts is loaded with `React.lazy` and must stay out of the entry chunk. Colours are read from the tokens at render time (`theme/cssColour.ts`) and re-read when `data-theme` changes; a chart never holds a hex.
+- No two files in a folder may differ only by case (`Keypad.tsx` and `keypad.ts`): Windows resolves them to the same file and the import breaks there but not on CI. The same trap applies across extensions: `Trend.tsx` beside `trend.ts` resolves to one file, so the chart components are `TrendChart`, `TrendSection`, `TrendFilter`.
 - `tokens.test.ts` fails on a raw colour outside `tokens.css`, and on a token missing from one theme.
 - `/kit` (dev server only, dropped from the production build) shows every `ui/` component in every state.
 
@@ -98,7 +100,7 @@ Failing test, minimal code, refactor. Write the test first, watch it fail for th
 | Application unit | `tests/Budget.Application.Tests` | xUnit + NSubstitute + in-memory fakes. Use cases, validation, demo caps. |
 | Infrastructure integration | `tests/Budget.Infrastructure.Tests` | Testcontainers, `mcr.microsoft.com/mssql/server:2022-latest`. Repositories, query filters, migrations apply from empty. |
 | API integration | `tests/Budget.Api.Tests` | `WebApplicationFactory` + Testcontainers. Auth, cookies, **tenant isolation (user A cannot touch user B via any endpoint)**, rate limits, problem-details shape. |
-| Web unit | `src/web` | Vitest + React Testing Library + MSW + `fake-indexeddb`. An undeclared request fails the test. jsdom has no `showModal` or `matchMedia` (stand-ins in `src/test/setup.ts`), so focus trap, Escape and focus return on sheets and dialogs are not covered here. |
+| Web unit | `src/web` | Vitest + React Testing Library + MSW + `fake-indexeddb`. An undeclared request fails the test. jsdom has no `showModal` or `matchMedia` (stand-ins in `src/test/setup.ts`), so focus trap, Escape and focus return on sheets and dialogs are not covered here. jsdom lays out no SVG either, so a chart is checked for its name, its table and its cards, never its pixels. Workers are capped at four: one jsdom per core plus Recharts runs the heap out of memory, and files that die that way are reported as passing. |
 | E2E | `tests/e2e` | Playwright, iPhone 15 profile, local on demand. One spec per story in `docs/user-stories.md`; seeds from `fixtures/demo-seed.json`. |
 
 Any red test fails the PR. Coverage on Domain and Application must stay at or above 90%.
