@@ -2,8 +2,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router'
-import { describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { CategoryRollup, CycleSummary, Me } from '../../api/types'
+import { db } from '../../offline/db'
+import { configureOutbox, enqueue, stopOutbox } from '../../offline/outbox'
 import { server } from '../../test/server'
 import { SessionContext } from '../auth/useSession'
 import { categoryStatus } from './categoryStatus'
@@ -85,6 +87,12 @@ function renderHome() {
   )
 }
 
+beforeEach(async () => {
+  stopOutbox()
+  await db.outbox.clear()
+  await db.cache.clear()
+})
+
 describe('Home', () => {
   test('the cycle header: dates, day, and the one hero amount', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
@@ -151,5 +159,32 @@ describe('Home', () => {
     renderHome()
 
     expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument()
+  })
+
+  // The offline store behind useCurrentCycle (slice 7).
+  test('the last answer from the server is on screen before the network replies, and when it never does', async () => {
+    await db.cache.put({ key: 'u1:cycles/current', userId: 'u1', json: SUMMARY, at: 1 })
+    server.use(http.get('/api/cycles/current', () => HttpResponse.error()))
+    renderHome()
+
+    expect(await screen.findByRole('heading', { level: 3, name: 'Groceries' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
+  })
+
+  test('a spend queued offline counts on Home at once', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    server.use(http.get('/api/cycles/current', () => HttpResponse.json(SUMMARY)))
+    await configureOutbox({ userId: 'u1', refresh: async () => undefined })
+    renderHome()
+    const groceries = () => within(screen.getByRole('heading', { level: 3, name: 'Groceries' }).closest('li')!)
+    await screen.findByRole('heading', { level: 3, name: 'Groceries' })
+    expect(groceries().getByText('$242.90 / $700.00')).toBeInTheDocument()
+
+    const groceriesId = SUMMARY.rollup.categories[2].categoryId
+    await enqueue({ type: 'transaction.create', create: { clientId: 'tx-1', cycleId: 'c1', categoryId: groceriesId, amount: 500, occurredOn: '2026-09-20', note: null } })
+
+    expect(await screen.findByText('$742.90 / $700.00')).toBeInTheDocument()
+    expect(groceries().getByText('Over by $42.90')).toBeInTheDocument()
+    expect(screen.getByText('$3,282.90')).toBeInTheDocument()
   })
 })

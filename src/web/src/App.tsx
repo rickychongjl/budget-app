@@ -6,6 +6,7 @@ import { NetworkError, ProblemError } from './api/client'
 import { SessionGate } from './features/auth/SessionGate'
 import { Home } from './features/home/Home'
 import { Settings } from './features/settings/Settings'
+import { OutboxSync } from './offline/OutboxSync'
 import { AppShell } from './shell/AppShell'
 import { Screen } from './shell/Screen'
 import { EmptyState } from './ui/EmptyState'
@@ -42,6 +43,7 @@ export default function App() {
       <ToastProvider>
         {/* Signed out, every path shows the sign-in screen; the routes below exist only for someone signed in. */}
         <SessionGate>
+          <OutboxSync />
           <BrowserRouter>
             <Routes>
               <Route element={<AppShell />}>

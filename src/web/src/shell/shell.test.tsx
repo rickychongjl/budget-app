@@ -2,6 +2,7 @@ import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { afterEach, describe, expect, test, vi } from 'vitest'
+import { SessionContext } from '../features/auth/useSession'
 import { AppShell } from './AppShell'
 import { ConnectivityBanner } from './ConnectivityBanner'
 import { Screen } from './Screen'
@@ -10,8 +11,14 @@ function Where() {
   return <p data-testid="where">{useLocation().pathname}</p>
 }
 
+const SESSION = {
+  me: { id: 'u1', displayName: 'Demo', timeZone: 'Australia/Sydney', currency: 'AUD', isDemo: true, cycleLengthDays: 30 },
+  signOut: async () => undefined,
+}
+
 function renderShell(path = '/') {
   render(
+    <SessionContext value={SESSION}>
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route element={<AppShell />}>
@@ -20,7 +27,8 @@ function renderShell(path = '/') {
           <Route path="settings" element={<Screen title="Settings"><Where /></Screen>} />
         </Route>
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
+    </SessionContext>,
   )
   return within(screen.getByRole('navigation', { name: 'Main' }))
 }

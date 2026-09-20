@@ -1,6 +1,7 @@
 import { CalendarRange, House, Plus, Settings } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router'
+import { countWaiting, useOutbox } from '../offline/useOutbox'
 import { Sheet } from '../ui/Sheet'
 import styles from './AppShell.module.css'
 import { ConnectivityBanner } from './ConnectivityBanner'
@@ -12,11 +13,11 @@ const tabClass = ({ isActive }: { isActive: boolean }) => (isActive ? `${styles.
 // add per-tab scroll restoration when a screen is long enough for it to be missed.
 export function AppShell() {
   const [adding, setAdding] = useState(false)
+  const waiting = countWaiting(useOutbox())
 
   return (
     <div className={styles.shell}>
-      {/* The outbox count arrives with the offline store (M6 slice 7). */}
-      <ConnectivityBanner waiting={0} />
+      <ConnectivityBanner waiting={waiting} />
 
       <main className={styles.scroll}>
         <Outlet />

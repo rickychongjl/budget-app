@@ -60,3 +60,36 @@ export type CycleRollup = {
 
 // CycleSummaryDto: GET /api/cycles/current and /api/cycles/{id}
 export type CycleSummary = { cycle: Cycle; rollup: CycleRollup }
+
+// TransactionDto. clientId is the idempotency key the client made up; id is the server's.
+export type Transaction = {
+  id: string
+  clientId: string
+  cycleId: string
+  categoryId: string
+  amount: number
+  occurredOn: string
+  note: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type CreateTransactionRequest = Pick<Transaction, 'clientId' | 'cycleId' | 'categoryId' | 'amount' | 'occurredOn' | 'note'>
+export type EditTransactionRequest = Partial<Pick<Transaction, 'categoryId' | 'amount' | 'occurredOn' | 'note'>>
+export type EditCategoryRequest = Partial<{ name: string; icon: string; colour: string; sortOrder: number; budgetAmount: number }>
+
+// TransactionResult / TransactionDeleted. requiresClosingBalanceReview: the write landed in a past cycle, so the UI
+// offers to update that cycle's closing balance. It comes from the server and is never guessed here.
+export type TransactionResult = { transaction: Transaction; requiresClosingBalanceReview: boolean; created: boolean }
+export type TransactionDeleted = { requiresClosingBalanceReview: boolean }
+
+// SyncItem: one queued offline change, in exactly the shape POST /api/sync takes. A transaction is named by clientId,
+// not id: one created offline has no server id until its create has synced.
+export type SyncItem =
+  | { type: 'transaction.create'; create: CreateTransactionRequest }
+  | { type: 'transaction.edit'; clientId: string; edit: EditTransactionRequest }
+  | { type: 'transaction.delete'; clientId: string }
+  | { type: 'category.edit'; cycleId: string; categoryId: string; category: EditCategoryRequest }
+
+// SyncItemResult, one per item, in order. A refusal has code and detail and would be refused again if resent.
+export type SyncItemResult = { index: number; ok: boolean; result?: unknown; code?: string; detail?: string }

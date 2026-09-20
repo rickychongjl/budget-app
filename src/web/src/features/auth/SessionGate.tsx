@@ -3,6 +3,7 @@ import { WifiOff } from 'lucide-react'
 import { useCallback, useEffect, useMemo, type ReactNode } from 'react'
 import { api, onUnauthorized, ProblemError, resetCsrf } from '../../api/client'
 import type { Me } from '../../api/types'
+import { db } from '../../offline/db'
 import { Button } from '../../ui/Button'
 import { EmptyState } from '../../ui/EmptyState'
 import { Skeleton } from '../../ui/Skeleton'
@@ -44,8 +45,10 @@ export function SessionGate({ children }: { children: ReactNode }) {
     await api.post('/auth/logout')
     resetCsrf()
     client.setQueryData(ME, null)
-    // Nothing of this user's is left for the next person on this device.
+    // Nothing of this user's is left on screen or on disk for the next person on this device. The outbox is kept: it is
+    // theirs if they sign back in, and configureOutbox discards it if someone else does.
     client.removeQueries({ predicate: (query) => query.queryKey[0] !== ME[0] })
+    await db.cache.clear()
   }, [client])
 
   const session = useMemo(() => (me.data ? { me: me.data, signOut } : null), [me.data, signOut])
