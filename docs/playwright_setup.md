@@ -250,13 +250,38 @@ jobs:
 
 It stays `workflow_dispatch`: the constraint on e2e in CI is hassle, not cost (decision 8). `ci.yml` is untouched.
 
-## 9. Windows notes
+## 9. Seeing the tests: UI mode
+
+Playwright ships its own dashboard, no service and no extra dependency.
+
+```bash
+cd tests/e2e
+npx playwright test --ui
+```
+
+It opens a local app with every test in a tree by file and project (`setup`, `iphone`, `sw`), filterable by status, project or tag. Pick one, run it, and the right-hand side gives the action timeline: hover any step for the DOM snapshot at that moment, plus source, console, network and errors. There is a watch toggle that re-runs a test when its file changes. Use it as the debugging loop; use `npx playwright test` for a clean full run.
+
+**The caveat for this repo:** global setup is a session-level step in UI mode, run once when the session starts — re-running a test from the tree does **not** re-run `global-setup.ts`, so the demo is not reset between attempts. A spec that mutates data will see what the previous attempt left behind. Reset by hand when that bites:
+
+```bash
+docker compose run --rm --entrypoint "dotnet jobs/Budget.Jobs.dll reset-demo" migrate
+```
+
+The other three views, none of which need UI mode:
+
+- `npx playwright show-report` — the HTML report of the last run: every test with status and duration, and the trace, video and screenshot of each failure attached. Already configured above, and it is what the CI job uploads.
+- `npx playwright show-trace test-results/<...>/trace.zip` — the same timeline as UI mode for one recorded run. This is how you read a CI failure locally.
+- The **Playwright Test for VSCode** extension — the same tree in the editor's Test Explorer, with run and debug from the gutter and a "record new test" button. Optional; UI mode does everything it does except breakpoints.
+
+There is no hosted Playwright dashboard in the box. (Microsoft sells one — Azure Playwright Testing, cloud browsers plus reporting — and it is not worth it for a suite that runs on demand on one machine.)
+
+## 10. Windows notes
 
 - Docker Desktop must be running; the stack takes ports 8080 and 1434, and `.env` must exist with `MSSQL_SA_PASSWORD`.
-- `npx playwright test --ui` is the debugging loop worth learning first; `--debug` steps through one spec.
+- `--debug` steps through one spec with the inspector, when UI mode is not enough.
 - Browsers install per user, not per project, so a second clone of the repo needs no second download.
 
-## 10. Prove the setup before writing any story spec
+## 11. Prove the setup before writing any story spec
 
 ```ts
 // specs/smoke.spec.ts
