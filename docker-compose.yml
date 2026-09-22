@@ -40,6 +40,9 @@ services:
       Auth__AllowedOids: ${AUTH_ALLOWED_OIDS:-}
       # Local only: lets the session cookie work over plain http. Production never sets this.
       ASPNETCORE_ENVIRONMENT: Development
+      # Requests a minute per address, static files included. The Playwright suite reloads the app dozens of times a
+      # minute from one address and needs more than a person does (tests/e2e/playwright.config.ts sets it).
+      RateLimiting__PermitLimit: ${RATE_LIMIT_PERMIT:-100}
     ports:
       - "8080:8080"
     depends_on:

@@ -95,6 +95,23 @@ public sealed class ResetDemoTests
     }
 
     [Fact]
+    public async Task Clearing_leaves_the_demo_as_a_first_sign_in_finds_it_and_touches_nobody_else()
+    {
+        var someoneElse = _store.SignIn();
+        var theirCycle = new Cycle(someoneElse.Id, Today);
+        _store.Cycles.Add(theirCycle);
+        var demo = Demo();
+        await Sut().RunAsync(_fixture);
+
+        (await Sut().ClearAsync()).Id.Should().Be(demo.Id);
+
+        _store.Cycles.Where(c => c.UserId == demo.Id).Should().BeEmpty();
+        _store.Categories.Should().BeEmpty();
+        _store.Transactions.Should().BeEmpty();
+        _store.Cycles.Should().Contain(theirCycle);
+    }
+
+    [Fact]
     public async Task Without_a_demo_user_there_is_nothing_to_reset()
     {
         _store.SignIn();

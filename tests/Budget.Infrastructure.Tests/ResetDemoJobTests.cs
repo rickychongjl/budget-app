@@ -71,6 +71,34 @@ public sealed class ResetDemoJobTests(SqlServerFixture sql)
     }
 
     [Fact]
+    public async Task Empty_leaves_the_demo_with_nothing_and_a_reset_puts_the_fixture_back()
+    {
+        await using var services = JobHost.BuildServices(sql.ConnectionString, allowedOids: null);
+        Guid demoId;
+        await using (var scope = services.CreateAsyncScope())
+        {
+            var demo = scope.ServiceProvider.GetRequiredService<DemoUser>();
+            await demo.EnsureExistsAsync();
+            demoId = await demo.GetIdAsync();
+        }
+        await JobHost.ResetDemoAsync(services);
+
+        (await JobHost.ResetDemoAsync(services, empty: true)).Should().Be(0);
+
+        await using (var db = sql.ContextFor(demoId))
+        {
+            (await db.Cycles.AnyAsync()).Should().BeFalse();
+            (await db.Categories.AnyAsync()).Should().BeFalse();
+            (await db.Transactions.AnyAsync()).Should().BeFalse();
+        }
+
+        (await JobHost.ResetDemoAsync(services)).Should().Be(0);
+
+        await using var again = sql.ContextFor(demoId);
+        (await again.Cycles.CountAsync()).Should().Be(ExpectedCycles);
+    }
+
+    [Fact]
     public async Task Deleting_a_users_data_as_someone_else_deletes_nothing()
     {
         var (owner, other) = (await sql.NewUserAsync(), await sql.NewUserAsync());

@@ -11,6 +11,7 @@ import { Onboarding } from './features/onboarding/Onboarding'
 import { Settings } from './features/settings/Settings'
 import { CategoryTransactions } from './features/transactions/CategoryTransactions'
 import { OutboxSync } from './offline/OutboxSync'
+import { UpdatePrompt } from './pwa/UpdatePrompt'
 import { AppShell } from './shell/AppShell'
 import { ToastProvider } from './ui/Toast'
 
@@ -43,6 +44,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
+        <UpdatePrompt />
         {/* Signed out, every path shows the sign-in screen; the routes below exist only for someone signed in. */}
         <SessionGate>
           <OutboxSync />

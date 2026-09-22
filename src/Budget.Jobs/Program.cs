@@ -37,7 +37,11 @@ switch (args)
     case ["reset-demo"]:
         return await JobHost.ResetDemoAsync(services);
 
+    // For the onboarding Playwright specs: the demo as a first sign-in finds it, with nothing in it.
+    case ["reset-demo", "--empty"]:
+        return await JobHost.ResetDemoAsync(services, empty: true);
+
     default:
-        Console.Error.WriteLine("Usage: Budget.Jobs migrate|rollover|reset-demo");
+        Console.Error.WriteLine("Usage: Budget.Jobs migrate|rollover|reset-demo [--empty]");
         return 2;
 }

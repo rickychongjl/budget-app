@@ -89,6 +89,7 @@ Hard rules (details in MASTER):
 - No two files in a folder may differ only by case (`Keypad.tsx` and `keypad.ts`): Windows resolves them to the same file and the import breaks there but not on CI. The same trap applies across extensions: `Trend.tsx` beside `trend.ts` resolves to one file, so the chart components are `TrendChart`, `TrendSection`, `TrendFilter`.
 - `tokens.test.ts` fails on a raw colour outside `tokens.css`, and on a token missing from one theme.
 - `/kit` (dev server only, dropped from the production build) shows every `ui/` component in every state.
+- **PWA** (`vite-plugin-pwa`, all of it in `vite.config.ts` and `src/pwa/`): the service worker precaches the app shell and caches exactly one API answer, `GET /api/me`, network-first, because `SessionGate` needs it before anything can render offline; sign-out clears it. Never add `/api/cycles/*` or `/api/reports/*` to the worker: a worker-served answer lands in Dexie with a fresh timestamp and the overlay drops queued rows as already counted. `/api`, `/auth` and `/health` are on the navigation denylist, so the worker never answers them with `index.html`. A new build is offered (`UpdatePrompt`, a sticky toast with Update), never applied unasked. `InstallHint` sits on Home until dismissed or installed; it is the only place the browser is asked about installing. The mark is `public/favicon.svg`; the PNGs beside it are rasterised from it (headless Edge), so change the SVG and regenerate them together.
 
 ## TDD loop
 
@@ -101,7 +102,7 @@ Failing test, minimal code, refactor. Write the test first, watch it fail for th
 | Infrastructure integration | `tests/Budget.Infrastructure.Tests` | Testcontainers, `mcr.microsoft.com/mssql/server:2022-latest`. Repositories, query filters, migrations apply from empty. |
 | API integration | `tests/Budget.Api.Tests` | `WebApplicationFactory` + Testcontainers. Auth, cookies, **tenant isolation (user A cannot touch user B via any endpoint)**, rate limits, problem-details shape. |
 | Web unit | `src/web` | Vitest + React Testing Library + MSW + `fake-indexeddb`. An undeclared request fails the test. jsdom has no `showModal` or `matchMedia` (stand-ins in `src/test/setup.ts`), so focus trap, Escape and focus return on sheets and dialogs are not covered here. jsdom lays out no SVG either, so a chart is checked for its name, its table and its cards, never its pixels. Workers are capped at four: one jsdom per core plus Recharts runs the heap out of memory, and files that die that way are reported as passing. |
-| E2E | `tests/e2e` | Playwright, iPhone 15 profile, local on demand. One spec per story in `docs/user-stories.md`; seeds from `fixtures/demo-seed.json`. |
+| E2E | `tests/e2e` | Playwright, iPhone 15 profile (WebKit), local on demand against `docker compose`, as the one shared demo user: one worker, no retries, and the spec files are numbered because each may build on what the one before left; onboarding is last because it starts by emptying the demo (`reset-demo --empty`) and puts the fixture back after. One spec per story in `docs/user-stories.md`; `support.ts` derives every number from `fixtures/demo-seed.json`. Service-worker specs (`*.sw.spec.ts`) run in Chromium, the only browser whose worker Playwright can see. The suite needs `RATE_LIMIT_PERMIT` raised (the config sets it when it starts the stack). |
 
 Any red test fails the PR. Coverage on Domain and Application must stay at or above 90%.
 
@@ -135,13 +136,16 @@ docker compose down
 
 # Jobs (same image; migrate also seeds the demo from tests/e2e/fixtures/demo-seed.json when it is empty)
 docker compose run --rm --entrypoint "dotnet jobs/Budget.Jobs.dll reset-demo" migrate
+docker compose run --rm --entrypoint "dotnet jobs/Budget.Jobs.dll reset-demo --empty" migrate   # the demo as a first sign-in finds it (onboarding specs)
 docker compose run --rm --entrypoint "dotnet jobs/Budget.Jobs.dll rollover" migrate
 
-# E2E (against docker compose)
-npx playwright test --config tests/e2e/playwright.config.ts
+# E2E (in tests/e2e; setup and reasoning in docs/playwright_setup.md)
+npm ci && npx playwright install webkit chromium   # once per machine
+npm test                                           # starts docker compose if :8080 does not answer, resets the demo, runs one worker
+npm run test:ui                                    # the same tests in Playwright's UI mode (re-running there does not reset the demo)
 ```
 
-Planned convenience targets (`make`/`just` or npm scripts; not yet created, check before assuming they exist): `up`, `test`, `test:e2e`, `migrate`, `rollover`, `reset-demo`. No scheduler runs locally; rollover happens through the request-time fallback.
+Planned convenience targets (`make`/`just` or npm scripts; not yet created, check before assuming they exist): `up`, `test`, `migrate`, `rollover`, `reset-demo`. `test:e2e` is `npm test` in `tests/e2e`. No scheduler runs locally; rollover happens through the request-time fallback.
 
 Local auth: use the demo session (`GET /auth/csrf`, then `POST /auth/demo` with the token). There is deliberately no dev-login endpoint. Entra sign-in works locally on `https://localhost:5001` once `Entra:*` and `Auth:AllowedOids` are in user-secrets (one-time setup: `docs/tenant_app_registration_setup.md`); without them `/auth/login` is `404`.
 
