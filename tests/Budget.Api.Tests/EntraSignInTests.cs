@@ -84,6 +84,19 @@ public sealed class EntraSignInTests(ApiFactory api)
         query["code_challenge_method"].Should().Be("S256");
     }
 
+    // Entra only accepts the registered https redirect URI, and behind the ingress the request itself is http.
+    [Fact]
+    public async Task Behind_the_ingress_the_redirect_uri_is_https()
+    {
+        await using var host = Host("", new TokenEndpoint());
+        var client = host.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        client.DefaultRequestHeaders.Add("X-Forwarded-Proto", "https");
+
+        var response = await client.GetAsync("/auth/login");
+
+        HttpUtility.ParseQueryString(response.Headers.Location!.Query)["redirect_uri"].Should().Be("https://localhost/auth/callback");
+    }
+
     [Fact]
     public async Task An_allowed_oid_with_a_user_row_gets_the_hardened_thirty_day_session()
     {

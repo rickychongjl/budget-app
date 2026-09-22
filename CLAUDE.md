@@ -143,9 +143,21 @@ docker compose run --rm --entrypoint "dotnet jobs/Budget.Jobs.dll rollover" migr
 npm ci && npx playwright install webkit chromium   # once per machine
 npm test                                           # starts docker compose if :8080 does not answer, resets the demo, runs one worker
 npm run test:ui                                    # the same tests in Playwright's UI mode (re-running there does not reset the demo)
+
+# Infra (Azure; needs az login. Secrets come from env vars named in infra/parameters/prod.bicepparam; runbook in docs/plans/m9-infra.md)
+az bicep build -f infra/main.bicep --stdout > $null                                                    # compile and lint, no Azure
+az deployment group what-if -g bgt-prod-rg -f infra/main.bicep -p infra/parameters/prod.bicepparam    # the review step, always first
+az deployment group create  -g bgt-prod-rg -f infra/main.bicep -p infra/parameters/prod.bicepparam
 ```
 
 Planned convenience targets (`make`/`just` or npm scripts; not yet created, check before assuming they exist): `up`, `test`, `migrate`, `rollover`, `reset-demo`. `test:e2e` is `npm test` in `tests/e2e`. No scheduler runs locally; rollover happens through the request-time fallback.
+
+### Deploy and the edge (`infra/`, `.github/workflows/deploy.yml`, `src/Budget.Api/Hosting/Edge.cs`; reasoning in `docs/plans/m9-infra.md`)
+
+- `infra/main.bicep` composes one module per resource area; names are `bgt-<env>-<resource>`, tags `project`/`env`/`owner`. `prod.bicepparam` is committed; secrets and the alert email are `readEnvironmentVariable(...)`. `what-if` before every `create`. A role assignment's name is `guid(scope, principal, role)` so a redeploy finds it rather than duplicating it.
+- `deploy.yml` on push to `main`: `ci.yml` (called, so main is tested once) → one image to GHCR (`:sha` and `:latest`; the package is public, so no pull secret) → the `migrate` job on that image, polled to completion → the app and the two scheduled jobs moved to the tag. It is skipped until the `AZURE_*` repository variables exist. Rollback is `az containerapp update --image` with the previous tag.
+- The custom domain is two parameters (`customDomain`, then `customDomainCertificateId` after `az containerapp hostname bind`) and `restrictIngressToCloudflare` closes the origin once the domain is proxied. Cloudflare's ranges live in `main.bicep`.
+- `Edge` runs right after the exception handler: `X-Forwarded-Proto` makes the request https (Secure cookies, antiforgery, the Entra `redirect_uri`, HSTS all depend on it); the client address is `CF-Connecting-IP`, so the rate limiter is per phone behind Cloudflare and one shared bucket without it; CSP is `default-src 'self'` with inline styles allowed. A new origin or inline script needs the CSP changed and the `HostTests` expectation with it. App Insights is on when `APPLICATIONINSIGHTS_CONNECTION_STRING` is set.
 
 Local auth: use the demo session (`GET /auth/csrf`, then `POST /auth/demo` with the token). There is deliberately no dev-login endpoint. Entra sign-in works locally on `https://localhost:5001` once `Entra:*` and `Auth:AllowedOids` are in user-secrets (one-time setup: `docs/tenant_app_registration_setup.md`); without them `/auth/login` is `404`.
 

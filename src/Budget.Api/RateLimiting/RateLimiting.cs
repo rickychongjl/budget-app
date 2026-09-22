@@ -7,8 +7,8 @@ namespace Budget.Api;
 internal static class RateLimiting
 {
     // One sliding window per client address over everything except liveness. Defaults: 100 requests a minute.
-    // ponytail: behind Cloudflare and the Container Apps ingress every request arrives from the proxy's address,
-    // so until M9 configures forwarded headers this is one shared bucket in production. Locally it is per client.
+    // The address is the one Cloudflare reports (Edge); a request that reaches the ingress without Cloudflare in front
+    // carries none and shares the ingress's bucket. Locally it is the connection's, so per client.
     public const string AuthPolicy = "auth";
 
     public static IServiceCollection AddBudgetRateLimiting(this IServiceCollection services, IConfiguration configuration)

@@ -238,8 +238,8 @@ Key ring persisted to Azure Blob Storage (`PersistKeysToAzureBlobStorage`) so co
 | Layer | Control |
 |---|---|
 | Edge | Cloudflare proxied DNS: WAF managed rules, bot fight mode, DDoS, origin IP hidden. ACA ingress restricted to Cloudflare IP ranges. |
-| Transport | HTTPS only, HSTS (preload after first month), TLS 1.2+. TLS ends at the ingress, so the app must honour `X-Forwarded-Proto` (M9): outside Development antiforgery refuses requests it sees as plain http, and every write would fail. |
-| Headers | CSP (self + inline hashes for Vite), `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `frame-ancestors 'none'`. |
+| Transport | HTTPS only, HSTS (preload after first month), TLS 1.2+. TLS ends at the ingress, so the app honours `X-Forwarded-Proto` (`Edge`, M9): outside Development antiforgery refuses requests it sees as plain http, and every write would fail. The client address is Cloudflare's `CF-Connecting-IP`. |
+| Headers | CSP (`default-src 'self'`; inline styles allowed because React and Recharts set style attributes; the built SPA has no inline scripts), `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `frame-ancestors 'none'`. Set by the app, tested, not by Cloudflare rules. |
 | Auth | Single-tenant Entra + `oid` allowlist, MFA, passkey, BFF cookie, anti-forgery on state-changing requests (ASP.NET Core antiforgery: token from `GET /auth/csrf`, sent back as `X-XSRF-TOKEN` on every non-GET; bound to the signed-in user, so it is fetched again after sign-in and sign-out). |
 | Rate limiting | ASP.NET `RateLimiter`: global per-IP sliding window; stricter on `/auth/*`. |
 | Data | Tenant filter on every query; parameterised queries via EF; `decimal` money; no PII in logs. |
@@ -304,8 +304,8 @@ TDD loop: failing test → minimal code → refactor. CI fails the PR on any red
 ### `deploy.yml` — on push to `main`
 
 1. Run the same test steps (fail fast).
-2. Build one Docker image (multi-stage Dockerfile: Node build of `web` → `dotnet publish` copying the build into `wwwroot` → runtime image). Also produce the EF **migration bundle** into the image.
-3. Push to **GitHub Container Registry**, tagged with the git SHA and `latest`.
+2. Build one Docker image (multi-stage Dockerfile: Node build of `web` → `dotnet publish` copying the build into `wwwroot` → runtime image). The `migrate` job in it applies migrations with `Database.MigrateAsync` (M3), so no separate bundle.
+3. Push to **GitHub Container Registry**, tagged with the git SHA and `latest`. The repository is public, so the package is public and Container Apps pulls it with no credential.
 4. `azure/login` with **OIDC** federated credential (no secrets).
 5. `az containerapp job start` for `budget-migrate` with the new image tag; **wait** and fail the workflow if the job fails.
 6. `az containerapp update` for `budget-api` to the new image tag (new revision; ACA health-probes it before shifting traffic). Then `az containerapp job update` for `budget-rollover` and `budget-demo-reset` so the scheduled jobs run the same image.

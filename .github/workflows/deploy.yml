@@ -1,0 +1,92 @@
+# Design section 10, deploy.yml: test, build one image, push it to GHCR, run the migration job with it and wait, then
+# move the app and the scheduled jobs to it. Until the three AZURE_* repository variables exist the last job is skipped,
+# which is how the first image gets built before the infrastructure that pulls it (docs/plans/m9-infra.md).
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time, in order: two migrations racing would be worse than one waiting.
+concurrency: deploy
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+  RESOURCE_GROUP: bgt-prod-rg
+  PREFIX: bgt-prod
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+      security-events: write
+
+  build:
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: src/Budget.Api/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build
+    if: vars.AZURE_CLIENT_ID != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - run: az config set extension.use_dynamic_install=yes_without_prompt
+
+      # Expand, migrate, contract: the schema moves first, and the old revision keeps serving while it does.
+      - name: Migrate
+        run: |
+          az containerapp job update -n $PREFIX-migrate -g $RESOURCE_GROUP --image $IMAGE:$GITHUB_SHA --output none
+          execution=$(az containerapp job start -n $PREFIX-migrate -g $RESOURCE_GROUP --query name -o tsv)
+          echo "execution $execution"
+          for i in $(seq 1 90); do
+            sleep 10
+            status=$(az containerapp job execution show -n $PREFIX-migrate -g $RESOURCE_GROUP --job-execution-name "$execution" --query properties.status -o tsv)
+            echo "$status"
+            case "$status" in
+              Succeeded) exit 0 ;;
+              Failed|Stopped) exit 1 ;;
+            esac
+          done
+          echo "timed out"; exit 1
+
+      # A new revision; Container Apps probes it before traffic moves. Rollback is this command with the previous tag.
+      - name: Release
+        run: |
+          az containerapp update -n $PREFIX-api -g $RESOURCE_GROUP --image $IMAGE:$GITHUB_SHA --output none
+          az containerapp job update -n $PREFIX-rollover -g $RESOURCE_GROUP --image $IMAGE:$GITHUB_SHA --output none
+          az containerapp job update -n $PREFIX-demo-reset -g $RESOURCE_GROUP --image $IMAGE:$GITHUB_SHA --output none
+          echo "Deployed \`$IMAGE:$GITHUB_SHA\`" >> "$GITHUB_STEP_SUMMARY"

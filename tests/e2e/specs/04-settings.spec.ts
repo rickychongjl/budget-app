@@ -42,7 +42,8 @@ test('Settings 2, 11.2: every cycle is listed with its dates, and the current on
 
 test('Settings 3, 4, 5, 6: only the current start date moves, never into the previous cycle, and its transactions stay', async ({ page }) => {
   await page.goto('/settings')
-  const field = page.getByLabel('Start date')
+  // Exact, or the open "Move the start date?" dialog matches too for the instant before it closes.
+  const field = page.getByLabel('Start date', { exact: true })
   await expect(field).toHaveValue(currentStart())
   // No end date to set: it is always 29 days on.
   await expect(page.getByLabel('End date')).toHaveCount(0)

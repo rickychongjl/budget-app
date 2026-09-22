@@ -1,9 +1,9 @@
 name: ci
 
+# On a pull request, and as the first job of deploy.yml on main (so main is not tested twice per push).
 on:
   pull_request:
-  push:
-    branches: [main]
+  workflow_call:
 
 permissions:
   contents: read
