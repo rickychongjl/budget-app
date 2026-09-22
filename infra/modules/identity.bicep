@@ -4,6 +4,12 @@ param name string
 param location string
 param tags object
 param githubRepo string
+param githubOwnerId int
+param githubRepoId int
+
+// GitHub's subject claim carries the owner's and the repository's numeric ids beside the names
+// (repo:<owner>@<id>/<name>@<id>:ref:...), so a renamed or re-created repository cannot inherit the trust.
+var subject = 'repo:${replace(githubRepo, '/', '@${githubOwnerId}/')}@${githubRepoId}:ref:refs/heads/main'
 
 resource identity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: name
@@ -14,7 +20,7 @@ resource identity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' 
     name: 'github-main'
     properties: {
       issuer: 'https://token.actions.githubusercontent.com'
-      subject: 'repo:${githubRepo}:ref:refs/heads/main'
+      subject: subject
       audiences: ['api://AzureADTokenExchange']
     }
   }
