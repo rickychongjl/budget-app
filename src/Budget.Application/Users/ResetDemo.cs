@@ -22,12 +22,19 @@ public sealed class ResetDemo(
         }
     }
 
+    // The demo as a first sign-in finds it: no cycles, no categories, nothing. What the onboarding specs start from.
+    public async Task<User> ClearAsync(CancellationToken ct = default)
+    {
+        var demo = await users.GetDemoAsync(ct) ?? throw new NotFoundException("demo.unavailable", "The demo is not available.");
+        await users.DeleteDataAsync(demo.Id, ct);
+        return demo;
+    }
+
     // ponytail: the delete and the rebuild are not one transaction. If the rebuild fails the demo is empty until the
     // next run; the job exits non-zero so it is noticed. Wrap both in a transaction if that ever happens in practice.
     public async Task RunAsync(DemoFixture fixture, CancellationToken ct = default)
     {
-        var demo = await users.GetDemoAsync(ct) ?? throw new NotFoundException("demo.unavailable", "The demo is not available.");
-        await users.DeleteDataAsync(demo.Id, ct);
+        var demo = await ClearAsync(ct);
 
         var now = clock.GetUtcNow();
         var today = demo.Today(clock);

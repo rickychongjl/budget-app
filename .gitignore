@@ -480,3 +480,9 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Playwright (tests/e2e): the saved demo session, reports and traces
+tests/e2e/.auth/
+tests/e2e/playwright-report/
+tests/e2e/blob-report/
+tests/e2e/.last-run.json

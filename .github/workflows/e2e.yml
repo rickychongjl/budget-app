@@ -1,0 +1,33 @@
+# On demand only (design decision 8): the suite is local by default, and this is here for a green run to point at.
+name: e2e
+
+on: workflow_dispatch
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: src/web/.nvmrc
+          cache: npm
+          cache-dependency-path: tests/e2e/package-lock.json
+      # A throwaway SQL Server password for a throwaway stack. Compose insists on one; nothing is kept.
+      - run: echo "MSSQL_SA_PASSWORD=Ci$(openssl rand -hex 12)Aa1!" > .env
+      - run: npm ci
+        working-directory: tests/e2e
+      - run: npx playwright install --with-deps webkit chromium
+        working-directory: tests/e2e
+      # CI unset reuseExistingServer, so Playwright builds and starts the stack itself, with the rate limit it needs.
+      - run: npm test
+        working-directory: tests/e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: tests/e2e/playwright-report/
+          retention-days: 7

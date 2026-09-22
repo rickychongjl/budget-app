@@ -1,0 +1,32 @@
+.hint {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.text {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.title {
+  font: var(--text-heading);
+}
+
+.detail {
+  font: var(--text-label);
+  color: var(--color-text-muted);
+}
+
+.inlineIcon {
+  display: inline-block;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  vertical-align: text-bottom;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}

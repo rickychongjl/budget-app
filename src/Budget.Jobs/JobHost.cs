@@ -45,15 +45,22 @@ public static class JobHost
     }
 
     // Runs as the demo user, so the demo goes through the tenant filter like everyone else. The fixture ships beside the
-    // job (tests/e2e/fixtures/demo-seed.json, shared with the Playwright specs). onlyIfEmpty is migrate's first-run seed.
-    public static async Task<int> ResetDemoAsync(IServiceProvider services, bool onlyIfEmpty = false, CancellationToken ct = default)
+    // job (tests/e2e/fixtures/demo-seed.json, shared with the Playwright specs). onlyIfEmpty is migrate's first-run seed;
+    // empty is the onboarding specs' starting point, and the fixture is not read for it.
+    public static async Task<int> ResetDemoAsync(IServiceProvider services, bool onlyIfEmpty = false, bool empty = false, CancellationToken ct = default)
     {
-        var fixture = DemoFixture.Parse(await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "demo-seed.json"), ct));
-
         await using var scope = services.CreateAsyncScope();
         scope.ServiceProvider.GetRequiredService<JobUser>().Id = await scope.ServiceProvider.GetRequiredService<DemoUser>().GetIdAsync(ct);
-
         var reset = scope.ServiceProvider.GetRequiredService<ResetDemo>();
+
+        if (empty)
+        {
+            await reset.ClearAsync(ct);
+            Console.WriteLine("Demo emptied.");
+            return 0;
+        }
+
+        var fixture = DemoFixture.Parse(await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "demo-seed.json"), ct));
         await (onlyIfEmpty ? reset.SeedIfEmptyAsync(fixture, ct) : reset.RunAsync(fixture, ct));
 
         Console.WriteLine(onlyIfEmpty ? "Demo data present." : "Demo reset to the fixture.");

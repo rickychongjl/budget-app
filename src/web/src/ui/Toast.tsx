@@ -13,7 +13,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const context = useMemo(() => ({ show: setToast }), [])
 
   useEffect(() => {
-    if (toast && toast.tone !== 'error') {
+    if (toast && toast.tone !== 'error' && !toast.sticky) {
       const timer = setTimeout(dismiss, LIFETIME_MS)
       return () => clearTimeout(timer)
     }
@@ -40,7 +40,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 {toast.action.label}
               </button>
             )}
-            {toast.tone === 'error' && (
+            {(toast.tone === 'error' || toast.sticky) && (
               <button type="button" className={styles.dismiss} aria-label="Dismiss" onClick={dismiss}>
                 <X aria-hidden="true" />
               </button>

@@ -1,6 +1,6 @@
-# Playwright setup (one-time, before the M8 specs)
+# Playwright setup (how `tests/e2e` is put together, and why)
 
-What this covers: getting a green `npx playwright test` against `docker compose`, signed in as the demo user, with the fixture data in place. It does not write any story specs — that is M8 proper (`docs/user-stories.md`, one spec per story).
+Written before M8 as the plan for the e2e project, then brought in line with what M8 built. What this covers: a green `npm test` in `tests/e2e` against `docker compose`, signed in as the demo user, with the fixture data in place, and the shape the story specs take. The M8 plan itself is `docs/plans/m8-pwa.md`.
 
 Settled elsewhere, not re-decided here: Playwright over the alternatives, `tests/e2e` as the home, the iPhone 15 profile, local by default with an optional `workflow_dispatch` in CI, and `fixtures/demo-seed.json` as the data (`docs/solution-design.md` sections 9, 13, 14 and decision 8).
 
@@ -22,12 +22,17 @@ tests/e2e/
 ├── package.json
 ├── tsconfig.json
 ├── playwright.config.ts
-├── auth.setup.ts
-├── global-setup.ts
+├── global-setup.ts         ← resets the demo before the run; exports resetDemo() for the one spec that needs it mid-run
+├── support.ts              ← the fixture as data, today() in Sydney, addTransaction() and the other page helpers
 ├── fixtures/
-│   └── demo-seed.json      ← already here
+│   └── demo-seed.json      ← shared with the reset-demo job
 ├── specs/
-│   └── smoke.spec.ts
+│   ├── auth.setup.ts       ← inside specs/, or the setup project finds nothing (testDir)
+│   ├── 01-signin.spec.ts   ← numbered: the order is the point (section 4)
+│   ├── 02-dashboard.spec.ts
+│   ├── ...
+│   ├── 07-onboarding.spec.ts
+│   └── pwa.sw.spec.ts      ← Chromium only
 └── .auth/                  ← gitignored; the saved session cookie
 ```
 
@@ -111,7 +116,8 @@ Notes on the choices that are not obvious:
 - **`workers: 1`.** The demo user is one row set, shared by every spec. This is the cost of decision 14 (the demo is a normal user, not a special case) and it is the right trade: one tenant, one worker. Do not reach for per-worker users — the app deliberately has no registration endpoint.
 - **`webServer` with `docker compose`.** `up -d` returns straight away; Playwright then polls `url` until it answers. `/health` is liveness and touches no database, so it goes green the moment the API is listening — which is after `migrate` has completed, because compose orders it that way. `reuseExistingServer` keeps the loop fast when the stack is already up.
 - **`timezoneId`.** Every date in the app is `todayIn(me.timeZone)`. If the browser sits in a different zone the specs will pass for most of the day and fail near midnight.
-- **No `baseURL` pointing at Vite.** `npm run dev` does not register the service worker and serves unbundled modules; M8 is precisely about the PWA, so the specs must run against the image.
+- **No `baseURL` pointing at Vite.** `npm run dev` does not register the service worker and serves unbundled modules; M8 is precisely about the PWA, so the specs must run against the image. `E2E_BASE_URL` points the suite at a stack on another port (handy beside a second worktree's stack; a compose override file moves the ports).
+- **`webServer.env` raises the rate limit.** The API allows 100 requests a minute per address, static files included, and one worker reloading the app dozens of times spends that in seconds: the symptom is a page whose whole body is a `429` problem document. The config passes `RATE_LIMIT_PERMIT=2000` when it starts the stack; a stack started by hand needs the same in `.env`.
 
 `tsconfig.json`:
 
@@ -174,20 +180,11 @@ export default function () {
 
 This runs after `webServer` has the stack up, which is the order you want — the job needs SQL.
 
-**The one gap that needs code.** Onboarding stories 1 to 5 need a demo user with *no* data, and `reset-demo` always re-seeds. The cheapest fix is a flag on the job that stops after the delete:
+**Onboarding needs an empty demo.** Stories 1 to 5 start from a user with *no* data, and `reset-demo` always re-seeds, so M8 gave the job a flag: `reset-demo --empty` deletes and stops (`ResetDemo.ClearAsync`). `global-setup.ts` exports `resetDemo('empty' | 'fixture')` around it; `07-onboarding.spec.ts` calls the first in `beforeAll` and the second in `afterAll`.
 
-```csharp
-// Budget.Jobs/Program.cs
-case ["reset-demo"]:
-    return await JobHost.ResetDemoAsync(services);
+**Which is why the spec files are numbered.** Playwright runs a project's files in alphabetical order, and with one shared demo user the order is part of the contract: `03-transactions` adds rows that `04-settings` then sees, `07-onboarding` empties everything and must be last. The number says so on the file, rather than leaving it to be rediscovered.
 
-case ["reset-demo", "--empty"]:
-    return await JobHost.ResetDemoAsync(services, empty: true);
-```
-
-with `JobHost.ResetDemoAsync` calling `users.DeleteDataAsync(demo.Id)` and returning before `ResetDemo.RunAsync`. About five lines plus an Application test. The onboarding spec then empties the demo in a `beforeAll` and the next spec's reset puts it back — so keep onboarding in its own file and let it run last (`testMatch` order, or name it `zz-onboarding.spec.ts`).
-
-Do not seed by writing SQL from a spec. The fixture goes in through the domain rules, which is the only reason the seeded cycles have correct rollups and carry-forward.
+Do not seed by writing SQL from a spec. The fixture goes in through the domain rules, which is the only reason the seeded cycles have correct rollups and carry-forward. `support.ts` reads the same JSON to derive counts and amounts (`cycleCount`, `fixtureSpent('groceries')`), so a change to the fixture moves the assertions with it; note it does the C# integer division by hand (`Math.floor`), which was the first thing to go wrong.
 
 ## 5. Offline and the service worker
 
@@ -196,6 +193,7 @@ This is why M8 needs Playwright at all — jsdom cannot express it.
 - `await context.setOffline(true)` works in every browser. That is the tool for the outbox specs: go offline, add a transaction, assert the screen shows it (that is `overlay(server snapshot, outbox)`), go back online, assert `drain()` posted it and the server's numbers now match.
 - `context.serviceWorkers()` and `context.waitForEvent('serviceworker')` are **Chromium only**. Any spec that asserts the worker installed, or that a cold reload is served from its cache, belongs in the `sw` project. Story specs stay on the iPhone 15 profile.
 - Each test gets a fresh context, so the worker installs again every time. If a spec needs an already-installed worker across steps, use `test.describe.serial` and install it in the first step rather than fighting the isolation.
+- **The visit that installs the worker is not served by it.** A page is only controlled by a worker that was active before the page loaded, so nothing fetched during the first visit reaches the worker's runtime cache. The cold-start spec waits for `navigator.serviceWorker.ready` and the precache, then reloads once online (that visit is controlled and `/api/me` is kept), and only then goes offline. That is also what happens for a real person: the app opens with no signal from the second visit on.
 - After any change under `src/web`, rebuild before running: `docker compose up -d --build`. A stale image is the single most likely cause of a spec that fails for no visible reason.
 
 ## 6. Writing the specs
@@ -281,32 +279,17 @@ There is no hosted Playwright dashboard in the box. (Microsoft sells one — Azu
 - `--debug` steps through one spec with the inspector, when UI mode is not enough.
 - Browsers install per user, not per project, so a second clone of the repo needs no second download.
 
-## 11. Prove the setup before writing any story spec
+## 11. Running it
 
-```ts
-// specs/smoke.spec.ts
-import { test, expect } from '@playwright/test'
-
-test('the demo lands on its current cycle', async ({ page }) => {
-  await page.goto('/')
-  await expect(page.getByText('Groceries')).toBeVisible()
-})
-
-test('offline, the page still renders from the cache', async ({ page, context }) => {
-  await page.goto('/')
-  await expect(page.getByText('Groceries')).toBeVisible()
-  await context.setOffline(true)
-  await page.reload()
-  await expect(page.getByText('Groceries')).toBeVisible()
-})
+```bash
+cd tests/e2e
+npm ci && npx playwright install webkit chromium   # once per machine
+npx playwright test --list                          # the config parses, the projects resolve: 21 tests in 8 files
+npm test                                            # the run: about a minute
+npx playwright test specs/03-transactions.spec.ts   # one file (mind the order: it may expect what an earlier file left)
+npm run test:ui                                     # section 9
 ```
 
-The first test proves the config, the sign-in and the seed. The second is the M8 acceptance criterion in miniature and is **expected to fail until the service worker exists** — that is the red test M8 starts from.
+`npm test` starts `docker compose up -d --build` only if nothing answers on `:8080/health`; with the stack already up it goes straight to the demo reset and the specs. After a change under `src/web`, `docker compose up -d --build` by hand first, or the specs run against the old image.
 
-Order to work through:
-
-1. `docker compose up -d --build`, then check `http://localhost:8080` in a browser.
-2. `cd tests/e2e && npm ci && npx playwright install webkit chromium`.
-3. `npx playwright test --list` — proves the config parses and the projects resolve.
-4. `npx playwright test specs/smoke.spec.ts --project=iphone` — the first test green, the second red for the right reason.
-5. Only then start the story specs.
+What a green run has proved: sign-in through the screen; every story in `docs/user-stories.md` (17 specs, one per story or story group, against the real API and SQL, in WebKit at 393px); a transaction added with the network off is shown at once, counted as waiting, and is on the server after a reload; category add and remove are disabled offline with the reason on screen; and in Chromium, the manifest is installable, the app opens with no signal, and `/api` and `/auth` are never answered with the shell.

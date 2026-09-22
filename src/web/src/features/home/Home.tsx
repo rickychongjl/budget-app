@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import type { CategoryRollup } from '../../api/types'
 import { cycleDay, formatRange, todayIn } from '../../format/dates'
 import { formatMoney } from '../../format/money'
+import { InstallHint } from '../../pwa/InstallHint'
 import { Screen } from '../../shell/Screen'
 import buttonStyles from '../../ui/Button.module.css'
 import { Button } from '../../ui/Button'
@@ -77,6 +78,8 @@ export function Home() {
 
   return (
     <Screen title="Home">
+      {/* Only once there is a budget to come back to: the invitation to install is not the first thing a new user sees. */}
+      <InstallHint />
       <header className={styles.header}>
         <p className={styles.caption}>
           {formatRange(cycle.startDate, cycle.endDate, today)} · day {day} of {length}

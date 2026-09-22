@@ -1,8 +1,12 @@
 import '@testing-library/jest-dom/vitest'
 import 'fake-indexeddb/auto'
 import { cleanup } from '@testing-library/react'
-import { afterAll, afterEach, beforeAll } from 'vitest'
+import { afterAll, afterEach, beforeAll, vi } from 'vitest'
 import { server } from './server'
+
+// The service worker's registration module only exists inside a Vite build; here there is no worker to register.
+// pwa.test.tsx replaces this with a mock it can drive.
+vi.mock('virtual:pwa-register', () => ({ registerSW: () => () => Promise.resolve() }))
 
 // A request no test declared is a bug in the test, not something to let through to the network.
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
