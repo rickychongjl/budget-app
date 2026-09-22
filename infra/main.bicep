@@ -12,6 +12,9 @@ param image string
 
 @description('GitHub repository (owner/name) whose main branch may deploy, through the federated credential.')
 param githubRepo string
+@description('The owner\'s and the repository\'s numeric ids, part of the token GitHub presents: gh api repos/<owner/name> --jq ".owner.id, .id"')
+param githubOwnerId int = 61214361
+param githubRepoId int = 1376599150
 
 @description('Where alerts and the cost budget notify.')
 param alertEmail string
@@ -160,6 +163,8 @@ module identity 'modules/identity.bicep' = {
     location: location
     tags: tags
     githubRepo: githubRepo
+    githubOwnerId: githubOwnerId
+    githubRepoId: githubRepoId
   }
 }
 
