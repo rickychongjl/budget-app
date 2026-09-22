@@ -45,7 +45,9 @@ param customDomainCertificateId string = ''
 @description('Once the domain is proxied (runbook step 8): only Cloudflare may reach the ingress, so the origin cannot be hit directly.')
 param restrictIngressToCloudflare bool = false
 
-// Cloudflare's published ranges (https://www.cloudflare.com/ips/). They change rarely; check the page when they do.
+// Cloudflare's published IPv4 ranges (https://www.cloudflare.com/ips/). They change rarely; check the page when they do.
+// IPv6 is left out: the ingress restriction rejects IPv6 ranges, and the environment has an IPv4 address only, so
+// Cloudflare reaches it over IPv4 whatever the visitor used.
 var cloudflareRanges = [
   '173.245.48.0/20'
   '103.21.244.0/22'
@@ -62,13 +64,6 @@ var cloudflareRanges = [
   '104.24.0.0/14'
   '172.64.0.0/13'
   '131.0.72.0/22'
-  '2400:cb00::/32'
-  '2606:4700::/32'
-  '2803:f800::/32'
-  '2405:b500::/32'
-  '2405:8100::/32'
-  '2a06:98c0::/29'
-  '2c0f:f248::/32'
 ]
 
 var tags = { project: 'budget', env: env, owner: 'ricky' }

@@ -72,9 +72,10 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             ] : []
           )
           // Liveness only, and never the database: /health/ready is for dashboards (design section 12).
+          // Liveness first: that is the order Azure stores them in, and what-if diffs the pair otherwise.
           probes: [
-            { type: 'Startup', httpGet: { path: '/health', port: 8080 }, periodSeconds: 5, failureThreshold: 30 }
             { type: 'Liveness', httpGet: { path: '/health', port: 8080 }, periodSeconds: 30 }
+            { type: 'Startup', httpGet: { path: '/health', port: 8080 }, periodSeconds: 5, failureThreshold: 30 }
           ]
         }
       ]
