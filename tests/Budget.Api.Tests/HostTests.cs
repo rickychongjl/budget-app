@@ -71,6 +71,34 @@ public sealed class HostTests(ApiFactory api)
         await ShouldBeProblem(response, HttpStatusCode.NotFound, "user.not-found");
     }
 
+    [Fact]
+    public async Task Every_response_carries_the_security_headers()
+    {
+        var headers = (await api.CreateClient().GetAsync("/health")).Headers;
+
+        headers.GetValues("Content-Security-Policy").Single().Should().Be(
+            "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
+        headers.GetValues("X-Content-Type-Options").Single().Should().Be("nosniff");
+        headers.GetValues("Referrer-Policy").Single().Should().Be("no-referrer");
+        headers.GetValues("Permissions-Policy").Single().Should().Be("camera=(), microphone=(), geolocation=()");
+    }
+
+    // TLS ends at the Container Apps ingress, so the app sees plain http plus X-Forwarded-Proto. Outside Development it must
+    // treat that as https, or Secure cookies and antiforgery refuse every write. HSTS is the observable sign that it did.
+    [Fact]
+    public async Task Behind_the_ingress_a_forwarded_https_request_counts_as_https()
+    {
+        await using var production = new WebApplicationFactory<Program>().WithWebHostBuilder(b => b
+            .UseEnvironment("Production")
+            .UseSetting("ConnectionStrings:Budget", "Server=127.0.0.1,1;Database=none;User Id=none;Password=none;Connect Timeout=1;Encrypt=false"));
+        var options = new WebApplicationFactoryClientOptions { BaseAddress = new Uri("http://budget.example") };
+        var forwarded = production.CreateClient(options);
+        forwarded.DefaultRequestHeaders.Add("X-Forwarded-Proto", "https");
+
+        (await forwarded.GetAsync("/health")).Headers.GetValues("Strict-Transport-Security").Single().Should().Be("max-age=2592000");
+        (await production.CreateClient(options).GetAsync("/health")).Headers.Contains("Strict-Transport-Security").Should().BeFalse();
+    }
+
     internal static async Task<JsonElement> ShouldBeProblem(HttpResponseMessage response, HttpStatusCode status, string code)
     {
         response.StatusCode.Should().Be(status);

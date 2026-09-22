@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Azure.Identity;
+using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Budget.Api;
 using Budget.Application;
 using Budget.Infrastructure;
@@ -30,6 +31,13 @@ if (builder.Configuration["DataProtection:BlobUri"] is { Length: > 0 } blobUri)
     dataProtection.PersistKeysToAzureBlobStorage(new Uri(blobUri), new DefaultAzureCredential());
 }
 
+// Application Insights through the OpenTelemetry distro: requests, SQL calls, exceptions and logs, correlated per request.
+// Only where the connection string is set (the Container App); locally and in tests there is nowhere to send it.
+if (builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"] is { Length: > 0 })
+{
+    builder.Services.AddOpenTelemetry().UseAzureMonitor();
+}
+
 // Recognises a session on every request. Issuing one is separate: /auth/demo, and Entra through /auth/login.
 // An API answers 401 and 403; it never redirects to a login page.
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(o =>
@@ -53,6 +61,8 @@ builder.Services.AddBudgetRateLimiting(builder.Configuration);
 var app = builder.Build();
 
 app.UseExceptionHandler();
+// After the exception handler, which clears the response before it re-runs the pipeline; the headers must be set again.
+app.UseEdge();
 app.UseStatusCodePages();
 // The built SPA. Ahead of the rate limiter, so the files of one page load do not spend the API's allowance.
 app.UseStaticFiles(Spa.Files);

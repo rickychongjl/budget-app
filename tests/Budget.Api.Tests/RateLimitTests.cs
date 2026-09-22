@@ -28,4 +28,22 @@ public sealed class RateLimitTests(ApiFactory api)
             (await client.GetAsync("/health")).StatusCode.Should().Be(HttpStatusCode.OK);
         }
     }
+
+    // Behind Cloudflare every request reaches the app from the ingress, so the address that counts is the one Cloudflare
+    // reports, not the connection's.
+    [Fact]
+    public async Task The_client_address_is_the_one_cloudflare_reports()
+    {
+        await using var strict = api.WithWebHostBuilder(b => b.UseSetting("RateLimiting:PermitLimit", "2"));
+        var phone = strict.CreateClient();
+        phone.DefaultRequestHeaders.Add("CF-Connecting-IP", "203.0.113.5");
+        var laptop = strict.CreateClient();
+        laptop.DefaultRequestHeaders.Add("CF-Connecting-IP", "203.0.113.6");
+
+        await phone.GetAsync("/api/me");
+        await phone.GetAsync("/api/me");
+
+        (await phone.GetAsync("/api/me")).StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+        (await laptop.GetAsync("/api/me")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
 }
