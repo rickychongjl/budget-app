@@ -1,5 +1,6 @@
 .field {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-1);
 }
 
@@ -17,6 +18,17 @@
   background: var(--color-surface);
   /* 16px: anything smaller makes iOS zoom the page on focus. */
   font: var(--text-body);
+}
+
+/* iOS Safari draws a date input natively at its own width, past width: 100%, and the page scrolls sideways. Without
+   the native appearance it takes the box it is given and still opens the date wheel. */
+.input[type='date'] {
+  min-width: 0;
+  appearance: none;
+}
+
+.input::-webkit-date-and-time-value {
+  text-align: start;
 }
 
 .input::placeholder {
