@@ -20,6 +20,6 @@ param entraClientSecret = readEnvironmentVariable('ENTRA_CLIENT_SECRET', '')
 param allowedOids = readEnvironmentVariable('AUTH_ALLOWED_OIDS', '')
 
 // Runbook steps 6 to 8 (docs/plans/m9-infra.md) fill these in, in that order.
-param customDomain = ''
-param customDomainCertificateId = ''
-param restrictIngressToCloudflare = false
+param customDomain = 'tightarse.app'
+param customDomainCertificateId = '/subscriptions/7997d424-7699-4c60-947c-b196908ed469/resourceGroups/bgt-prod-rg/providers/Microsoft.App/managedEnvironments/bgt-prod-env/managedCertificates/mc-bgt-prod-env-tightarse-app-3620'
+param restrictIngressToCloudflare = true
