@@ -36,6 +36,12 @@
   color: var(--color-text-muted);
 }
 
+/* Matches Field's hint. */
+.hint {
+  font: var(--text-label);
+  color: var(--color-text-muted);
+}
+
 /* Eight slots in one row of 44px targets at 360px: (360 - 32) / 8 = 41, so they wrap to two rows there and that is fine. */
 .swatches,
 .icons {

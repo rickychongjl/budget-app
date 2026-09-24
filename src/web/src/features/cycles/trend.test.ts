@@ -3,7 +3,7 @@ import type { CategoryRollup, Cycle, CycleSummary } from '../../api/types'
 import { categoriesOf, niceTicks, summarise, toSeries, type TrendFilter } from './trend'
 
 const line = (categoryId: string, name: string, actual: number, type: CategoryRollup['type'] = 'Debit', colour = 'blue'): CategoryRollup => ({
-  categoryId, name, icon: 'tag', colour, type, budgeted: 700, actual, remaining: 700 - actual, percentUsed: (actual / 700) * 100, status: 'OnTrack',
+  categoryId, name, icon: 'tag', colour, type, budgeted: 700, actual, remaining: 700 - actual, percentUsed: (actual / 700) * 100, status: 'OnTrack', spreadEvenly: true,
 })
 
 const summary = (

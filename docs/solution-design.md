@@ -119,6 +119,8 @@ Category                  -- stable identity across cycles (used for trend repor
 CycleCategory             -- the per-cycle snapshot: what the category looked like in that cycle
   Id, UserId, CycleId, CategoryId, Name, Icon, Colour, SortOrder,
   BudgetAmount (decimal 18,2)   -- spend limit for Debit, expected amount for Credit
+  SpreadEvenly (bit, default 1) -- spent a little at a time; false for a bill paid in one go. Only the UI's
+                                   "ahead of pace" hint reads it (design-system MASTER 3.3)
 
 Transaction
   Id, UserId, CycleId, CategoryId, Amount (decimal 18,2), OccurredOn (date),

@@ -58,6 +58,23 @@ public sealed class CategoryTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task A_category_is_spread_evenly_until_it_is_marked_as_a_bill()
+    {
+        var a = await CurrentCycleAsync();
+        var categoryId = await AddAsync(a.Client, a.Cycle);
+        async Task<bool> SpreadEvenlyAsync() =>
+            (await a.Client.GetFromJsonAsync<JsonElement>($"/api/cycles/{a.Cycle.Id}")).GetProperty("rollup").GetProperty("categories")[0].GetProperty("spreadEvenly").GetBoolean();
+
+        (await SpreadEvenlyAsync()).Should().BeTrue();
+
+        var response = await a.Client.PatchAsJsonAsync($"/api/cycles/{a.Cycle.Id}/categories/{categoryId}", new { spreadEvenly = false });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("spreadEvenly").GetBoolean().Should().BeFalse();
+        (await SpreadEvenlyAsync()).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Delete_is_204_unless_the_category_has_transactions_in_that_cycle()
     {
         var a = await CurrentCycleAsync();

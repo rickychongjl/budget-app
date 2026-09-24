@@ -4,7 +4,7 @@ import { useRef, useState, type FormEvent } from 'react'
 import { useParams } from 'react-router'
 import { api } from '../../api/client'
 import type { Cycle } from '../../api/types'
-import { formatRange, todayIn } from '../../format/dates'
+import { cycleElapsed, formatRange, todayIn } from '../../format/dates'
 import { formatMoney, parseMoney } from '../../format/money'
 import { Screen } from '../../shell/Screen'
 import { useOnline } from '../../shell/useOnline'
@@ -54,6 +54,8 @@ export function CycleDetail() {
 
   const { cycle: details, rollup } = cycle.data
   const money = (amount: number) => formatMoney(amount, me.currency)
+  // A past cycle is over and an upcoming one has not begun, so neither has a today to mark. A Draft is not under way yet.
+  const elapsed = details.phase === 'Current' && details.status === 'Confirmed' ? cycleElapsed(details.startDate, details.endDate, today) : undefined
 
   return (
     <Screen title={formatRange(details.startDate, details.endDate, today)} back>
@@ -70,8 +72,8 @@ export function CycleDetail() {
       <Balances key={`${details.id}:${details.closingBalance}`} cycle={details} accrued={rollup.accrued} currency={me.currency} />
 
       {rollup.categories.length === 0 && <EmptyState icon={Shapes}>This cycle has no categories.</EmptyState>}
-      <CategorySection id="spending" title="Spending" rows={rollup.categories.filter((row) => row.type === 'Debit')} currency={me.currency} cycleId={details.id} />
-      <CategorySection id="income" title="Income" rows={rollup.categories.filter((row) => row.type === 'Credit')} currency={me.currency} cycleId={details.id} />
+      <CategorySection id="spending" title="Spending" rows={rollup.categories.filter((row) => row.type === 'Debit')} currency={me.currency} cycleId={details.id} today={elapsed} />
+      <CategorySection id="income" title="Income" rows={rollup.categories.filter((row) => row.type === 'Credit')} currency={me.currency} cycleId={details.id} today={elapsed} />
     </Screen>
   )
 }

@@ -17,7 +17,7 @@ import { ClosingBalancePrompt } from './ClosingBalancePrompt'
 const ME: Me = { id: 'u1', displayName: 'Demo', timeZone: 'Australia/Sydney', currency: 'AUD', isDemo: true, cycleLengthDays: 30 }
 
 const row = (categoryId: string, name: string, type: 'Debit' | 'Credit'): CategoryRollup => ({
-  categoryId, name, icon: 'tag', colour: 'blue', type, budgeted: 100, actual: 0, remaining: 100, percentUsed: 0, status: 'OnTrack',
+  categoryId, name, icon: 'tag', colour: 'blue', type, budgeted: 100, actual: 0, remaining: 100, percentUsed: 0, status: 'OnTrack', spreadEvenly: true,
 })
 
 const SUMMARY: CycleSummary = {

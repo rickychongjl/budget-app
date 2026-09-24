@@ -14,7 +14,7 @@ import { Home } from './Home'
 const ME: Me = { id: 'u1', displayName: 'Demo', timeZone: 'Australia/Sydney', currency: 'AUD', isDemo: true, cycleLengthDays: 30 }
 
 function category(overrides: Partial<CategoryRollup>): CategoryRollup {
-  const base = { categoryId: crypto.randomUUID(), name: 'Food', icon: 'utensils', colour: 'orange', type: 'Debit' as const, budgeted: 400, actual: 0 }
+  const base = { categoryId: crypto.randomUUID(), name: 'Food', icon: 'utensils', colour: 'orange', type: 'Debit' as const, budgeted: 400, actual: 0, spreadEvenly: true }
   const row = { ...base, ...overrides }
   return {
     remaining: row.budgeted - row.actual,
@@ -47,6 +47,26 @@ describe('categoryStatus', () => {
     expect(status.icon).toBe(icon)
   })
 
+  // MASTER 3.3, "Ahead of pace". 11 of 30 days gone: $400 spread evenly allows $146.67 by the end of today.
+  const DAY_11 = 11 / 30
+
+  test.each([
+    ['past the line', { actual: 200 }, DAY_11, 'normal', '$53.33 ahead of pace', 'gauge'],
+    ['exactly on the line', { actual: 146.67 }, DAY_11, 'normal', '$253.33 left', undefined],
+    ['behind the line', { actual: 100 }, DAY_11, 'normal', '$300.00 left', undefined],
+    ['a bill, paid in one go', { actual: 200, spreadEvenly: false }, DAY_11, 'normal', '$200.00 left', undefined],
+    ['not the current cycle', { actual: 200 }, undefined, 'normal', '$200.00 left', undefined],
+    ['at 80% as well: warning wins', { actual: 320 }, DAY_11, 'warning', '$80.00 left', 'triangle-alert'],
+    ['over as well: over wins', { actual: 420 }, DAY_11, 'negative', 'Over by $20.00', 'circle-alert'],
+    ['income is never ahead of pace', { type: 'Credit', budgeted: 5000, actual: 2500 }, DAY_11, 'normal', '$2,500.00 to go', undefined],
+  ] as const)('pace: %s', (_, overrides, elapsed, tone, word, icon) => {
+    const status = categoryStatus(category(overrides), 'AUD', elapsed)
+
+    expect(status.tone).toBe(tone)
+    expect(status.word).toBe(word)
+    expect(status.icon).toBe(icon)
+  })
+
   test('over and ahead come from the API, not from comparing the numbers here', () => {
     // A row the server calls OnTrack stays that way even if its numbers look over.
     const row = { ...category({ actual: 420 }), status: 'OnTrack' as const }
@@ -60,7 +80,7 @@ const SUMMARY: CycleSummary = {
   rollup: {
     categories: [
       category({ name: 'Salary', icon: 'banknote', colour: 'blue', type: 'Credit', budgeted: 5200, actual: 5200 }),
-      category({ name: 'Rent', icon: 'house', colour: 'slate', budgeted: 2200, actual: 2200 }),
+      category({ name: 'Rent', icon: 'house', colour: 'slate', budgeted: 2200, actual: 2200, spreadEvenly: false }),
       category({ name: 'Groceries', icon: 'shopping-cart', budgeted: 700, actual: 242.9 }),
       category({ name: 'Eating out', icon: 'utensils', colour: 'pink', budgeted: 300, actual: 340 }),
     ],
@@ -137,6 +157,42 @@ describe('Home', () => {
 
     expect(await screen.findByText('No budget yet. Set up your first cycle.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Set up your first cycle' })).toHaveAttribute('href', '/onboarding')
+  })
+
+  test('every bar has a line where today falls in the cycle', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    server.use(http.get('/api/cycles/current', () => HttpResponse.json(SUMMARY)))
+    renderHome()
+
+    await screen.findByRole('heading', { level: 3, name: 'Eating out' })
+    // Day 11 of 30.
+    const lines = screen.getAllByTestId('today-line')
+    expect(lines).toHaveLength(SUMMARY.rollup.categories.length)
+    for (const line of lines) {
+      expect(parseFloat(line.style.left)).toBeCloseTo((11 / 30) * 100)
+    }
+    vi.useRealTimers()
+  })
+
+  test('a category spent faster than the days have gone says so under its bar, in words', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const fun = category({ name: 'Fun', icon: 'gamepad-2', colour: 'violet', budgeted: 300, actual: 150 })
+    server.use(http.get('/api/cycles/current', () => HttpResponse.json({ ...SUMMARY, rollup: { ...SUMMARY.rollup, categories: [...SUMMARY.rollup.categories, fun] } })))
+    renderHome()
+
+    // Day 11 of 30: $300 spread evenly allows $110.00 by now.
+    const row = within((await screen.findByRole('heading', { level: 3, name: 'Fun' })).closest('li')!)
+    expect(row.getByText('$40.00 ahead of pace')).toBeInTheDocument()
+    expect(row.getByRole('progressbar')).toHaveAttribute('aria-valuetext', 'Fun: $150.00 of $300.00, $40.00 ahead of pace')
+
+    // Groceries has $256.67 of its $700 by now and has spent $242.90: behind the line.
+    const groceries = within(screen.getByRole('heading', { level: 3, name: 'Groceries' }).closest('li')!)
+    expect(groceries.getByText('$457.10 left')).toBeInTheDocument()
+
+    // Rent is paid in one go, so being all spent on day 11 is not a pace problem.
+    const rent = within(screen.getByRole('heading', { level: 3, name: 'Rent' }).closest('li')!)
+    expect(rent.queryByText(/ahead of pace/)).not.toBeInTheDocument()
+    vi.useRealTimers()
   })
 
   test('a cycle with no categories says so instead of showing two empty sections', async () => {

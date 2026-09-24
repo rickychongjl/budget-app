@@ -1,7 +1,7 @@
 import { CloudOff, Shapes, Wallet } from 'lucide-react'
 import { Link } from 'react-router'
 import type { CategoryRollup } from '../../api/types'
-import { cycleDay, formatRange, todayIn } from '../../format/dates'
+import { cycleDay, cycleElapsed, formatRange, todayIn } from '../../format/dates'
 import { formatMoney } from '../../format/money'
 import { InstallHint } from '../../pwa/InstallHint'
 import { Screen } from '../../shell/Screen'
@@ -72,6 +72,7 @@ export function Home() {
   const { cycle, rollup } = current.data
   const today = todayIn(me.timeZone)
   const { day, length } = cycleDay(cycle.startDate, cycle.endDate, today)
+  const elapsed = cycleElapsed(cycle.startDate, cycle.endDate, today)
   const money = (amount: number) => formatMoney(amount, me.currency)
   const spending = rollup.categories.filter((row) => row.type === 'Debit')
   const income = rollup.categories.filter((row) => row.type === 'Credit')
@@ -93,13 +94,23 @@ export function Home() {
       </header>
 
       {rollup.categories.length === 0 && <EmptyState icon={Shapes}>This cycle has no categories yet.</EmptyState>}
-      <CategorySection id="spending" title="Spending" rows={spending} currency={me.currency} cycleId={cycle.id} />
-      <CategorySection id="income" title="Income" rows={income} currency={me.currency} cycleId={cycle.id} />
+      <CategorySection id="spending" title="Spending" rows={spending} currency={me.currency} cycleId={cycle.id} today={elapsed} />
+      <CategorySection id="income" title="Income" rows={income} currency={me.currency} cycleId={cycle.id} today={elapsed} />
     </Screen>
   )
 }
 
-export function CategorySection({ id, title, rows, currency, cycleId }: { id: string; title: string; rows: CategoryRollup[]; currency: string; cycleId: string }) {
+type SectionProps = {
+  id: string
+  title: string
+  rows: CategoryRollup[]
+  currency: string
+  cycleId: string
+  // Draws the "today" line on every bar. Only for the cycle being lived in.
+  today?: number
+}
+
+export function CategorySection({ id, title, rows, currency, cycleId, today }: SectionProps) {
   if (rows.length === 0) {
     return null
   }
@@ -112,7 +123,7 @@ export function CategorySection({ id, title, rows, currency, cycleId }: { id: st
       <Card>
         <ul className={styles.rows}>
           {rows.map((row) => (
-            <CategoryRow key={row.categoryId} row={row} currency={currency} to={`/cycles/${cycleId}/categories/${row.categoryId}`} />
+            <CategoryRow key={row.categoryId} row={row} currency={currency} to={`/cycles/${cycleId}/categories/${row.categoryId}`} today={today} />
           ))}
         </ul>
       </Card>

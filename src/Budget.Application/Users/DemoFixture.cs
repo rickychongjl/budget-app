@@ -17,7 +17,8 @@ public sealed record DemoFixture(
     public static DemoFixture Parse(string json) =>
         JsonSerializer.Deserialize<DemoFixture>(json, Json) ?? throw new JsonException("The demo fixture is empty.");
 
-    public sealed record CategorySeed(string Key, CategoryType Type, string Name, string Icon, string Colour, decimal Budget);
+    // SpreadEvenly is false for a bill paid in one go; left out, it is true.
+    public sealed record CategorySeed(string Key, CategoryType Type, string Name, string Icon, string Colour, decimal Budget, bool SpreadEvenly = true);
 
     // A transaction lands in whichever cycle covers its day.
     public sealed record TransactionSeed(string Category, int DayOffset, decimal Amount, string? Note);

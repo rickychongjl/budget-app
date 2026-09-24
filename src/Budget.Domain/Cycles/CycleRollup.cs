@@ -22,7 +22,8 @@ public sealed record CategoryRollup(
     decimal Actual,
     decimal Remaining,
     decimal? PercentUsed,
-    RollupStatus Status);
+    RollupStatus Status,
+    bool SpreadEvenly);
 
 public sealed record CycleRollup(
     IReadOnlyList<CategoryRollup> Categories,
@@ -101,6 +102,7 @@ public sealed record CycleRollup(
             actual,
             budgeted - actual,
             budgeted == 0m ? null : actual / budgeted * 100m,
-            status);
+            status,
+            snapshot.SpreadEvenly);
     }
 }

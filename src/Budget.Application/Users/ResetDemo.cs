@@ -51,7 +51,7 @@ public sealed class ResetDemo(
             var category = new Category(demo.Id, seed.Type, now);
             categories.Add(category);
             categoryIds.Add(seed.Key, category.Id);
-            firstCategories.Add(new CycleCategory(first, category.Id, seed.Name, seed.Icon, seed.Colour, firstCategories.Count, seed.Budget));
+            firstCategories.Add(new CycleCategory(first, category.Id, seed.Name, seed.Icon, seed.Colour, firstCategories.Count, seed.Budget, seed.SpreadEvenly));
         }
 
         first.Confirm();

@@ -70,6 +70,7 @@ Text on a soft background uses the matching status text colour. Text on a destru
 | Category type | Condition | Status | Bar fill | Icon (Lucide) | Word |
 |---|---|---|---|---|---|
 | Debit | under 80% of budget | Normal | `--color-primary` | none | "$X left" |
+| Debit, spent over the cycle, current cycle only | under 80%, and past the today line | Ahead of pace | `--color-primary` | `gauge` | "$X ahead of pace", in `--color-text-muted` |
 | Debit | 80% to 100% | Warning | `--color-warning-fill` | `triangle-alert` | "$X left" |
 | Debit | over 100% | Negative | `--color-negative-fill` | `circle-alert` | "Over by $X" |
 | Credit | under 100% of expected | Normal | `--color-primary` | none | "$X to go" |
@@ -77,6 +78,8 @@ Text on a soft background uses the matching status text colour. Text on a destru
 | Credit | over 100% | Positive | `--color-positive-fill` | `trending-up` | "Ahead by $X" |
 
 The thresholds are presentation only. Whether a category is over or ahead comes from the API rollup; the front end does not recompute it.
+
+**Ahead of pace** is a nudge, not an alarm, so it keeps the Normal bar and muted text; Over and Warning win over it. The today line sits at budget × day ÷ cycle length (the end of today), and $X is what has been spent beyond it. It needs a today, so a past or upcoming cycle never shows it. It applies only to a spending category marked as spent "Over the cycle" (`spreadEvenly`, the default); a bill marked "In one go" would otherwise read as ahead of pace from the day it is paid. Like the 80% threshold, the front end works it out, because it depends on today and a cached answer may be yesterday's.
 
 ### 3.4 Category and chart palette
 
@@ -177,7 +180,7 @@ Every interactive element is at least 44x44px (48px preferred) with at least 8px
 
 **Cycle header (Home).** Caption "1 Sep to 30 Sep · day 12 of 30". The hero amount in `--text-display`: total spent. Under it, muted: "of $X budgeted". A second line shows received against expected.
 
-**Category row.** Icon chip, name (`--text-heading`, truncates), amount "spent / budget" right-aligned in `.num`. Beneath: a progress bar 8px tall, `--radius-full`, track `--color-surface-2`, fill per 3.3, capped at 100% wide. Beneath that: the status word, with its icon when not Normal. The bar has `role="progressbar"` with `aria-valuetext` such as "Food: $420 of $400, over by $20". Debit and credit categories are listed in separate sections headed "Spending" and "Income".
+**Category row.** Icon chip, name (`--text-heading`, truncates), amount "spent / budget" right-aligned in `.num`. Beneath: a progress bar 8px tall, `--radius-full`, track `--color-surface-2`, fill per 3.3, capped at 100% wide. Beneath that: the status word, with its icon when not Normal. The bar has `role="progressbar"` with `aria-valuetext` such as "Food: $420 of $400, over by $20". In the current cycle only (Home, and cycle detail when the cycle is Current and Confirmed), every bar also carries a today line: a 2px upright in `--color-text`, 4px proud of the track above and below, placed at day ÷ cycle length (the end of today). It is decorative (`aria-hidden`), since the cycle header says "day 12 of 30" in words, and it is never red. Past and upcoming cycles have no line. Debit and credit categories are listed in separate sections headed "Spending" and "Income".
 
 **Status badge.** Pill, caption size, soft background with matching status text colour, icon plus word. Used in the cycle list (Current, Past, Upcoming, Draft) and on cycle detail.
 

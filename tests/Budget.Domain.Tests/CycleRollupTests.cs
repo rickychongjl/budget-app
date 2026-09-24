@@ -39,6 +39,17 @@ public class CycleRollupTests
         line.Remaining.Should().Be(300m);
         line.PercentUsed.Should().Be(25m);
         line.Status.Should().Be(RollupStatus.OnTrack);
+        line.SpreadEvenly.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Line_says_whether_the_category_is_spent_evenly()
+    {
+        var category = new Category(TestData.UserId, CategoryType.Debit, TestData.Now);
+        _categories.Add(category);
+        _cycleCategories.Add(new CycleCategory(_cycle, category.Id, "Rent", "house", "slate", 0, 2200m, spreadEvenly: false));
+
+        Calculate().Categories.Should().ContainSingle().Which.SpreadEvenly.Should().BeFalse();
     }
 
     [Fact]
