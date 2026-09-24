@@ -26,7 +26,7 @@ export function SignIn({ onSignedIn }: Props) {
     <main className={styles.screen}>
       <header className={styles.header}>
         <BrandMark size="lg" />
-        <h1 className={styles.title}>Budget</h1>
+        <h1 className={styles.title}>Tight Arse</h1>
         <p className={styles.lead}>A 30-day budget you can keep up with from your phone.</p>
       </header>
 

@@ -73,7 +73,7 @@ describe('signed out', () => {
     backend()
     renderGate()
 
-    const title = await screen.findByRole('heading', { level: 1, name: 'Budget' })
+    const title = await screen.findByRole('heading', { level: 1, name: 'Tight Arse' })
     expect(title.parentElement!.querySelector('img[src="/favicon.svg"]')).toHaveAttribute('alt', '')
   })
 

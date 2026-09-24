@@ -18,7 +18,7 @@ export function InstallHint() {
       <section aria-labelledby="install-hint" className={styles.hint}>
         <div className={styles.text}>
           <h2 id="install-hint" className={styles.title}>
-            Add Budget to your Home Screen
+            Add Tight Arse to your Home Screen
           </h2>
           <p className={styles.detail}>
             {offer === 'ios' ? (

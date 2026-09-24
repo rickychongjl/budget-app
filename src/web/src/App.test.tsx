@@ -12,6 +12,6 @@ test('a visitor with no session lands on the sign-in screen', async () => {
 
   render(<App />)
 
-  expect(await screen.findByRole('heading', { name: 'Budget' })).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: 'Tight Arse' })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Try the demo' })).toBeInTheDocument()
 })
