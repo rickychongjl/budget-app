@@ -42,16 +42,19 @@ resource actionGroup 'Microsoft.Insights/actionGroups@2023-01-01' = {
 
 // Log alerts, because a failure *rate* and a percentile are not platform metrics. Every fifteen minutes, not five:
 // a log alert is priced by frequency and fifteen is the cheapest tier, which is right for a one-user app.
+// The liveness probe is left out: it calls /health every 30 s, which alone met the old 20-request floor, so a quiet
+// night could fire on two failures. A failure is a 5xx only. App Insights marks every 4xx failed, 401 included, and
+// here those are the app refusing someone as designed: the signed-out /api/me check, scanners' 404s, the rate limiter.
 var requestAlerts = [
   {
     name: 'failure-rate'
-    description: 'More than 5% of requests failed in the last 15 minutes.'
-    query: 'requests | where timestamp > ago(15m) | summarize failed = countif(success == false), total = count() | where total >= 20 | where 100.0 * failed / total > 5'
+    description: 'At least 3 server errors (5xx), and more than 5% of requests, in the last 15 minutes. Liveness probes and 4xx are not counted.'
+    query: 'requests | where timestamp > ago(15m) | where name != "GET /health" | summarize failed = countif(toint(resultCode) >= 500), total = count() | where failed >= 3 and 100.0 * failed / total > 5'
   }
   {
     name: 'p95-latency'
-    description: 'P95 request duration above 1 s over the last 15 minutes.'
-    query: 'requests | where timestamp > ago(15m) | summarize p95 = percentile(duration, 95) | where p95 > 1000'
+    description: 'P95 request duration above 1 s over at least 20 requests in the last 15 minutes. Liveness probes are not counted.'
+    query: 'requests | where timestamp > ago(15m) | where name != "GET /health" | summarize p95 = percentile(duration, 95), total = count() | where total >= 20 and p95 > 1000'
   }
 ]
 
