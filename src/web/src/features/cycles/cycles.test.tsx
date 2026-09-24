@@ -225,6 +225,23 @@ describe('CycleDetail', () => {
     expect(screen.getByRole('link', { name: /Groceries/ })).toHaveAttribute('href', '/cycles/p2/categories/food')
   })
 
+  test('the current cycle marks today on its bars', async () => {
+    renderAt('/cycles/cur')
+
+    await screen.findByRole('heading', { level: 1, name: '10 Sep to 9 Oct' })
+    const lines = screen.getAllByTestId('today-line')
+    expect(lines).toHaveLength(2)
+    // 20 Sep is day 11 of the cycle that started on the 10th.
+    expect(parseFloat(lines[0].style.left)).toBeCloseTo((11 / 30) * 100)
+  })
+
+  test.each(['p2', 'fut'])('cycle %s is not the current one, so it has no today line', async (id) => {
+    renderAt(`/cycles/${id}`)
+
+    await screen.findByRole('link', { name: /Groceries/ })
+    expect(screen.queryByTestId('today-line')).not.toBeInTheDocument()
+  })
+
   test('shows both balances and what was accrued', async () => {
     renderAt('/cycles/p2')
 

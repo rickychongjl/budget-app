@@ -158,6 +158,16 @@ describe('ProgressBar', () => {
 
     expect(screen.getByRole('progressbar').firstElementChild).toHaveStyle({ transform: 'scaleX(0)' })
   })
+
+  test('draws a today line where it is told, and none when there is no today', () => {
+    const { rerender } = render(<ProgressBar value={0.2} label="Food: $80 of $400, $320 left" today={0.25} />)
+
+    expect(screen.getByTestId('today-line')).toHaveStyle({ left: '25%' })
+    expect(screen.getByTestId('today-line')).toHaveAttribute('aria-hidden', 'true')
+
+    rerender(<ProgressBar value={0.2} label="Food: $80 of $400, $320 left" />)
+    expect(screen.queryByTestId('today-line')).not.toBeInTheDocument()
+  })
 })
 
 describe('Field', () => {

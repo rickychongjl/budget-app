@@ -73,10 +73,6 @@
   justify-items: start;
 }
 
-.categoryBody > [role='progressbar'] {
-  width: 100%;
-}
-
 .categoryTop {
   display: flex;
   justify-content: space-between;

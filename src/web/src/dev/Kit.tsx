@@ -70,6 +70,8 @@ export default function Kit() {
   const [sheet, setSheet] = useState(false)
   const [dialog, setDialog] = useState(false)
   const [pending, setPending] = useState(false)
+  // The current cycle's bars carry a today line; a past cycle's do not.
+  const [todayLine, setTodayLine] = useState(true)
 
   return (
     <ToastProvider>
@@ -123,6 +125,9 @@ export default function Kit() {
         </Section>
 
         <Section title="Category rows (status, MASTER 3.3)">
+          <Button variant="secondary" aria-pressed={todayLine} onClick={() => setTodayLine(!todayLine)}>
+            Today line (current cycle): {todayLine ? 'on' : 'off'}
+          </Button>
           <Card>
             <div className={styles.rows}>
               {STATUS_ROWS.map((row, index) => (
@@ -133,7 +138,7 @@ export default function Kit() {
                       <span className={styles.categoryName}>{row.name}</span>
                       <span className={`${styles.amount} num`}>{row.amount}</span>
                     </div>
-                    <ProgressBar value={row.value} tone={row.tone} label={`${row.name}: ${row.amount}, ${row.word}`} />
+                    <ProgressBar value={row.value} tone={row.tone} label={`${row.name}: ${row.amount}, ${row.word}`} today={todayLine ? 0.4 : undefined} />
                     {row.tone === 'normal' ? (
                       <span className={styles.statusNormal}>{row.word}</span>
                     ) : (

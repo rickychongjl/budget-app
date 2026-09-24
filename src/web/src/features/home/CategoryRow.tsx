@@ -15,10 +15,12 @@ type Props = {
   currency: string
   // Where a tap goes: this category's transactions in this cycle.
   to: string
+  // How far through the cycle today is, for the current cycle only.
+  today?: number
 }
 
 // MASTER 9, "Category row". Home and cycle detail are lists of these; there is no chart.
-export function CategoryRow({ row, currency, to }: Props) {
+export function CategoryRow({ row, currency, to, today }: Props) {
   const status = categoryStatus(row, currency)
   const StatusIcon = status.icon && STATUS_ICONS[status.icon]
   const actual = formatMoney(row.actual, currency)
@@ -40,6 +42,7 @@ export function CategoryRow({ row, currency, to }: Props) {
           value={row.percentUsed === null ? null : row.percentUsed / 100}
           tone={status.tone}
           label={`${row.name}: ${actual} of ${budgeted}, ${status.word}`}
+          today={today}
         />
         <p className={`${styles.status} ${styles[status.tone]} num`}>
           {StatusIcon && <StatusIcon aria-hidden="true" className={styles.statusIcon} />}

@@ -31,6 +31,13 @@ export function cycleDay(start: string, end: string, today: string) {
   return { day: Math.min(Math.max(day, 1), length), length }
 }
 
+// How much of the cycle is gone by the end of today, 0 to 1: where the "today" line sits on a category's bar, so a
+// spend that has run ahead of the line has run ahead of the calendar.
+export function cycleElapsed(start: string, end: string, today: string) {
+  const { day, length } = cycleDay(start, end, today)
+  return day / length
+}
+
 // Today where the user lives (User.TimeZone from /api/me), which is how the server decides the current cycle.
 // The device's own zone is the wrong answer on a trip, and UTC is the wrong answer every morning in Sydney.
 export function todayIn(timeZone: string, now = new Date()) {

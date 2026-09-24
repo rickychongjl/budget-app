@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { cycleDay, formatDate, formatRange, todayIn } from './dates'
+import { cycleDay, cycleElapsed, formatDate, formatRange, todayIn } from './dates'
 import { formatMoney } from './money'
 
 // MASTER section 11.
@@ -79,6 +79,21 @@ describe('cycleDay', () => {
   test('stays inside the cycle when today is outside it', () => {
     expect(cycleDay('2026-09-01', '2026-09-30', '2026-08-15').day).toBe(1)
     expect(cycleDay('2026-09-01', '2026-09-30', '2026-10-15').day).toBe(30)
+  })
+})
+
+describe('cycleElapsed', () => {
+  test.each([
+    ['2026-09-01', 1 / 30],
+    ['2026-09-15', 0.5],
+    ['2026-09-30', 1],
+  ])('on %s', (today, expected) => {
+    expect(cycleElapsed('2026-09-01', '2026-09-30', today)).toBeCloseTo(expected)
+  })
+
+  test('stays on the bar when today is outside the cycle', () => {
+    expect(cycleElapsed('2026-09-01', '2026-09-30', '2026-08-15')).toBeCloseTo(1 / 30)
+    expect(cycleElapsed('2026-09-01', '2026-09-30', '2026-10-15')).toBe(1)
   })
 })
 

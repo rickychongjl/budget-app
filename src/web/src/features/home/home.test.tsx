@@ -139,6 +139,21 @@ describe('Home', () => {
     expect(screen.getByRole('link', { name: 'Set up your first cycle' })).toHaveAttribute('href', '/onboarding')
   })
 
+  test('every bar has a line where today falls in the cycle', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    server.use(http.get('/api/cycles/current', () => HttpResponse.json(SUMMARY)))
+    renderHome()
+
+    await screen.findByRole('heading', { level: 3, name: 'Eating out' })
+    // Day 11 of 30.
+    const lines = screen.getAllByTestId('today-line')
+    expect(lines).toHaveLength(SUMMARY.rollup.categories.length)
+    for (const line of lines) {
+      expect(parseFloat(line.style.left)).toBeCloseTo((11 / 30) * 100)
+    }
+    vi.useRealTimers()
+  })
+
   test('a cycle with no categories says so instead of showing two empty sections', async () => {
     server.use(http.get('/api/cycles/current', () => HttpResponse.json({ ...SUMMARY, rollup: { ...SUMMARY.rollup, categories: [] } })))
     renderHome()
