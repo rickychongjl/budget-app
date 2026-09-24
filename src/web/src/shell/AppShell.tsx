@@ -1,9 +1,10 @@
-import { CalendarRange, House, Plus, Settings } from 'lucide-react'
+import { CalendarRange, Plus, Settings } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router'
 import { AddTransactionSheet } from '../features/transactions/AddTransactionSheet'
 import { ClosingBalancePrompt } from '../features/transactions/ClosingBalancePrompt'
 import { countWaiting, useOutbox } from '../offline/useOutbox'
+import { BrandMark } from '../ui/BrandMark'
 import styles from './AppShell.module.css'
 import { ConnectivityBanner } from './ConnectivityBanner'
 
@@ -27,7 +28,10 @@ export function AppShell() {
       <nav aria-label="Main" className={styles.tabBar}>
         {/* NavLink sets aria-current="page" on the active tab. */}
         <NavLink to="/" end className={tabClass}>
-          <House aria-hidden="true" />
+          {/* The app mark stands in for a house: Home is the app's front page. */}
+          <span className={styles.mark}>
+            <BrandMark />
+          </span>
           Home
         </NavLink>
         {/* Not a route: adding happens over whatever screen you are on. */}

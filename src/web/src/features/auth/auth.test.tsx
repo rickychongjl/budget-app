@@ -69,6 +69,14 @@ describe('signed out', () => {
     expect(screen.queryByText(/Hello/)).not.toBeInTheDocument()
   })
 
+  test('shows the app mark with the name, and the mark adds nothing for a screen reader', async () => {
+    backend()
+    renderGate()
+
+    const title = await screen.findByRole('heading', { level: 1, name: 'Budget' })
+    expect(title.parentElement!.querySelector('img[src="/favicon.svg"]')).toHaveAttribute('alt', '')
+  })
+
   test('offers Microsoft only when this deployment has it', async () => {
     backend({ signIn: ['demo'] })
     renderGate()

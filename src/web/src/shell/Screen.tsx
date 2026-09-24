@@ -1,6 +1,7 @@
 import { ArrowLeft } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router'
+import { BrandMark } from '../ui/BrandMark'
 import styles from './Screen.module.css'
 
 type Props = {
@@ -25,6 +26,7 @@ export function Screen({ title, action, back = false, children }: Props) {
             <ArrowLeft aria-hidden="true" />
           </button>
         )}
+        <BrandMark />
         <h1 className={styles.title}>{title}</h1>
         {action}
       </header>

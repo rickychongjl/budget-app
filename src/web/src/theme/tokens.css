@@ -46,6 +46,8 @@
   /* 8. Icons, 9. targets */
   --icon-md: 24px;
   --icon-sm: 20px;
+  /* The app mark on the sign-in screen; everywhere else it is --icon-md. */
+  --mark-lg: 96px;
   --target-min: 44px;
   --control-height: 48px;
 }

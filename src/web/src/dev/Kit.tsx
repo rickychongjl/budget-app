@@ -2,6 +2,7 @@ import { Car, Check, House, Inbox, Plus, ShoppingCart, Trash2, TrendingUp, Trian
 import type { LucideIcon } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { getPreference, setPreference, type ThemePreference } from '../theme/theme'
+import { BrandMark } from '../ui/BrandMark'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Dialog } from '../ui/Dialog'
@@ -145,6 +146,13 @@ export default function Kit() {
               ))}
             </div>
           </Card>
+        </Section>
+
+        <Section title="App mark (top bar, Home tab, sign-in)">
+          <div className={styles.row}>
+            <BrandMark />
+            <BrandMark size="lg" />
+          </div>
         </Section>
 
         <Section title="Palette slots">
