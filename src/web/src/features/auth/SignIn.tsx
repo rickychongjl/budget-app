@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { CircleAlert } from 'lucide-react'
 import { api } from '../../api/client'
 import type { AuthOptions } from '../../api/types'
+import { BrandMark } from '../../ui/BrandMark'
 import { Button } from '../../ui/Button'
 import styles from './SignIn.module.css'
 
@@ -24,6 +25,7 @@ export function SignIn({ onSignedIn }: Props) {
   return (
     <main className={styles.screen}>
       <header className={styles.header}>
+        <BrandMark size="lg" />
         <h1 className={styles.title}>Budget</h1>
         <p className={styles.lead}>A 30-day budget you can keep up with from your phone.</p>
       </header>

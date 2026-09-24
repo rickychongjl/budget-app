@@ -157,6 +157,7 @@ CSS transitions only. No animation library.
 - Lucide (`lucide-react`), outline style only, stroke width 2 everywhere. Two sizes: `--icon-md` 24px (default) and `--icon-sm` 20px (inside buttons and badges). No other sizes, no filled variants.
 - Icons that carry meaning (status icons, icon-only buttons) need 3:1 or better against their background. Align icons to the text's centre line with an 8px gap.
 - The "Sign in with Microsoft" button uses Microsoft's official logo and wording, unmodified. It is the only third-party brand asset in the app.
+- The app mark (`BrandMark`, drawn from `public/favicon.svg`, the same file the PWA icons are rasterised from) is the one full-colour, non-Lucide icon of our own. It appears in three places only: before the title in every screen's top bar (`--icon-md`), as the Home tab's icon (`--icon-md`), and above the name on the sign-in screen (`--mark-lg`). It is always decorative (`alt=""`), because a name or title beside it says the same thing.
 - A category's `Icon` is stored as the Lucide icon name (`"utensils"`), shown inside a 40px round chip: slot colour at 15% opacity as the background, slot colour for the icon.
 - No emoji as icons. Decorative icons are `aria-hidden="true"`. An icon-only button always has an `aria-label`.
 
@@ -168,9 +169,9 @@ Every interactive element is at least 44x44px (48px preferred) with at least 8px
 
 **Gestures.** One gesture per region. A sheet is dragged by its handle and header only, so dragging never fights the sheet's own scrolling. No swipe actions on list rows (edit and delete are reached by tapping the row), which also keeps the phone's edge back-swipe free. Every drag has a button alternative.
 
-**App shell.** Top bar (56px plus top inset): screen title on the left, at most one action on the right. Scrolling content. Bottom tab bar.
+**App shell.** Top bar (56px plus top inset): the app mark then the screen title on the left, at most one action on the right. Scrolling content. Bottom tab bar.
 
-**Bottom tab bar.** Four tabs: Home, Add, Cycles, Settings. Height 56px plus bottom inset, `--color-surface`, 1px top border. Each tab is an icon with a caption label that is always visible. Active tab: `--color-primary` icon and label on a `--color-primary-soft` pill. Add opens the add-transaction sheet over the current screen rather than navigating. Each tab keeps its own scroll position and history; the back gesture is predictable.
+**Bottom tab bar.** Four tabs: Home, Add, Cycles, Settings. Height 56px plus bottom inset, `--color-surface`, 1px top border. Each tab is an icon with a caption label that is always visible. Home's icon is the app mark (section 8), not `house`. Active tab: `--color-primary` icon and label on a `--color-primary-soft` pill. Add opens the add-transaction sheet over the current screen rather than navigating. Each tab keeps its own scroll position and history; the back gesture is predictable.
 
 **Card.** `--color-surface`, 1px border, `--radius-md`, 16 padding. A tappable card shows a trailing `chevron-right`.
 

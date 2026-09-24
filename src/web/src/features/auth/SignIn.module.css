@@ -16,6 +16,11 @@
   margin-block: auto;
 }
 
+/* A little more room under the mark than between the title and the lead, so the mark reads as its own element. */
+.header > img {
+  margin-bottom: var(--space-2);
+}
+
 .title {
   font: var(--text-display);
   letter-spacing: var(--tracking-display);

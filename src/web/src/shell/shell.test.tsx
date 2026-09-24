@@ -50,6 +50,15 @@ function setOnline(online: boolean) {
 
 afterEach(() => setOnline(true))
 
+describe('top bar', () => {
+  test.each(['/', '/cycles', '/settings'])('on %s it shows the app mark before the title', (path) => {
+    renderShell(path)
+    const bar = screen.getByRole('heading', { level: 1 }).parentElement!
+
+    expect(bar.querySelector('img[src="/favicon.svg"]')).toHaveAttribute('alt', '')
+  })
+})
+
 describe('tab bar', () => {
   test('has the four tabs, each with a label that is always visible', () => {
     const tabs = renderShell()
@@ -70,6 +79,13 @@ describe('tab bar', () => {
     expect(tabs.getByRole('link', { name: 'Cycles' })).toHaveAttribute('aria-current', 'page')
     expect(tabs.getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current')
     expect(screen.getByRole('heading', { level: 1, name: 'Cycles' })).toBeInTheDocument()
+  })
+
+  test('Home carries the app mark, and its name is still only "Home"', () => {
+    const tabs = renderShell()
+    const home = tabs.getByRole('link', { name: 'Home' })
+
+    expect(home.querySelector('img[src="/favicon.svg"]')).toHaveAttribute('alt', '')
   })
 
   test('Add opens the sheet over the current screen rather than navigating', async () => {

@@ -44,8 +44,10 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-/* The pill sits behind the icon only, so the label never reflows when the active tab changes. */
-.tab svg {
+/* The pill sits behind the icon only, so the label never reflows when the active tab changes. The mark is an image
+   with its own rounded corners, so it takes the pill from a wrapper rather than from padding on itself. */
+.tab svg,
+.mark {
   box-sizing: content-box;
   width: var(--icon-md);
   height: var(--icon-md);
@@ -54,7 +56,8 @@
   transition: background var(--dur-fast);
 }
 
-.tab:active svg {
+.tab:active svg,
+.tab:active .mark {
   background: var(--color-surface-2);
 }
 
@@ -64,6 +67,7 @@
   font-weight: 700;
 }
 
-.active svg {
+.active svg,
+.active .mark {
   background: var(--color-primary-soft);
 }

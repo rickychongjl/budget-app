@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Plus } from 'lucide-react'
 import { describe, expect, test, vi } from 'vitest'
+import { BrandMark } from './BrandMark'
 import { Button } from './Button'
 import { Dialog } from './Dialog'
 import { Field } from './Field'
@@ -11,6 +12,13 @@ import { Sheet } from './Sheet'
 import { StatusBadge } from './StatusBadge'
 import { ToastProvider } from './Toast'
 import { useToast } from './useToast'
+
+test('BrandMark is the app icon, drawn from the same file as the favicon, and decorative', () => {
+  const { container } = render(<BrandMark />)
+
+  expect(container.querySelector('img')).toHaveAttribute('src', '/favicon.svg')
+  expect(screen.queryByRole('img')).not.toBeInTheDocument()
+})
 
 describe('Button', () => {
   test('is a real button that does not submit a form by accident', () => {
