@@ -343,7 +343,7 @@ Learning notes to capture as you go: modules and outputs, `existing` references,
 - **Structured logging** via `ILogger` with event IDs. Sign-in events log `oid`, IP (Cloudflare `CF-Connecting-IP`), user agent, and outcome — the audit trail.
 - **Health:** `/health` (liveness, no DB) for ACA probes; `/health/ready` (DB ping) for the dashboard only, so a DB blip never restarts the container.
 - **Rollover logging:** each job run logs users checked and cycles created. The request-time fallback logs a warning when it is the one that creates a cycle, because that means the job missed it.
-- **Alerts:** failure rate > 5% over 5 min; P95 latency > 1 s; rollover job failed; demo-reset job failed; Cost Management budget alert at A$30/month.
+- **Alerts:** server errors (5xx, at least 3) > 5% of requests over 15 min; P95 latency > 1 s over at least 20 requests; both exclude the liveness probe; rollover job failed; demo-reset job failed; Cost Management budget alert at A$30/month.
 - **Dashboards:** the built-in Failures and Performance blades; one saved KQL query for sign-ins.
 
 ---

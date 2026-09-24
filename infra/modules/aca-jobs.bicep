@@ -11,10 +11,12 @@ param sqlConnectionString string
 param allowedOids string
 param actionGroupId string
 
+// command is the Budget.Jobs argument (src/Budget.Jobs/Program.cs). It is not the resource name: the demo job is
+// named demo-reset in Azure, but the entry point is reset-demo, and passing the name made every nightly run exit 2.
 var jobs = [
-  { name: 'migrate', cron: '', timeout: 1800, retries: 0 }
-  { name: 'rollover', cron: '5 * * * *', timeout: 300, retries: 1 }
-  { name: 'demo-reset', cron: '0 17 * * *', timeout: 300, retries: 1 }
+  { name: 'migrate', command: 'migrate', cron: '', timeout: 1800, retries: 0 }
+  { name: 'rollover', command: 'rollover', cron: '5 * * * *', timeout: 300, retries: 1 }
+  { name: 'demo-reset', command: 'reset-demo', cron: '0 17 * * *', timeout: 300, retries: 1 }
 ]
 
 resource job 'Microsoft.App/jobs@2024-03-01' = [for j in jobs: {
@@ -37,7 +39,7 @@ resource job 'Microsoft.App/jobs@2024-03-01' = [for j in jobs: {
         {
           name: j.name
           image: image
-          command: ['dotnet', 'jobs/Budget.Jobs.dll', j.name]
+          command: ['dotnet', 'jobs/Budget.Jobs.dll', j.command]
           resources: { cpu: json('0.25'), memory: '0.5Gi' }
           env: [
             { name: 'ConnectionStrings__Budget', secretRef: 'sql-connection' }
