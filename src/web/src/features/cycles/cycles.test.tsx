@@ -44,7 +44,7 @@ const CYCLES = [
 ]
 
 const row = (categoryId: string, name: string, type: 'Debit' | 'Credit', budgeted: number, actual: number): CategoryRollup => ({
-  categoryId, name, icon: 'tag', colour: 'blue', type, budgeted, actual, remaining: budgeted - actual, percentUsed: (actual / budgeted) * 100, status: actual > budgeted ? (type === 'Debit' ? 'Over' : 'Ahead') : 'OnTrack',
+  categoryId, name, icon: 'tag', colour: 'blue', type, budgeted, actual, remaining: budgeted - actual, percentUsed: (actual / budgeted) * 100, status: actual > budgeted ? (type === 'Debit' ? 'Over' : 'Ahead') : 'OnTrack', spreadEvenly: true,
 })
 
 // What each cycle spent of the same $700 budget, so a row's own figures can be told apart from its neighbour's.
@@ -235,11 +235,13 @@ describe('CycleDetail', () => {
     expect(parseFloat(lines[0].style.left)).toBeCloseTo((11 / 30) * 100)
   })
 
-  test.each(['p2', 'fut'])('cycle %s is not the current one, so it has no today line', async (id) => {
+  test.each(['p2', 'fut'])('cycle %s is not the current one, so it has no today line and no pace', async (id) => {
     renderAt(`/cycles/${id}`)
 
     await screen.findByRole('link', { name: /Groceries/ })
     expect(screen.queryByTestId('today-line')).not.toBeInTheDocument()
+    // p2 spent $640 of $700: well past any line, but the cycle is over, so only its total matters.
+    expect(screen.queryByText(/ahead of pace/)).not.toBeInTheDocument()
   })
 
   test('shows both balances and what was accrued', async () => {

@@ -20,6 +20,7 @@ function line(categoryId: string, type: 'Debit' | 'Credit', budgeted: number, ac
     remaining: budgeted - actual,
     percentUsed: budgeted === 0 ? null : (actual / budgeted) * 100,
     status: actual <= budgeted ? 'OnTrack' : type === 'Debit' ? 'Over' : 'Ahead',
+    spreadEvenly: true,
   }
 }
 
@@ -128,6 +129,12 @@ describe('overlaySummary', () => {
 
     expect(food(result)).toMatchObject({ name: 'Groceries', colour: 'pink', icon: 'tag', budgeted: 300, remaining: -80, status: 'Over' })
     expect(result.rollup.debitsBudgeted).toBe(2500)
+  })
+
+  test('a queued change to how a category is spent shows at once', () => {
+    const row: OutboxRow = { seq: ++seq, userId: 'u1', item: { type: 'category.edit', cycleId: CYCLE, categoryId: FOOD, category: { spreadEvenly: false } } }
+
+    expect(food(overlaySummary(SUMMARY, [row], 0)).spreadEvenly).toBe(false)
   })
 
   test('a budget of zero has no percentage', () => {

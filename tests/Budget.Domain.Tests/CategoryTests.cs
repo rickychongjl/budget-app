@@ -35,7 +35,7 @@ public class CategoryTests
         var january = Food();
         var february = january.CopyTo(Cycle.CreateNext());
 
-        february.Edit("Groceries", "shopping-cart", "green", 2, 450m);
+        february.Edit("Groceries", "shopping-cart", "green", 2, 450m, spreadEvenly: false);
 
         january.Name.Should().Be("Food");
         january.BudgetAmount.Should().Be(400m);
@@ -44,6 +44,23 @@ public class CategoryTests
         february.Colour.Should().Be("green");
         february.SortOrder.Should().Be(2);
         february.BudgetAmount.Should().Be(450m);
+        february.SpreadEvenly.Should().BeFalse();
+        january.SpreadEvenly.Should().BeTrue();
+    }
+
+    [Fact]
+    public void A_new_snapshot_is_spent_evenly_over_the_cycle_unless_told_otherwise()
+    {
+        Food().SpreadEvenly.Should().BeTrue();
+        new CycleCategory(Cycle, Guid.NewGuid(), "Rent", "house", "slate", 0, 2200m, spreadEvenly: false).SpreadEvenly.Should().BeFalse();
+    }
+
+    [Fact]
+    public void A_bill_stays_a_bill_in_the_next_cycle()
+    {
+        var rent = new CycleCategory(Cycle, Guid.NewGuid(), "Rent", "house", "slate", 0, 2200m, spreadEvenly: false);
+
+        rent.CopyTo(Cycle.CreateNext()).SpreadEvenly.Should().BeFalse();
     }
 
     [Fact]
@@ -85,7 +102,7 @@ public class CategoryTests
     public void Negative_budget_is_rejected_on_create_and_edit()
     {
         var create = () => Food(budget: -1m);
-        var edit = () => Food().Edit("Food", "utensils", "blue", 1, -1m);
+        var edit = () => Food().Edit("Food", "utensils", "blue", 1, -1m, spreadEvenly: true);
 
         create.Should().Throw<DomainException>().Which.Code.Should().Be("money.negative");
         edit.Should().Throw<DomainException>().Which.Code.Should().Be("money.negative");

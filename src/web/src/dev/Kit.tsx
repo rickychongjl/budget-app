@@ -1,4 +1,4 @@
-import { Car, Check, House, Inbox, Plus, ShoppingCart, Trash2, TrendingUp, TriangleAlert, Utensils, Wallet, Zap } from 'lucide-react'
+import { Car, Check, Gauge, House, Inbox, Plus, ShoppingCart, Trash2, TrendingUp, TriangleAlert, Utensils, Wallet, Zap } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { getPreference, setPreference, type ThemePreference } from '../theme/theme'
@@ -29,11 +29,13 @@ const THEMES = [
 
 const ICONS = [Utensils, House, Car, ShoppingCart, Zap, Wallet, TrendingUp, Inbox]
 
-type Row = { name: string; value: number; tone: 'normal' | 'warning' | 'negative' | 'positive'; word: string; amount: string; icon?: LucideIcon }
+type Row = { name: string; value: number; tone: 'normal' | 'warning' | 'negative' | 'positive'; word: string; amount: string; icon?: LucideIcon; pace?: boolean }
 
 // MASTER 3.3, one row each.
 const STATUS_ROWS: Row[] = [
   { name: 'Food', value: 0.5, tone: 'normal', word: '$200.00 left', amount: '$200.00 / $400.00' },
+  // Past the today line (0.4 on /kit) and under 80%: muted, with its icon. Only with the line on.
+  { name: 'Groceries', value: 0.55, tone: 'normal', word: '$60.00 ahead of pace', amount: '$220.00 / $400.00', icon: Gauge, pace: true },
   { name: 'Transport', value: 0.85, tone: 'warning', word: '$30.00 left', amount: '$170.00 / $200.00', icon: TriangleAlert },
   { name: 'Eating out with a very long category name that must truncate', value: 1.05, tone: 'negative', word: 'Over by $20.00', amount: '$420.00 / $400.00' },
   { name: 'Salary', value: 0.5, tone: 'normal', word: '$2,500.00 to go', amount: '$2,500.00 / $5,000.00' },
@@ -130,7 +132,7 @@ export default function Kit() {
           </Button>
           <Card>
             <div className={styles.rows}>
-              {STATUS_ROWS.map((row, index) => (
+              {STATUS_ROWS.filter((row) => todayLine || !row.pace).map((row, index) => (
                 <div key={row.name} className={styles.categoryRow}>
                   <IconChip icon={ICONS[index]} colour={SLOTS[index]} />
                   <div className={styles.categoryBody}>
@@ -140,7 +142,10 @@ export default function Kit() {
                     </div>
                     <ProgressBar value={row.value} tone={row.tone} label={`${row.name}: ${row.amount}, ${row.word}`} today={todayLine ? 0.4 : undefined} />
                     {row.tone === 'normal' ? (
-                      <span className={styles.statusNormal}>{row.word}</span>
+                      <span className={styles.statusNormal}>
+                        {row.icon && <row.icon aria-hidden="true" className={styles.statusIcon} />}
+                        {row.word}
+                      </span>
                     ) : (
                       <StatusBadge tone={row.tone} icon={row.icon}>
                         {row.word}

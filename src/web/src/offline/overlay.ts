@@ -56,11 +56,11 @@ export function overlaySummary(summary: CycleSummary, outbox: OutboxRow[], snaps
     } else if (item.type === 'category.edit') {
       const row = categories.get(item.categoryId)
       if (row) {
-        const { budgetAmount, name, icon, colour, sortOrder } = item.category
+        const { budgetAmount, name, icon, colour, sortOrder, spreadEvenly } = item.category
         if (sortOrder !== undefined) {
           position.set(item.categoryId, sortOrder)
         }
-        Object.assign(row, { name: name ?? row.name, icon: icon ?? row.icon, colour: colour ?? row.colour, budgeted: budgetAmount ?? row.budgeted })
+        Object.assign(row, { name: name ?? row.name, icon: icon ?? row.icon, colour: colour ?? row.colour, budgeted: budgetAmount ?? row.budgeted, spreadEvenly: spreadEvenly ?? row.spreadEvenly })
       }
     } else if (before) {
       // Take the transaction out as it was, and for an edit put it back as it now is.

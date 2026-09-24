@@ -3,7 +3,7 @@ using FluentValidation;
 
 namespace Budget.Application;
 
-public sealed record CycleCategoryDto(Guid CategoryId, CategoryType Type, string Name, string Icon, string Colour, int SortOrder, decimal BudgetAmount);
+public sealed record CycleCategoryDto(Guid CategoryId, CategoryType Type, string Name, string Icon, string Colour, int SortOrder, decimal BudgetAmount, bool SpreadEvenly);
 
 // The stable identity with its most recent name: what a report filter lists.
 public sealed record CategoryIdentityDto(Guid Id, CategoryType Type, string Name);
@@ -40,7 +40,7 @@ public sealed class CycleCategories(
             categories.Add(category);
         }
 
-        var snapshot = new CycleCategory(cycle, category.Id, request.Name, request.Icon, request.Colour, request.SortOrder, request.BudgetAmount);
+        var snapshot = new CycleCategory(cycle, category.Id, request.Name, request.Icon, request.Colour, request.SortOrder, request.BudgetAmount, request.SpreadEvenly ?? true);
         categories.Add(snapshot);
         await unitOfWork.SaveChangesAsync(ct);
         return ToDto(snapshot, category);
@@ -57,7 +57,8 @@ public sealed class CycleCategories(
             request.Icon ?? snapshot.Icon,
             request.Colour ?? snapshot.Colour,
             request.SortOrder ?? snapshot.SortOrder,
-            request.BudgetAmount ?? snapshot.BudgetAmount);
+            request.BudgetAmount ?? snapshot.BudgetAmount,
+            request.SpreadEvenly ?? snapshot.SpreadEvenly);
         await unitOfWork.SaveChangesAsync(ct);
         return ToDto(snapshot, category);
     }
@@ -106,5 +107,5 @@ public sealed class CycleCategories(
     private static NotFoundException NotFound() => new("category.not-found", "Category not found.");
 
     private static CycleCategoryDto ToDto(CycleCategory snapshot, Category category) =>
-        new(category.Id, category.Type, snapshot.Name, snapshot.Icon, snapshot.Colour, snapshot.SortOrder, snapshot.BudgetAmount);
+        new(category.Id, category.Type, snapshot.Name, snapshot.Icon, snapshot.Colour, snapshot.SortOrder, snapshot.BudgetAmount, snapshot.SpreadEvenly);
 }

@@ -23,7 +23,7 @@ test.each([
 
 const ME: Me = { id: 'u1', displayName: 'Ricky', timeZone: 'Australia/Sydney', currency: 'AUD', isDemo: false, cycleLengthDays: 30 }
 const DRAFT: Cycle = { id: 'd1', startDate: '2026-09-20', endDate: '2026-10-19', status: 'Draft', phase: 'Current', openingBalance: 3000, closingBalance: null }
-const FOOD: CategoryRollup = { categoryId: 'food', name: 'Groceries', icon: 'tag', colour: 'blue', type: 'Debit', budgeted: 700, actual: 0, remaining: 700, percentUsed: 0, status: 'OnTrack' }
+const FOOD: CategoryRollup = { categoryId: 'food', name: 'Groceries', icon: 'tag', colour: 'blue', type: 'Debit', budgeted: 700, actual: 0, remaining: 700, percentUsed: 0, status: 'OnTrack', spreadEvenly: true }
 
 // A tiny in-memory server: what onboarding creates, it then reads back.
 function backend({ cycles = [] as Cycle[], categories = [] as CategoryRollup[] } = {}) {

@@ -20,6 +20,11 @@ const TYPES = [
   { value: 'Credit', label: 'Income' },
 ] as const
 
+const SPENT = [
+  { value: 'spread', label: 'Over the cycle' },
+  { value: 'once', label: 'In one go' },
+] as const
+
 type Props = {
   cycleId: string
   // Every category in the cycle: for the next unused colour and the end of the sort order.
@@ -43,6 +48,7 @@ export function CategorySheet({ cycleId, rows, editing, online, onClose }: Props
   const [name, setName] = useState(editing?.name ?? '')
   const [budget, setBudget] = useState(editing ? editing.budgeted.toFixed(2) : '')
   const [icon, setIcon] = useState(editing?.icon ?? 'tag')
+  const [spent, setSpent] = useState<'spread' | 'once'>(editing?.spreadEvenly === false ? 'once' : 'spread')
   // A new category takes the next unused slot; after eight they repeat and the icon tells them apart (MASTER 3.4).
   const [colour, setColour] = useState<string>(() => (editing ? toSlot(editing.colour) : (SLOTS.find((slot) => !rows.some((row) => row.colour === slot)) ?? SLOTS[rows.length % SLOTS.length])))
   const [errors, setErrors] = useState<{ name?: string; budget?: string }>({})
@@ -54,7 +60,17 @@ export function CategorySheet({ cycleId, rows, editing, online, onClose }: Props
     onClose()
   }
   const add = useMutation({
-    mutationFn: (budgetAmount: number) => api.post(`/api/cycles/${cycleId}/categories`, { type, name: name.trim(), icon, colour, sortOrder: rows.length, budgetAmount }),
+    mutationFn: (budgetAmount: number) =>
+      api.post(`/api/cycles/${cycleId}/categories`, {
+        type,
+        name: name.trim(),
+        icon,
+        colour,
+        sortOrder: rows.length,
+        budgetAmount,
+        // Income has no pace, so it is not asked and not sent.
+        ...(type === 'Debit' && { spreadEvenly: spent === 'spread' }),
+      }),
     onSuccess: done,
     onError: (error: Error) => setProblem(error.message),
   })
@@ -93,6 +109,7 @@ export function CategorySheet({ cycleId, rows, editing, online, onClose }: Props
     if (budgetAmount !== editing.budgeted) category.budgetAmount = budgetAmount
     if (icon !== editing.icon) category.icon = icon
     if (colour !== editing.colour) category.colour = colour
+    if (type === 'Debit' && (spent === 'spread') !== editing.spreadEvenly) category.spreadEvenly = spent === 'spread'
     if (Object.keys(category).length > 0) {
       await enqueue({ type: 'category.edit', cycleId, categoryId: editing.categoryId, category })
       toast.show({ message: 'Saved' })
@@ -134,6 +151,17 @@ export function CategorySheet({ cycleId, rows, editing, online, onClose }: Props
           hint={type === 'Debit' ? 'The most you plan to spend this cycle.' : 'What you expect to receive this cycle.'}
           onChange={(event) => setBudget(event.target.value)}
         />
+
+        {type === 'Debit' && (
+          <div className={styles.group}>
+            {/* Drawn as well as announced: the segments alone ("In one go") do not say what is being asked. */}
+            <p className={styles.legend} aria-hidden="true">
+              How is it spent?
+            </p>
+            <SegmentedControl label="How is it spent?" options={SPENT} value={spent} onChange={setSpent} />
+            <p className={styles.hint}>{spent === 'spread' ? 'Home says when spending runs ahead of the days gone.' : 'A bill paid in one go is never ahead of pace.'}</p>
+          </div>
+        )}
 
         <fieldset className={styles.group}>
           <legend className={styles.legend}>Colour</legend>

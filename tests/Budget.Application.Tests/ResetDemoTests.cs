@@ -82,6 +82,17 @@ public sealed class ResetDemoTests
     }
 
     [Fact]
+    public async Task Bills_in_the_fixture_are_not_spread_over_the_cycle_and_everything_else_is()
+    {
+        Demo();
+        await Sut().RunAsync(_fixture);
+
+        var bills = _fixture.Categories.Where(c => !c.SpreadEvenly).Select(c => c.Name).ToList();
+        bills.Should().BeEquivalentTo(["Rent", "Bills"]);
+        _store.CycleCategories.Should().OnlyContain(c => c.SpreadEvenly != bills.Contains(c.Name), "every cycle copies the flag forward");
+    }
+
+    [Fact]
     public async Task Seeding_only_happens_when_the_demo_is_empty()
     {
         Demo();

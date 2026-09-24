@@ -79,13 +79,36 @@ public class MappingTests(SqlServerFixture sql)
 
         await using (var edit = sql.ContextFor(user))
         {
-            (await edit.CycleCategories.SingleAsync()).Edit("Food", "apple", "green", 1, 650.5m);
+            (await edit.CycleCategories.SingleAsync()).Edit("Food", "apple", "green", 1, 650.5m, spreadEvenly: false);
             await edit.SaveChangesAsync();
         }
 
         await using var db = sql.ContextFor(user);
         var read = await db.CycleCategories.SingleAsync();
-        (read.Name, read.Icon, read.Colour, read.SortOrder, read.BudgetAmount).Should().Be(("Food", "apple", "green", 1, 650.5m));
+        (read.Name, read.Icon, read.Colour, read.SortOrder, read.BudgetAmount, read.SpreadEvenly).Should().Be(("Food", "apple", "green", 1, 650.5m, false));
+    }
+
+    // Expand before contract: the previous app version inserts snapshots without SpreadEvenly and must still succeed,
+    // and every row that existed before the column did is a category spent a little at a time until the user says not.
+    [Fact]
+    public async Task A_snapshot_written_without_spread_evenly_is_spread_evenly()
+    {
+        var user = await sql.NewUserAsync();
+        var cycle = TestData.Confirmed(user);
+        var category = new Category(user.Id, CategoryType.Debit, TestData.Now);
+
+        await using (var write = sql.ContextFor(user))
+        {
+            write.AddRange(cycle, category);
+            await write.SaveChangesAsync();
+            await write.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO CycleCategory (Id, UserId, CycleId, CategoryId, Name, Icon, Colour, SortOrder, BudgetAmount)
+                VALUES ({Guid.NewGuid()}, {user.Id}, {cycle.Id}, {category.Id}, 'Food', 'utensils', 'blue', 0, 400)
+                """);
+        }
+
+        await using var db = sql.ContextFor(user);
+        (await db.CycleCategories.SingleAsync()).SpreadEvenly.Should().BeTrue();
     }
 
     // Shifting by exactly one cycle length makes each future cycle take the next one's old date,

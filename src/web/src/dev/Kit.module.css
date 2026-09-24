@@ -96,6 +96,15 @@
 }
 
 .statusNormal {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
   font: var(--text-label);
   color: var(--color-text-muted);
+}
+
+.statusIcon {
+  flex: none;
+  width: var(--space-4);
+  height: var(--space-4);
 }

@@ -46,8 +46,19 @@ public sealed class CycleCategoriesTests
         category.Type.Should().Be(CategoryType.Debit);
         category.CreatedAt.Should().Be(Now);
         _store.CycleCategories.Should().ContainSingle().Which.CycleId.Should().Be(chain.Current.Id);
-        dto.Should().Be(new CycleCategoryDto(category.Id, CategoryType.Debit, "Groceries", "shopping-cart", "blue", 0, 600m));
+        dto.Should().Be(new CycleCategoryDto(category.Id, CategoryType.Debit, "Groceries", "shopping-cart", "blue", 0, 600m, SpreadEvenly: true));
         _store.Saves.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task A_new_category_can_be_a_bill_rather_than_spread_over_the_cycle()
+    {
+        var chain = Chain();
+
+        var dto = await Sut().AddAsync(chain.Current.Id, NewGroceries with { Name = "Rent", SpreadEvenly = false });
+
+        dto.SpreadEvenly.Should().BeFalse();
+        _store.CycleCategories.Should().ContainSingle().Which.SpreadEvenly.Should().BeFalse();
     }
 
     [Fact]
@@ -126,9 +137,21 @@ public sealed class CycleCategoriesTests
 
         var dto = await Sut().EditAsync(chain.Current.Id, current.CategoryId, new EditCategoryRequest("Food", null, null, null, 750m));
 
-        dto.Should().Be(new CycleCategoryDto(current.CategoryId, CategoryType.Debit, "Food", "shopping-cart", "blue", 0, 750m));
+        dto.Should().Be(new CycleCategoryDto(current.CategoryId, CategoryType.Debit, "Food", "shopping-cart", "blue", 0, 750m, SpreadEvenly: true));
         (future.Name, future.BudgetAmount).Should().Be(("Groceries", 600m));
         _store.Saves.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Edit_can_change_just_whether_the_category_is_spread_evenly()
+    {
+        var chain = Chain();
+        var current = Existing(chain.Current, "Rent");
+
+        var dto = await Sut().EditAsync(chain.Current.Id, current.CategoryId, new EditCategoryRequest(null, null, null, null, null, SpreadEvenly: false));
+
+        dto.SpreadEvenly.Should().BeFalse();
+        (current.Name, current.SpreadEvenly).Should().Be(("Rent", false));
     }
 
     [Fact]

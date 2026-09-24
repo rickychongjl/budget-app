@@ -70,6 +70,7 @@ Text on a soft background uses the matching status text colour. Text on a destru
 | Category type | Condition | Status | Bar fill | Icon (Lucide) | Word |
 |---|---|---|---|---|---|
 | Debit | under 80% of budget | Normal | `--color-primary` | none | "$X left" |
+| Debit, spent over the cycle, current cycle only | under 80%, and past the today line | Ahead of pace | `--color-primary` | `gauge` | "$X ahead of pace", in `--color-text-muted` |
 | Debit | 80% to 100% | Warning | `--color-warning-fill` | `triangle-alert` | "$X left" |
 | Debit | over 100% | Negative | `--color-negative-fill` | `circle-alert` | "Over by $X" |
 | Credit | under 100% of expected | Normal | `--color-primary` | none | "$X to go" |
@@ -77,6 +78,8 @@ Text on a soft background uses the matching status text colour. Text on a destru
 | Credit | over 100% | Positive | `--color-positive-fill` | `trending-up` | "Ahead by $X" |
 
 The thresholds are presentation only. Whether a category is over or ahead comes from the API rollup; the front end does not recompute it.
+
+**Ahead of pace** is a nudge, not an alarm, so it keeps the Normal bar and muted text; Over and Warning win over it. The today line sits at budget × day ÷ cycle length (the end of today), and $X is what has been spent beyond it. It needs a today, so a past or upcoming cycle never shows it. It applies only to a spending category marked as spent "Over the cycle" (`spreadEvenly`, the default); a bill marked "In one go" would otherwise read as ahead of pace from the day it is paid. Like the 80% threshold, the front end works it out, because it depends on today and a cached answer may be yesterday's.
 
 ### 3.4 Category and chart palette
 

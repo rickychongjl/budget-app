@@ -1,15 +1,15 @@
 {
-  "_comment": "Demo data, shared by the reset-demo job and the Playwright specs. Every date is a day offset from today (the demo user's local date), so there is always a current cycle with history behind it. Cycles are 30 days: with a first start of -130 they are [-130,-101], [-100,-71], [-70,-41], [-40,-11] and [-10,+19]. Four finished cycles is what the trend chart needs to draw a line under every filter, and one of the closing balances is below its opening so money accrued crosses zero and shows its baseline. A transaction belongs to the cycle that covers its day. Colours are palette slots and icons are Lucide names (design-system/budget/MASTER.md).",
+  "_comment": "Demo data, shared by the reset-demo job and the Playwright specs. Every date is a day offset from today (the demo user's local date), so there is always a current cycle with history behind it. Cycles are 30 days: with a first start of -130 they are [-130,-101], [-100,-71], [-70,-41], [-40,-11] and [-10,+19]. Four finished cycles is what the trend chart needs to draw a line under every filter, and one of the closing balances is below its opening so money accrued crosses zero and shows its baseline. A transaction belongs to the cycle that covers its day. Colours are palette slots and icons are Lucide names (design-system/budget/MASTER.md). Rent and Bills are paid in one go, so they carry spreadEvenly: false and never read as ahead of pace.",
   "firstCycleStartOffset": -130,
   "openingBalance": 2400.00,
   "closingBalances": [2180.75, 2890.40, 3105.50, 3620.25],
   "categories": [
     { "key": "salary", "type": "Credit", "name": "Salary", "icon": "banknote", "colour": "blue", "budget": 5200.00 },
-    { "key": "rent", "type": "Debit", "name": "Rent", "icon": "house", "colour": "slate", "budget": 2200.00 },
+    { "key": "rent", "type": "Debit", "name": "Rent", "icon": "house", "colour": "slate", "budget": 2200.00, "spreadEvenly": false },
     { "key": "groceries", "type": "Debit", "name": "Groceries", "icon": "shopping-cart", "colour": "orange", "budget": 700.00 },
     { "key": "transport", "type": "Debit", "name": "Transport", "icon": "train-front", "colour": "cyan", "budget": 180.00 },
     { "key": "dining", "type": "Debit", "name": "Eating out", "icon": "utensils", "colour": "pink", "budget": 300.00 },
-    { "key": "bills", "type": "Debit", "name": "Bills", "icon": "zap", "colour": "ochre", "budget": 260.00 },
+    { "key": "bills", "type": "Debit", "name": "Bills", "icon": "zap", "colour": "ochre", "budget": 260.00, "spreadEvenly": false },
     { "key": "fun", "type": "Debit", "name": "Fun", "icon": "gamepad-2", "colour": "violet", "budget": 200.00 }
   ],
   "transactions": [

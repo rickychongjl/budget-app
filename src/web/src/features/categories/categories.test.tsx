@@ -19,7 +19,7 @@ const cycle = (id: string, startDate: string, endDate: string, phase: Cycle['pha
 const CYCLES = [cycle('past', '2026-08-11', '2026-09-09', 'Past'), cycle('cur', '2026-09-10', '2026-10-09', 'Current'), cycle('fut', '2026-10-10', '2026-11-08', 'Future')]
 
 const row = (categoryId: string, name: string, type: 'Debit' | 'Credit', colour: string, budgeted: number): CategoryRollup => ({
-  categoryId, name, icon: 'tag', colour, type, budgeted, actual: 0, remaining: budgeted, percentUsed: 0, status: 'OnTrack',
+  categoryId, name, icon: 'tag', colour, type, budgeted, actual: 0, remaining: budgeted, percentUsed: 0, status: 'OnTrack', spreadEvenly: true,
 })
 const ROWS = [row('pay', 'Salary', 'Credit', 'blue', 5200), row('rent', 'Rent', 'Debit', 'slate', 2200), row('food', 'Groceries', 'Debit', 'orange', 700), row('fun', 'Fun', 'Debit', 'violet', 200)]
 const summaryOf = (of: Cycle): CycleSummary => ({
@@ -100,6 +100,24 @@ describe('editing a category works offline', () => {
     await waitFor(async () => expect(await queued()).toEqual([{ type: 'category.edit', cycleId: 'cur', categoryId: 'food', category: { name: 'Food', budgetAmount: 650 } }]))
     expect(await screen.findByRole('heading', { level: 3, name: 'Food' })).toBeInTheDocument()
     expect(screen.getByText('$650.00')).toBeInTheDocument()
+  })
+
+  test('marking a spending category as paid in one go is queued like any other field', async () => {
+    await renderScreen({ online: false })
+    const sheet = await openEdit('Rent')
+    expect(sheet.getByRole('radio', { name: 'Over the cycle' })).toBeChecked()
+
+    await userEvent.click(sheet.getByRole('radio', { name: 'In one go' }))
+    await userEvent.click(sheet.getByRole('button', { name: 'Save' }))
+
+    await waitFor(async () => expect(await queued()).toEqual([{ type: 'category.edit', cycleId: 'cur', categoryId: 'rent', category: { spreadEvenly: false } }]))
+  })
+
+  test('income has no pace, so it is not asked how it is spent', async () => {
+    await renderScreen({ online: false })
+    const sheet = await openEdit('Salary')
+
+    expect(sheet.queryByRole('radiogroup', { name: 'How is it spent?' })).not.toBeInTheDocument()
   })
 
   test('icon and colour are chosen from the fixed sets, and the colour is stored as a slot name', async () => {
@@ -184,6 +202,24 @@ describe('adding and removing need a connection', () => {
 
     await waitFor(() => expect(body).toEqual({ type: 'Credit', name: 'Interest', icon: 'tag', colour: 'cyan', sortOrder: 4, budgetAmount: 20 }))
     expect(await queued()).toEqual([])
+  })
+
+  test('a new spending category says how it is spent, over the cycle unless told otherwise', async () => {
+    let body: unknown
+    server.use(http.post('/api/cycles/cur/categories', async ({ request }) => {
+      body = await request.json()
+      return HttpResponse.json({}, { status: 201 })
+    }))
+    await renderScreen()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add category' }))
+    const sheet = within(await screen.findByRole('dialog', { name: 'Add category' }))
+    await userEvent.type(sheet.getByLabelText('Name'), 'Insurance')
+    await userEvent.type(sheet.getByLabelText('Budget'), '75')
+    await userEvent.click(sheet.getByRole('radio', { name: 'In one go' }))
+    await userEvent.click(sheet.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(body).toMatchObject({ type: 'Debit', name: 'Insurance', budgetAmount: 75, spreadEvenly: false }))
   })
 
   test('removing asks first, then deletes; a refusal is shown in the server\'s words', async () => {
