@@ -21,8 +21,8 @@ export default defineConfig({
       registerType: 'prompt',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Budget',
-        short_name: 'Budget',
+        name: 'Tight Arse',
+        short_name: 'Tight Arse',
         description: 'A monthly budget tracker that works offline.',
         display: 'standalone',
         start_url: '/',

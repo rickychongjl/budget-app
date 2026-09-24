@@ -13,7 +13,7 @@ test('the manifest describes an installable app', async ({ request }) => {
   const manifest = await request.get('/manifest.webmanifest')
   expect(manifest.ok()).toBeTruthy()
   const body = (await manifest.json()) as { name: string; display: string; start_url: string; icons: { sizes: string; purpose?: string }[] }
-  expect(body.name).toBe('Budget')
+  expect(body.name).toBe('Tight Arse')
   expect(body.display).toBe('standalone')
   expect(body.start_url).toBe('/')
   expect(body.icons.some((icon) => icon.sizes === '512x512' && icon.purpose === 'maskable')).toBeTruthy()

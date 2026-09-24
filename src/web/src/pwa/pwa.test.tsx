@@ -58,18 +58,18 @@ describe('install hint', () => {
 
   test('a browser that can neither prompt nor add to the home screen gets nothing', () => {
     render(<InstallHint />)
-    expect(screen.queryByRole('heading', { name: 'Add Budget to your Home Screen' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Add Tight Arse to your Home Screen' })).not.toBeInTheDocument()
   })
 
   test('when the browser offers to install, Install asks it to, and an accepted install ends the hint', async () => {
     render(<InstallHint />)
     const event = installPrompt('accepted')
     expect(event.defaultPrevented).toBe(true)
-    expect(screen.getByRole('heading', { name: 'Add Budget to your Home Screen' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Add Tight Arse to your Home Screen' })).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: 'Install' }))
     expect(event.prompt).toHaveBeenCalled()
-    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Add Budget to your Home Screen' })).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Add Tight Arse to your Home Screen' })).not.toBeInTheDocument())
   })
 
   test('a declined install keeps the offer, and Not now ends it for good', async () => {
@@ -79,7 +79,7 @@ describe('install hint', () => {
     expect(screen.getByRole('button', { name: 'Install' })).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: 'Not now' }))
-    expect(screen.queryByRole('heading', { name: 'Add Budget to your Home Screen' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Add Tight Arse to your Home Screen' })).not.toBeInTheDocument()
     expect(localStorage.getItem('budget.install-hint')).toBe('dismissed')
   })
 
@@ -97,6 +97,6 @@ describe('install hint', () => {
     vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) Mobile/15E148')
     vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({ matches: query.includes('standalone'), media: query } as MediaQueryList))
     render(<InstallHint />)
-    expect(screen.queryByRole('heading', { name: 'Add Budget to your Home Screen' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Add Tight Arse to your Home Screen' })).not.toBeInTheDocument()
   })
 })
