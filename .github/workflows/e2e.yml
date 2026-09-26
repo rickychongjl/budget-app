@@ -25,7 +25,7 @@ jobs:
       # CI unset reuseExistingServer, so Playwright builds and starts the stack itself, with the rate limit it needs.
       - run: npm test
         working-directory: tests/e2e
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-report
