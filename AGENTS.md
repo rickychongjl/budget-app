@@ -213,3 +213,20 @@ below arrives looking like a broken command rather than a permission wall.
   `npm run build` do run confined.
 - **No worktrees inside the repo.** A tool worktree under `.claude/` is a whole second copy
   including `node_modules`; duplicate trees make a search return stale code that reads current.
+
+## Working style
+
+These are measurement, not taste. On the session that added them, one unbounded command was 9% of the
+whole bill and carried tool output was 39%: a tool result is re-sent on every later step, so 16k tokens of
+output is 16k tokens per remaining step, not 16k once.
+
+- **Cap command output.** `Select-Object -Last 20` (or `-First`) on anything that can print a list, and
+  let a bad pattern abort rather than print per-item errors: `$ErrorActionPreference = 'Stop'`, and try a
+  regex on a small input before running it over a tree.
+- **Read narrowly.** `grep` for the symbol, then `read` a window with `offset`/`limit`. One whole-file read
+  can be the right call; six of them were 16% of the context.
+- **Keep deliberation bounded on mechanical work.** Reasoning stays in the transcript and is re-sent, so it
+  compounds like everything else. Long thinking belongs to design and debugging, not to running a test.
+- **Delegate read-heavy exploration.** A subagent's steps live in its own context; only its answer arrives
+  here. Mapping a repo is the clearest case.
+- **One aggregated script beats five probe commands.** Discovery that prints a summary is one step, not six.
