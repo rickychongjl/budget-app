@@ -52,7 +52,6 @@ export async function addTransaction(page: Page, { type = 'Spending', amount, ca
   await sheet.getByRole('searchbox', { name: 'Search categories' }).fill(category)
   await sheet.getByRole('radio', { name: category }).click()
   if (note) {
-    await sheet.getByRole('button', { name: 'Add note' }).click()
     await sheet.getByLabel('Note').fill(note)
   }
   await sheet.getByRole('button', { name: 'Save' }).click()

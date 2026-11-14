@@ -168,7 +168,7 @@ CSS transitions only. No animation library.
 
 Every interactive element is at least 44x44px (48px preferred) with at least 8px between neighbouring targets, and shows a visible `:focus-visible` ring: `outline: 2px solid var(--color-primary); outline-offset: 2px`.
 
-**States, for every control.** Pressed (section 7), focused (the ring above), selected and disabled must each be distinguishable in both themes. Disabled: the native `disabled` attribute (or `aria-disabled` with the action blocked), 40% opacity, no press feedback. Selected state is announced, not only drawn: the active tab has `aria-current="page"`, segmented controls are a `radiogroup`, toggles use `aria-pressed`, and "Add note" uses `aria-expanded`. Use real `<button>`, `<a>` and `<input>` elements; never a clickable `<div>`. Focus order follows visual order.
+**States, for every control.** Pressed (section 7), focused (the ring above), selected and disabled must each be distinguishable in both themes. Disabled: the native `disabled` attribute (or `aria-disabled` with the action blocked), 40% opacity, no press feedback. Selected state is announced, not only drawn: the active tab has `aria-current="page"`, segmented controls are a `radiogroup`, and a toggle — the category pin — uses `aria-pressed`. Use real `<button>`, `<a>` and `<input>` elements; never a clickable `<div>`. Focus order follows visual order.
 
 **Gestures.** One gesture per region. A sheet is dragged by its handle and header only, so dragging never fights the sheet's own scrolling. No swipe actions on list rows (edit and delete are reached by tapping the row), which also keeps the phone's edge back-swipe free. Every drag has a button alternative.
 
@@ -191,8 +191,8 @@ Every interactive element is at least 44x44px (48px preferred) with at least 8px
 **Add-transaction sheet.** A bottom sheet that opens with the amount focused.
 - The amount is shown in `--text-display` with the currency symbol. A Spending / Income segmented control sits above it.
 - The app's own numeric keypad: a 3 by 4 grid of digits, decimal point and backspace. Keys are at least 56px tall, `--color-surface-2`, `--radius-sm`, separated by 8px. The keypad, not the system keyboard, is used here so the layout does not jump.
-- Category picker: a search field, then the last-used category first, then the rest, filtered by the Spending / Income choice. Rows are category rows without the bar.
-- The date defaults to today. The note is optional and collapsed behind "Add note".
+- Category picker: a search field, then the categories pinned as favourites (in the order they were pinned), then the last-used category, then the rest, filtered by the Spending / Income choice. A pin is per device and is set from the category's own sheet on Categories. Pinned rows carry a small star, and the grouping is a caption reading "Favourites" rather than a heading, because every row belongs to one radio group. Rows are category rows without the bar.
+- The date defaults to today. The note is optional and always shown, under the date: never behind a button. The category list is the only part of the form that grows, so it is capped at about four rows and scrolls inside its own box, which keeps the date and the note a short flick away however many categories a cycle has.
 - Save is a sticky primary button, disabled until there is an amount and a category. On save: haptic, the sheet closes, and a toast says "Saved" with an Undo action.
 - Saving into a past cycle shows the closing-balance prompt (see Dialog).
 
