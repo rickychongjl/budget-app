@@ -216,17 +216,7 @@ below arrives looking like a broken command rather than a permission wall.
 
 ## Working style
 
-These are measurement, not taste. On the session that added them, one unbounded command was 9% of the
-whole bill and carried tool output was 39%: a tool result is re-sent on every later step, so 16k tokens of
-output is 16k tokens per remaining step, not 16k once.
-
-- **Cap command output.** `Select-Object -Last 20` (or `-First`) on anything that can print a list, and
-  let a bad pattern abort rather than print per-item errors: `$ErrorActionPreference = 'Stop'`, and try a
-  regex on a small input before running it over a tree.
-- **Read narrowly.** `grep` for the symbol, then `read` a window with `offset`/`limit`. One whole-file read
-  can be the right call; six of them were 16% of the context.
-- **Keep deliberation bounded on mechanical work.** Reasoning stays in the transcript and is re-sent, so it
-  compounds like everything else. Long thinking belongs to design and debugging, not to running a test.
-- **Delegate read-heavy exploration.** A subagent's steps live in its own context; only its answer arrives
-  here. Mapping a repo is the clearest case.
-- **One aggregated script beats five probe commands.** Discovery that prints a summary is one step, not six.
+General habits — capping output, reading narrowly, bounding deliberation, delegating exploration — live in
+the user-global `$DSH_HOME/AGENTS.md`, so they are not repeated here. What is specific to this repo is
+above: scope a search because `node_modules` is 27,355 of 28,930 files, and expect `dotnet test`, `vitest`
+and `docker` to need a wider sandbox while `dotnet build` and `npm run lint` do not.
