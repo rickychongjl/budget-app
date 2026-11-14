@@ -24,6 +24,26 @@
 .categories {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  /* The only part of the sheet that grows with the budget. Bounded, so a big budget scrolls this box rather than
+     pushing the date and the note off the sheet. */
+  max-height: 15rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* The one word that separates pinned categories from the rest. Not a heading: the rows below stay one radio group. */
+.groupLabel {
+  padding: var(--space-2) var(--space-2) 0;
+  font: var(--text-caption);
+  color: var(--color-text-muted);
+}
+
+/* Decorative: pinned rows lead the list, and the pin itself is announced on the Categories screen. */
+.star {
+  flex: none;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  color: var(--color-text-muted);
 }
 
 /* A category row without the bar. The whole row is the radio's label, so the whole row is the target. */

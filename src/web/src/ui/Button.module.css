@@ -55,6 +55,13 @@
   background: var(--color-surface-2);
 }
 
+/* A toggle stays on: a tint and a stronger outline, so pressed is visible in both themes and not by colour alone. */
+.secondary[aria-pressed='true'] {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-text);
+}
+
 .destructive {
   background: var(--color-negative-fill);
   color: var(--color-on-negative);

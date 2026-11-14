@@ -1,6 +1,6 @@
-import { Check, SearchX, ShieldCheck, Trash2 } from 'lucide-react'
+import { Check, SearchX, ShieldCheck, Star, Trash2 } from 'lucide-react'
 import { useMemo, useState, type KeyboardEvent } from 'react'
-import type { CategoryType, CycleSummary, EditTransactionRequest, Transaction } from '../../api/types'
+import type { CategoryRollup, CategoryType, CycleSummary, EditTransactionRequest, Transaction } from '../../api/types'
 import { todayIn } from '../../format/dates'
 import { enqueue } from '../../offline/outbox'
 import { Button } from '../../ui/Button'
@@ -14,6 +14,7 @@ import { Sheet } from '../../ui/Sheet'
 import { Skeleton } from '../../ui/Skeleton'
 import { useToast } from '../../ui/useToast'
 import { useSession } from '../auth/useSession'
+import { readFavourites } from '../categories/favourites'
 import { useCurrentCycle } from '../home/useCurrentCycle'
 import styles from './AddTransactionSheet.module.css'
 import { Keypad } from './Keypad'
@@ -66,18 +67,31 @@ function Form({ summary, loading, editing, onClose }: { summary: CycleSummary | 
   const [search, setSearch] = useState('')
   const [categoryId, setCategoryId] = useState<string | null>(editing?.categoryId ?? null)
   const [date, setDate] = useState(() => editing?.occurredOn ?? todayIn(me.timeZone))
-  const [noteOpen, setNoteOpen] = useState(Boolean(editing?.note))
   const [note, setNote] = useState(editing?.note ?? '')
   const [saving, setSaving] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  // Read once, when the sheet opens: pinning happens on the Categories screen, never while this sheet is up.
+  const [favourites] = useState(readFavourites)
 
-  const categories = useMemo(() => {
+  // Pinned categories lead the picker, in the order they were pinned. A pin remembers an id, not a cycle, and the ids
+  // are this cycle's own rows, so a pin left over from a removed category simply matches nothing.
+  const pinned = useMemo(() => {
+    const ofType = new Map((summary?.rollup.categories ?? []).filter((row) => row.type === type).map((row) => [row.categoryId, row]))
+    return favourites.flatMap((id) => ofType.get(id) ?? [])
+  }, [summary, type, favourites])
+
+  const rest = useMemo(() => {
     const lastUsed = readLastUsed(type)
-    const ofType = (summary?.rollup.categories ?? []).filter((row) => row.type === type)
+    const ofType = (summary?.rollup.categories ?? []).filter((row) => row.type === type && !favourites.includes(row.categoryId))
     // Last used first, then the cycle's own order.
     return [...ofType.filter((row) => row.categoryId === lastUsed), ...ofType.filter((row) => row.categoryId !== lastUsed)]
-  }, [summary, type])
-  const matches = categories.filter((row) => row.name.toLowerCase().includes(search.trim().toLowerCase()))
+  }, [summary, type, favourites])
+
+  const searchTerm = search.trim().toLowerCase()
+  const matching = (rows: CategoryRollup[]) => rows.filter((row) => row.name.toLowerCase().includes(searchTerm))
+  const pinnedMatches = matching(pinned)
+  const restMatches = matching(rest)
+  const matches = [...pinnedMatches, ...restMatches]
 
   // A negative amount is a reversal. The keypad has no minus key, so a reversal keeps its sign while it is edited.
   // ponytail: a reversal cannot be entered from here, only kept. Add a +/- key if reversals turn out to be entered by hand.
@@ -88,6 +102,16 @@ function Form({ summary, loading, editing, onClose }: { summary: CycleSummary | 
     [me.currency],
   )
   const before = editing && { cycleId, categoryId: editing.categoryId, amount: editing.amount }
+
+  const categoryRow = (row: CategoryRollup) => (
+    <label key={row.categoryId} className={styles.category}>
+      <input type="radio" name="category" className={styles.radio} checked={row.categoryId === categoryId} onChange={() => setCategoryId(row.categoryId)} />
+      <IconChip icon={categoryIcon(row.icon)} colour={row.colour} />
+      <span className={styles.categoryName}>{row.name}</span>
+      {favourites.includes(row.categoryId) && <Star aria-hidden="true" className={styles.star} />}
+      <Check aria-hidden="true" className={styles.check} />
+    </label>
+  )
 
   // Into the outbox, never straight to the API: the change is on screen at once and reaches the server when it can.
   async function save() {
@@ -195,26 +219,19 @@ function Form({ summary, loading, editing, onClose }: { summary: CycleSummary | 
             <EmptyState icon={SearchX}>{search.trim() ? `No category matches "${search.trim()}".` : `This cycle has no ${type === 'Debit' ? 'spending' : 'income'} categories.`}</EmptyState>
           ) : (
             <div role="radiogroup" aria-label="Category" className={styles.categories}>
-              {matches.map((row) => (
-                <label key={row.categoryId} className={styles.category}>
-                  <input type="radio" name="category" className={styles.radio} checked={row.categoryId === categoryId} onChange={() => setCategoryId(row.categoryId)} />
-                  <IconChip icon={categoryIcon(row.icon)} colour={row.colour} />
-                  <span className={styles.categoryName}>{row.name}</span>
-                  <Check aria-hidden="true" className={styles.check} />
-                </label>
-              ))}
+              {pinnedMatches.length > 0 && <p className={styles.groupLabel}>Favourites</p>}
+              {pinnedMatches.map(categoryRow)}
+              {pinnedMatches.length > 0 && restMatches.length > 0 && <p className={styles.groupLabel}>All categories</p>}
+              {restMatches.map(categoryRow)}
             </div>
           )}
         </div>
 
         <Field label="Date" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
 
-        {!editing?.note && (
-          <Button variant="ghost" aria-expanded={noteOpen} onClick={() => setNoteOpen((now) => !now)}>
-            Add note
-          </Button>
-        )}
-        {noteOpen && <Field label="Note" value={note} maxLength={me.isDemo ? 200 : 280} onChange={(event) => setNote(event.target.value)} />}
+        {/* Always on screen (MASTER 9): optional, not hidden behind a button. It sits below the picker because the
+            picker is the required choice and its list is capped, which keeps this a short flick away, never a hunt. */}
+        <Field label="Note" value={note} maxLength={me.isDemo ? 200 : 280} onChange={(event) => setNote(event.target.value)} />
 
         {editing && (
           <Button variant="destructive" icon={Trash2} onClick={() => setConfirmingDelete(true)}>

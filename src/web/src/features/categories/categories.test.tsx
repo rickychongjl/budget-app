@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, onlineManager } from '@tanstack/react-query'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
@@ -54,8 +54,14 @@ const openEdit = async (name: string) => {
 beforeEach(async () => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-09-20T02:00:00Z'))
+  // The connection spies below are per test: left in place, one test's "offline" is the next test's starting state.
+  vi.restoreAllMocks()
+  // onlineManager is one object for the whole module. The offline test dispatches a real `offline` event, which pauses
+  // every query after it until an `online` one arrives, so each test starts connected and says otherwise if it means it.
+  onlineManager.setOnline(true)
   resetCsrf()
   stopOutbox()
+  localStorage.clear()
   await db.outbox.clear()
   await db.cache.clear()
   server.use(
@@ -151,6 +157,22 @@ describe('editing a category works offline', () => {
     expect(await queued()).toEqual([])
   })
 
+  test('an answer that leaves out how it is spent never turns a bill into a spread cost', async () => {
+    // An older API omits spreadEvenly. Saving something else must then say nothing about how it is spent, or a bill
+    // marked "In one go" would quietly become a spread one.
+    const legacy = ROWS.map((r) => ({ ...r, spreadEvenly: undefined })) as unknown as CategoryRollup[]
+    const summary = summaryOf(CYCLES[1])
+    server.use(http.get('/api/cycles/:id', () => HttpResponse.json({ ...summary, rollup: { ...summary.rollup, categories: legacy } })))
+
+    await renderScreen({ online: false })
+    const sheet = await openEdit('Groceries')
+    await userEvent.clear(sheet.getByLabelText('Name'))
+    await userEvent.type(sheet.getByLabelText('Name'), 'Food')
+    await userEvent.click(sheet.getByRole('button', { name: 'Save' }))
+
+    await waitFor(async () => expect(await queued()).toEqual([{ type: 'category.edit', cycleId: 'cur', categoryId: 'food', category: { name: 'Food' } }]))
+  })
+
   test('saving with nothing changed queues nothing', async () => {
     await renderScreen({ online: false })
     const sheet = await openEdit('Groceries')
@@ -244,5 +266,39 @@ describe('adding and removing need a connection', () => {
     const sheet = await openEdit('Groceries')
     expect(sheet.getByRole('button', { name: 'Remove from this cycle' })).toBeDisabled()
     expect(sheet.getByRole('button', { name: 'Save' })).toBeEnabled()
+  })
+})
+
+describe('favourites are pinned by hand, per device', () => {
+  test('a category is pinned and unpinned from its sheet, and the pin outlives the sheet', async () => {
+    await renderScreen({ online: false })
+    const sheet = await openEdit('Groceries')
+    const pin = sheet.getByRole('button', { name: 'Favourite' })
+    expect(pin).toHaveAttribute('aria-pressed', 'false')
+
+    await userEvent.click(pin)
+    expect(pin).toHaveAttribute('aria-pressed', 'true')
+    expect(JSON.parse(localStorage.getItem('budget.favouriteCategories')!)).toEqual(['food'])
+
+    await userEvent.click(pin)
+    expect(pin).toHaveAttribute('aria-pressed', 'false')
+    expect(JSON.parse(localStorage.getItem('budget.favouriteCategories')!)).toEqual([])
+  })
+
+  test('a pinned category opens already pinned', async () => {
+    localStorage.setItem('budget.favouriteCategories', JSON.stringify(['rent']))
+    await renderScreen({ online: false })
+    const sheet = await openEdit('Rent')
+
+    expect(sheet.getByRole('button', { name: 'Favourite' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  test('pinning is a device setting: it needs no connection and queues nothing for the server', async () => {
+    await renderScreen({ online: false })
+    const sheet = await openEdit('Rent')
+
+    await userEvent.click(sheet.getByRole('button', { name: 'Favourite' }))
+
+    expect(await queued()).toEqual([])
   })
 })

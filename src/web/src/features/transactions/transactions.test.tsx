@@ -170,15 +170,13 @@ describe('AddTransactionSheet', () => {
     vi.useRealTimers()
   })
 
-  test('the date can be changed and a note added; the note is collapsed until asked for', async () => {
+  test('the note is always on screen, so it is never a scroll and a tap to reach', async () => {
     const sheet = await renderSheet()
     await tap(sheet, '8')
     await userEvent.click(await sheet.findByRole('radio', { name: 'Fun' }))
-    const addNote = sheet.getByRole('button', { name: 'Add note' })
-    expect(addNote).toHaveAttribute('aria-expanded', 'false')
-    expect(sheet.queryByLabelText('Note')).not.toBeInTheDocument()
 
-    await userEvent.click(addNote)
+    // No toggle to find first: typing a note is one tap away from the moment the sheet opens.
+    expect(sheet.queryByRole('button', { name: 'Add note' })).not.toBeInTheDocument()
     await userEvent.type(sheet.getByLabelText('Note'), '  Cinema  ')
     await userEvent.clear(sheet.getByLabelText('Date'))
     await userEvent.type(sheet.getByLabelText('Date'), '2026-09-15')
@@ -216,6 +214,33 @@ describe('AddTransactionSheet', () => {
     // A fresh sheet: nothing carried over from the last entry.
     expect(again.getByLabelText('Amount')).toHaveTextContent('$0')
     expect(again.getByRole('radio', { name: 'Fun' })).not.toBeChecked()
+  })
+
+  test('the picker comes before the date and the note, so the required choice is not behind the optional ones', async () => {
+    const sheet = await renderSheet()
+    const picker = await sheet.findByRole('searchbox', { name: 'Search categories' })
+
+    expect(picker.compareDocumentPosition(sheet.getByLabelText('Date')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(picker.compareDocumentPosition(sheet.getByLabelText('Note')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  test('pinned favourites come first, in the order they were pinned, then the rest', async () => {
+    localStorage.setItem('budget.favouriteCategories', JSON.stringify(['fun', 'rent']))
+    const sheet = await renderSheet()
+
+    const names = (await sheet.findAllByRole('radio', { name: /Rent|Groceries|Fun/ })).map((r) => r.closest('label')!.textContent)
+    expect(names).toEqual(['Fun', 'Rent', 'Groceries'])
+    expect(sheet.getByText('Favourites')).toBeInTheDocument()
+  })
+
+  test('a pinned category of the other type is not listed among these', async () => {
+    localStorage.setItem('budget.favouriteCategories', JSON.stringify(['pay']))
+    const sheet = await renderSheet()
+    await sheet.findByRole('radio', { name: 'Rent' })
+
+    // Salary is pinned, but it is income: Spending still starts with its own categories.
+    const names = sheet.getAllByRole('radio', { name: /Rent|Groceries|Fun/ }).map((r) => r.closest('label')!.textContent)
+    expect(names).toEqual(['Rent', 'Groceries', 'Fun'])
   })
 
   test.each([

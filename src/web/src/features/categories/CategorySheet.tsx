@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { CircleAlert, Trash2 } from 'lucide-react'
+import { CircleAlert, Star, Trash2 } from 'lucide-react'
 import { useRef, useState, type CSSProperties } from 'react'
 import { api } from '../../api/client'
 import type { CategoryRollup, CategoryType, EditCategoryRequest } from '../../api/types'
@@ -14,6 +14,7 @@ import { Sheet } from '../../ui/Sheet'
 import { SLOTS, toSlot } from '../../ui/slots'
 import { useToast } from '../../ui/useToast'
 import styles from './CategorySheet.module.css'
+import { isFavourite, toggleFavourite } from './favourites'
 
 const TYPES = [
   { value: 'Debit', label: 'Spending' },
@@ -49,11 +50,16 @@ export function CategorySheet({ cycleId, rows, editing, online, onClose }: Props
   const [budget, setBudget] = useState(editing ? editing.budgeted.toFixed(2) : '')
   const [icon, setIcon] = useState(editing?.icon ?? 'tag')
   const [spent, setSpent] = useState<'spread' | 'once'>(editing?.spreadEvenly === false ? 'once' : 'spread')
+  // Whether the person touched "How is it spent?". An answer that leaves spreadEvenly out must not be read as
+  // "it is a spread cost", which would turn a bill into one the moment anything else on the sheet was saved.
+  const [spentEdited, setSpentEdited] = useState(false)
   // A new category takes the next unused slot; after eight they repeat and the icon tells them apart (MASTER 3.4).
   const [colour, setColour] = useState<string>(() => (editing ? toSlot(editing.colour) : (SLOTS.find((slot) => !rows.some((row) => row.colour === slot)) ?? SLOTS[rows.length % SLOTS.length])))
   const [errors, setErrors] = useState<{ name?: string; budget?: string }>({})
   const [problem, setProblem] = useState<string>()
   const [confirmingRemove, setConfirmingRemove] = useState(false)
+  // Per device, not per cycle: pinning is instant and never queued, so it needs no Save and works offline.
+  const [favourite, setFavourite] = useState(() => (editing ? isFavourite(editing.categoryId) : false))
 
   const done = async () => {
     await client.invalidateQueries({ queryKey: ['cycles'] })
@@ -109,7 +115,7 @@ export function CategorySheet({ cycleId, rows, editing, online, onClose }: Props
     if (budgetAmount !== editing.budgeted) category.budgetAmount = budgetAmount
     if (icon !== editing.icon) category.icon = icon
     if (colour !== editing.colour) category.colour = colour
-    if (type === 'Debit' && (spent === 'spread') !== editing.spreadEvenly) category.spreadEvenly = spent === 'spread'
+    if (type === 'Debit' && spentEdited && (spent === 'spread') !== editing.spreadEvenly) category.spreadEvenly = spent === 'spread'
     if (Object.keys(category).length > 0) {
       await enqueue({ type: 'category.edit', cycleId, categoryId: editing.categoryId, category })
       toast.show({ message: 'Saved' })
@@ -158,7 +164,10 @@ export function CategorySheet({ cycleId, rows, editing, online, onClose }: Props
             <p className={styles.legend} aria-hidden="true">
               How is it spent?
             </p>
-            <SegmentedControl label="How is it spent?" options={SPENT} value={spent} onChange={setSpent} />
+            <SegmentedControl label="How is it spent?" options={SPENT} value={spent} onChange={(next) => {
+              setSpent(next)
+              setSpentEdited(true)
+            }} />
             <p className={styles.hint}>{spent === 'spread' ? 'Home says when spending runs ahead of the days gone.' : 'A bill paid in one go is never ahead of pace.'}</p>
           </div>
         )}
@@ -186,6 +195,16 @@ export function CategorySheet({ cycleId, rows, editing, online, onClose }: Props
             ))}
           </div>
         </fieldset>
+
+        {editing && (
+          <div className={styles.group}>
+            {/* A toggle, so it is announced as one; the label never changes, the pressed state does (MASTER 9). */}
+            <Button variant="secondary" icon={Star} aria-pressed={favourite} onClick={() => setFavourite(toggleFavourite(editing.categoryId).includes(editing.categoryId))}>
+              Favourite
+            </Button>
+            <p className={styles.hint}>Listed first when you add a transaction. Saved on this device.</p>
+          </div>
+        )}
 
         {editing && (
           <>
