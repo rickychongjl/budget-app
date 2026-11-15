@@ -7,8 +7,8 @@ namespace Budget.Jobs;
 // What the entry points in Program.cs share. Public so the per-user loop can be tested against a real database.
 public static class JobHost
 {
-    public static ServiceProvider BuildServices(string connectionString, IEnumerable<string>? allowedOids) => new ServiceCollection()
-        .AddApplication(allowedOids)
+    public static ServiceProvider BuildServices(string connectionString) => new ServiceCollection()
+        .AddApplication()
         .AddInfrastructure(connectionString)
         .AddScoped<JobUser>()
         .AddScoped<ICurrentUser>(p => p.GetRequiredService<JobUser>())

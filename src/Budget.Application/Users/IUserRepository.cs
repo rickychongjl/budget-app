@@ -11,6 +11,9 @@ public interface IUserRepository
     // The one shared demo user; the oldest if a mistake ever made two.
     Task<User?> GetDemoAsync(CancellationToken ct = default);
     Task<IReadOnlyList<User>> ListAsync(CancellationToken ct = default);
+
+    // Non-demo users whose ExternalId is a bare Entra oid rather than "<provider>:<subject>" (LegacyAccountAdoption).
+    Task<IReadOnlyList<User>> ListLegacyAsync(CancellationToken ct = default);
     void Add(User user);
 
     // Deletes every tenant row of this user at once, not through the unit of work; the User row stays.

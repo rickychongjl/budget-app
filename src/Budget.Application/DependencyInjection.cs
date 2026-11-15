@@ -4,15 +4,15 @@ namespace Budget.Application;
 
 public static class DependencyInjection
 {
-    // allowedOids comes from each host's configuration (Auth:AllowedOids). Left out, nobody can sign in with Entra.
-    public static IServiceCollection AddApplication(this IServiceCollection services, IEnumerable<string>? allowedOids = null) => services
+    // adoptLegacyUserEmail is the Api's Auth:AdoptLegacyUserEmail (LegacyAccountAdoption). Left out, nothing is adopted.
+    public static IServiceCollection AddApplication(this IServiceCollection services, string? adoptLegacyUserEmail = null) => services
         .AddSingleton(TimeProvider.System)
-        .AddSingleton(new AllowedOids(allowedOids ?? []))
+        .AddSingleton(new LegacyAccountSettings(adoptLegacyUserEmail))
+        .AddScoped<LegacyAccountAdoption>()
         .AddScoped<UserToday>()
         .AddScoped<CycleFinder>()
         .AddScoped<DemoCaps>()
         .AddScoped<DemoUser>()
-        .AddScoped<RealUsers>()
         .AddScoped<ResetDemo>()
         .AddScoped<Login>()
         .AddScoped<CycleCategories>()

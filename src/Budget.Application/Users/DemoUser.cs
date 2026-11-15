@@ -2,8 +2,8 @@ using Budget.Domain;
 
 namespace Budget.Application;
 
-// The demo user is an ordinary User row with IsDemo set. The app never creates users at request time,
-// so the row is put there by the migrate job; a demo session only ever looks it up.
+// The demo user is an ordinary User row with IsDemo set. It is put there by the migrate job, not by a request:
+// a demo session only ever looks it up. (Real users are created by their first sign-in, in Login.)
 public sealed class DemoUser(IUserRepository users, IUnitOfWork unitOfWork, TimeProvider clock)
 {
     public async Task EnsureExistsAsync(CancellationToken ct = default)

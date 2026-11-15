@@ -32,10 +32,10 @@ public class UserTests
     [Fact]
     public void Real_user_has_an_external_id_and_demo_user_does_not()
     {
-        var real = new User("Ricky", "Australia/Sydney", "AUD", TestData.Now, externalId: "oid-123");
+        var real = new User("Ricky", "Australia/Sydney", "AUD", TestData.Now, externalId: "google:123");
         var demo = new User("Demo", "Australia/Sydney", "AUD", TestData.Now, isDemo: true);
 
-        real.ExternalId.Should().Be("oid-123");
+        real.ExternalId.Should().Be("google:123");
         real.IsDemo.Should().BeFalse();
         demo.ExternalId.Should().BeNull();
         demo.IsDemo.Should().BeTrue();
@@ -68,5 +68,58 @@ public class UserTests
 
         act.Should().Throw<DomainException>().Which.Code.Should().Be("user.timezone.unknown");
         user.TimeZone.Should().Be("Australia/Sydney");
+    }
+
+    [Fact]
+    public void Email_is_optional_and_follows_the_provider()
+    {
+        var user = new User("Ricky", "Australia/Sydney", "AUD", TestData.Now, externalId: "google:123", email: "first@example.com");
+
+        user.Email.Should().Be("first@example.com");
+
+        user.ChangeEmail("second@example.com");
+        user.Email.Should().Be("second@example.com");
+
+        user.ChangeEmail(null);
+        user.Email.Should().BeNull();
+        Sydney().Email.Should().BeNull();
+    }
+
+    // The one-off move of the original account from its Entra oid to a Google subject: same row, same data, new key.
+    [Fact]
+    public void A_real_user_can_be_linked_to_another_external_id_and_keeps_its_identity()
+    {
+        var user = new User("Ricky", "Australia/Sydney", "AUD", TestData.Now, externalId: "0b6f2d0e-5a63-4d0b-9d3a-0e3c1f2a7b11");
+        var id = user.Id;
+
+        user.LinkTo("google:123");
+
+        user.ExternalId.Should().Be("google:123");
+        user.Id.Should().Be(id);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void Linking_to_a_blank_external_id_is_rejected(string externalId)
+    {
+        var user = new User("Ricky", "Australia/Sydney", "AUD", TestData.Now, externalId: "oid");
+
+        var act = () => user.LinkTo(externalId);
+
+        act.Should().Throw<DomainException>().Which.Code.Should().Be("user.external-id.blank");
+        user.ExternalId.Should().Be("oid");
+    }
+
+    // The demo row is shared by every visitor; tying it to one person's account would hand them everyone's demo session.
+    [Fact]
+    public void The_demo_user_cannot_be_linked()
+    {
+        var demo = new User("Demo", "Australia/Sydney", "AUD", TestData.Now, isDemo: true);
+
+        var act = () => demo.LinkTo("google:123");
+
+        act.Should().Throw<DomainException>().Which.Code.Should().Be("user.demo.unlinkable");
+        demo.ExternalId.Should().BeNull();
     }
 }

@@ -18,6 +18,13 @@ public sealed class UserRepository(BudgetDbContext db) : IUserRepository
     public async Task<IReadOnlyList<User>> ListAsync(CancellationToken ct = default) =>
         await db.Users.OrderBy(u => u.CreatedAt).ToListAsync(ct);
 
+    // ExternalIdentity.IsQualified as SQL (LIKE '%:%'); the demo row and rows with no external id are never legacy.
+    public async Task<IReadOnlyList<User>> ListLegacyAsync(CancellationToken ct = default) =>
+        await db.Users
+            .Where(u => !u.IsDemo && u.ExternalId != null && !u.ExternalId.Contains(ExternalIdentity.Separator))
+            .OrderBy(u => u.CreatedAt)
+            .ToListAsync(ct);
+
     public void Add(User user) => db.Users.Add(user);
 
     // Children first: every foreign key is Restrict. The explicit UserId is on top of the query filter, not instead of it.

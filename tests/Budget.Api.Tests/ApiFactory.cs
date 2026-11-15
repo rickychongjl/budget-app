@@ -46,18 +46,19 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("RateLimiting:PermitLimit", "1000000");
         builder.UseSetting("RateLimiting:AuthPermitLimit", "1000000");
         // The host runs as Development, which loads the developer's user-secrets. Without these a machine that has done the
-        // Entra setup would run the suite against the real tenant and allowlist. EntraSignInTests set their own.
-        builder.UseSetting("Entra:ClientId", "");
-        builder.UseSetting("Auth:AllowedOids", "");
+        // Google setup would run the suite against the real client, and could adopt a test row. GoogleSignInTests set their own.
+        builder.UseSetting("Google:ClientId", "");
+        builder.UseSetting("Google:ClientSecret", "");
+        builder.UseSetting("Auth:AdoptLegacyUserEmail", "");
 
         builder.ConfigureTestServices(services => services
             .AddAuthentication(TestAuth.SchemeName)
             .AddScheme<AuthenticationSchemeOptions, TestAuth>(TestAuth.SchemeName, null));
     }
 
-    public async Task<User> NewUserAsync(bool isDemo = false, string? externalId = null)
+    public async Task<User> NewUserAsync(bool isDemo = false, string? externalId = null, string? email = null)
     {
-        var user = new User("Test", "Australia/Sydney", "AUD", DateTimeOffset.UtcNow, externalId, isDemo);
+        var user = new User("Test", "Australia/Sydney", "AUD", DateTimeOffset.UtcNow, externalId, isDemo, email);
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<BudgetDbContext>();
         db.Users.Add(user);
@@ -126,7 +127,7 @@ internal static class CsrfClientExtensions
         host.CreateDefaultClient((options ?? new()).BaseAddress, new CsrfHandler(), new CookieContainerHandler());
 }
 
-// Lets a test act as any user without signing in: only the demo user can get a real cookie until Entra arrives in M5.
+// Lets a test act as any user without signing in (GoogleSignInTests walk the real round trip instead).
 // Everything after authentication is the real pipeline.
 internal sealed class TestAuth(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder)
     : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)

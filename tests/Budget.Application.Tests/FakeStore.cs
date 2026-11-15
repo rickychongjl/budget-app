@@ -16,6 +16,9 @@ internal sealed class FakeStore : ICurrentUser, IUnitOfWork, IUserRepository, IC
     public int Saves { get; private set; }
     public Exception? FailNextSave { get; set; }
 
+    // Runs when FailNextSave fires: stands in for what the real unit of work and a concurrent writer do to the store.
+    public Action? OnFailedSave { get; set; }
+
     public User SignIn(string timeZone = "Australia/Sydney", bool isDemo = false)
     {
         var user = new User("Test", timeZone, "AUD", DateTimeOffset.UnixEpoch, isDemo: isDemo);
@@ -29,6 +32,8 @@ internal sealed class FakeStore : ICurrentUser, IUnitOfWork, IUserRepository, IC
         if (FailNextSave is { } failure)
         {
             FailNextSave = null;
+            OnFailedSave?.Invoke();
+            OnFailedSave = null;
             throw failure;
         }
 
@@ -40,6 +45,8 @@ internal sealed class FakeStore : ICurrentUser, IUnitOfWork, IUserRepository, IC
     Task<User?> IUserRepository.GetByExternalIdAsync(string externalId, CancellationToken ct) => Task.FromResult(Users.SingleOrDefault(u => u.ExternalId == externalId));
     Task<User?> IUserRepository.GetDemoAsync(CancellationToken ct) => Task.FromResult(Users.Where(u => u.IsDemo).OrderBy(u => u.CreatedAt).FirstOrDefault());
     Task<IReadOnlyList<User>> IUserRepository.ListAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<User>>(Users);
+    Task<IReadOnlyList<User>> IUserRepository.ListLegacyAsync(CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<User>>([.. Users.Where(u => !u.IsDemo && u.ExternalId is { } id && !ExternalIdentity.IsQualified(id))]);
     public void Add(User user) => Users.Add(user);
 
     // Like the real one, it is filtered by the current user as well as by the id it is given.
