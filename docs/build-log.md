@@ -390,3 +390,50 @@ Application Insights.
 
 **Not verified here.** .NET tests run in CI only. `HasIanaId` behaviour was checked locally against the .NET 10 runtime
 (`Australia/Sydney` true, `AUS Eastern Standard Time` false). NuGet vulnerability audit runs only in CI.
+
+## Landing page pricing · 15 Nov 2026 · PR into `main`
+
+**Built.** A pricing section on `/` after "What it does" ("Free to start. Cheap to keep."), replacing the one-line
+"See pricing" mention, and the same block at the top of `/pricing`:
+- `BillingToggle`: Yearly | Monthly, yearly first and the default, on the existing `SegmentedControl` (native radios, so
+  `radiogroup`, arrow keys and the checked state come free). `SegmentedControl` gained an optional `tag` per option, drawn as
+  a `--color-primary-soft` pill and read as part of the name ("Yearly Save 37%"); shown in `/kit`.
+- `PlanCards` / `PlanPicker` (`features/public/PlanCards.tsx`): Premium first with a "Best value" badge and a 2px
+  `--color-primary` edge, then Free. Each card: name, price per month, how it is billed, the trial line, three outcome
+  bullets, its own button. Then three trust lines (AUD incl. GST, no card for Free, going back to Free deletes nothing).
+- `billing.ts`: every number comes from `CATALOGUE` (`plans.json`, held equal to `GET /api/plans` by `PublicPagesTests`).
+  Yearly per month is rounded **up** to the cent (A$29.99 → A$2.50), the saving is rounded **down** to a whole percent
+  against 12 × monthly (37%), both in integer cents. Tested in `billing.test.ts`, including with a made-up catalogue.
+- `/pricing`: toggle and cards, the comparison table (row labels shortened: "Past cycles to look back on", "Trend chart"),
+  and a six-question FAQ on native `<details>`. Answers are written from the code and `docs/legal` (terms "Plans and
+  payment" and "If you stop paying", privacy "Where your data is stored"); limits in them come from the catalogue.
+- Meta descriptions mention the per-month price (computed). No fetch was added; both pages still render offline.
+- Fixed in passing: the `<ul>`s on the public pages kept the browser's 40px indent and 1em margins (feature cards and the
+  footer links sat 40px in at 360px). They now reset margin and padding like the app's other lists.
+
+**Decisions (conservative).**
+- **Cards always stack.** The brief said side by side where there is room, but MASTER 6 caps the column at 480px and has
+  no desktop layout, so two cards would be ~216px each. Not changed to fit a component; raise it if you want a wider
+  pricing section.
+- **One primary button per screen (MASTER 9).** On `/` the hero's "Start free" stays the primary, so both card buttons
+  are secondary. On `/pricing` Premium's card button is the primary and the old bottom "Start free" is gone.
+- **Billing wording lives in one place** (`catalogue.ts`: `FREE_CTA`, `PREMIUM_CTA`, `PREMIUM_NOTE`, `premiumTrial`,
+  `BILLING_SOON`). While `BILLING_SOON` holds, Premium's button reads "Start free, upgrade later" (to `/signin`) with
+  "Premium is coming with the mobile apps." under it, and the trial line reads "14-day free trial when Premium launches".
+  When billing lands, change those constants (and the test in `billing.test.ts` that forbids "trial" in the button).
+- Free shows "A$0.00 / month", "Nothing to pay", "A plan, not a trial" (two decimals, per MASTER 11).
+
+**For Ricky to look at.** The wording above; the FAQ's "Why does it cost less than other budgeting apps?" (no bank feeds,
+manual entry by design, no competitors named); "there is no time limit" on Free in the FAQ (true of the code; it is a
+promise in public copy); and the data-location answer, which the privacy draft's claims table still marks "Ricky to
+confirm" (the region is not in code).
+
+**Checked in a headless browser** (Chrome via Playwright, `vite preview` of the production build, `/api/me` stubbed to
+401): `/` and `/pricing`, light and dark, at 360, 430, 1280 wide, 640 wide at 2× (200% zoom of a 1280 window), and 360 wide
+with the root text at 200%. No sideways scroll anywhere, no console errors, every link, button, radio and summary at least
+44px (the one inline link inside an FAQ sentence excepted), cards in order Premium then Free. Keyboard: Tab reaches the
+toggle, ArrowRight selects Monthly and the price changes to A$3.99, Enter opens an FAQ answer. At 200% text the card button
+label wrapped and clipped inside the fixed 48px height; the card buttons now grow instead.
+
+**Not verified here.** Landscape and standalone mode on a real phone with a notch; the System theme setting (light and
+dark were forced); `PublicPagesTests` runs in CI only (no server number was added, so it is unchanged).

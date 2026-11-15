@@ -7,7 +7,8 @@ import { MemoryRouter } from 'react-router'
 import App from '../../App'
 import { resetCsrf } from '../../api/client'
 import { server } from '../../test/server'
-import { CATALOGUE, price } from './catalogue'
+import { yearlyPerMonth, yearlySaving } from './billing'
+import { CATALOGUE, PREMIUM_CTA, price } from './catalogue'
 import { Landing } from './Landing'
 import { parse, publishable } from './legalText'
 import { Markdown } from './Markdown'
@@ -15,6 +16,10 @@ import { usePageMeta } from './usePageMeta'
 
 const signedOut = () => http.get('/api/me', () => HttpResponse.json({ status: 401, code: 'http.401' }, { status: 401 }))
 const og = (property: string) => document.head.querySelector(`meta[property="${property}"]`)?.getAttribute('content')
+const { monthly, yearly, trialDays } = CATALOGUE.premiumPrice
+const saving = yearlySaving(monthly, yearly)
+// The hero's "Start free" comes first; the Free card further down has its own.
+const heroStartFree = () => screen.getAllByRole('link', { name: 'Start free' })[0]
 
 function visit(path: string) {
   history.replaceState(null, '', path)
@@ -34,19 +39,102 @@ describe('landing page', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Tight Arse' })).toBeInTheDocument()
     const features = within(screen.getByRole('region', { name: 'What it does' }))
     expect(features.getAllByRole('heading', { level: 3 })).toHaveLength(3)
-    expect(screen.getByRole('link', { name: 'Start free' })).toHaveAttribute('href', '/signin')
+    expect(heroStartFree()).toHaveAttribute('href', '/signin')
     expect(screen.getByRole('button', { name: 'Try the demo' })).toBeEnabled()
     expect(screen.getByText(/shared account that everyone trying it can see, and it resets every night/)).toBeInTheDocument()
-    expect(screen.getByText(new RegExp(`up to ${CATALOGUE.free.maxCategoriesPerCycle} categories`))).toBeInTheDocument()
     expect(document.title).toBe('Tight Arse')
     expect(og('og:url')).toBe(`${location.origin}/`)
+    expect(og('og:description')).toContain(`Premium from ${price(yearlyPerMonth(yearly))} a month`)
+  })
+
+  test('the pricing section comes after "What it does" and replaces the old one-line mention', async () => {
+    server.use(signedOut())
+    visit('/')
+
+    const pricing = await screen.findByRole('region', { name: 'Free to start. Cheap to keep.' })
+    const features = screen.getByRole('region', { name: 'What it does' })
+    expect(features.compareDocumentPosition(pricing) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(pricing).getByText(/Free is a plan, not a trial, and needs no card/)).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'See pricing' })).not.toBeInTheDocument()
+    expect(within(pricing).getByRole('link', { name: 'Compare plans in detail' })).toHaveAttribute('href', '/pricing')
+  })
+
+  test('billing defaults to yearly, with the saving and the per-month price worked out from the catalogue', async () => {
+    server.use(signedOut())
+    visit('/')
+
+    const pricing = within(await screen.findByRole('region', { name: 'Free to start. Cheap to keep.' }))
+    const group = within(pricing.getByRole('radiogroup', { name: 'Billing period' }))
+    expect(group.getByRole('radio', { name: `Yearly Save ${saving}%` })).toBeChecked()
+    expect(group.getByRole('radio', { name: 'Monthly' })).not.toBeChecked()
+    expect(saving).toBe(37)
+
+    const premium = within(pricing.getByRole('article', { name: 'Premium' }))
+    expect(premium.getByText(price(yearlyPerMonth(yearly)))).toBeInTheDocument()
+    expect(price(yearlyPerMonth(yearly))).toBe('A$2.50')
+    expect(premium.getByText(`${price(yearly)} billed yearly`)).toBeInTheDocument()
+    expect(premium.getByText(new RegExp(`${trialDays}-day free trial`))).toBeInTheDocument()
+  })
+
+  test('switching to monthly shows the monthly price, by pointer or by arrow key', async () => {
+    server.use(signedOut())
+    visit('/')
+
+    const pricing = within(await screen.findByRole('region', { name: 'Free to start. Cheap to keep.' }))
+    await userEvent.click(pricing.getByRole('radio', { name: 'Monthly' }))
+
+    const premium = within(pricing.getByRole('article', { name: 'Premium' }))
+    expect(pricing.getByRole('radio', { name: 'Monthly' })).toBeChecked()
+    expect(premium.getByText(price(monthly))).toBeInTheDocument()
+    expect(premium.getByText('Billed monthly')).toBeInTheDocument()
+    expect(premium.queryByText(price(yearlyPerMonth(yearly)))).not.toBeInTheDocument()
+
+    pricing.getByRole('radio', { name: 'Monthly' }).focus()
+    await userEvent.keyboard('{ArrowLeft}')
+    expect(pricing.getByRole('radio', { name: `Yearly Save ${saving}%` })).toBeChecked()
+    expect(premium.getByText(price(yearlyPerMonth(yearly)))).toBeInTheDocument()
+  })
+
+  test('Premium comes first and is highlighted; each card has its own honest button', async () => {
+    server.use(signedOut())
+    visit('/')
+
+    const pricing = within(await screen.findByRole('region', { name: 'Free to start. Cheap to keep.' }))
+    const cards = pricing.getAllByRole('article')
+    expect(cards.map((card) => within(card).getByRole('heading', { level: 3 }).textContent)).toEqual([
+      'Premium',
+      'Free',
+    ])
+    const [premium, free] = cards.map((card) => within(card))
+    expect(premium.getByText('Best value')).toBeInTheDocument()
+    expect(free.queryByText('Best value')).not.toBeInTheDocument()
+
+    expect(premium.getByRole('link', { name: PREMIUM_CTA.label })).toHaveAttribute('href', '/signin')
+    expect(premium.getByRole('link').textContent).not.toMatch(/trial/i)
+    expect(premium.getByText('Premium is coming with the mobile apps.')).toBeInTheDocument()
+    expect(free.getByRole('link', { name: 'Start free' })).toHaveAttribute('href', '/signin')
+    expect(free.getByText(`Up to ${CATALOGUE.free.maxCategoriesPerCycle} categories per cycle`)).toBeInTheDocument()
+    expect(premium.getByText('Unlimited categories')).toBeInTheDocument()
+    // One primary button per screen (MASTER 9): on "/" it is the hero's "Start free", so the cards' buttons are secondary.
+    expect(document.querySelectorAll('main a[class*="primary"], main button[class*="primary"]')).toHaveLength(1)
+  })
+
+  test('trust lines sit under the cards', async () => {
+    server.use(signedOut())
+    visit('/')
+
+    const pricing = within(await screen.findByRole('region', { name: 'Free to start. Cheap to keep.' }))
+    expect(pricing.getByText('Prices are in Australian dollars and include GST.')).toBeInTheDocument()
+    expect(pricing.getByText('No card needed for Free.')).toBeInTheDocument()
+    expect(pricing.getByText('Going back to Free never deletes anything.')).toBeInTheDocument()
   })
 
   test('"Start free" opens the sign-in screen', async () => {
     server.use(signedOut(), http.get('/auth/options', () => HttpResponse.json({ signIn: ['demo', 'google'] })))
     visit('/')
 
-    await userEvent.click(await screen.findByRole('link', { name: 'Start free' }))
+    await screen.findByRole('heading', { level: 1, name: 'Tight Arse' })
+    await userEvent.click(heroStartFree())
 
     expect(await screen.findByRole('link', { name: 'Continue with Google' })).toHaveAttribute('href', '/auth/login')
     expect(location.pathname).toBe('/signin')
@@ -106,12 +194,49 @@ describe('pricing', () => {
     expect(table.getByRole('row', { name: /Categories in a cycle/ })).toHaveTextContent(`Up to ${CATALOGUE.free.maxCategoriesPerCycle}Unlimited`)
     expect(table.getByRole('row', { name: /Trend chart/ })).toHaveTextContent('Not includedIncluded')
     expect(table.getByRole('row', { name: /Export your data/ })).toHaveTextContent('IncludedIncluded')
-    expect(screen.getByText(price(CATALOGUE.premiumPrice.monthly))).toBeInTheDocument()
-    expect(screen.getByText(price(CATALOGUE.premiumPrice.yearly))).toBeInTheDocument()
-    expect(screen.getByText(new RegExp(`${CATALOGUE.premiumPrice.trialDays}-day free trial`))).toBeInTheDocument()
-    expect(screen.getByText(/coming with the mobile apps/)).toBeInTheDocument()
     expect(document.title).toBe('Pricing · Tight Arse')
-    expect(og('og:description')).toContain('A$3.99 a month or A$29.99 a year')
+    expect(og('og:description')).toContain(`${price(yearlyPerMonth(yearly))} a month billed yearly (${price(yearly)}), or ${price(monthly)} billed monthly`)
+  })
+
+  test("reuses the toggle and the cards, with Premium's button as the one primary", async () => {
+    visit('/pricing')
+
+    await screen.findByRole('heading', { level: 1, name: 'Pricing' })
+    expect(screen.getByRole('radio', { name: `Yearly Save ${saving}%` })).toBeChecked()
+    const [premium, free] = screen.getAllByRole('article').map((card) => within(card))
+    expect(premium.getByRole('heading', { level: 2, name: 'Premium' })).toBeInTheDocument()
+    expect(premium.getByText(price(yearlyPerMonth(yearly)))).toBeInTheDocument()
+    expect(premium.getByRole('link', { name: PREMIUM_CTA.label }).className).toMatch(/primary/)
+    expect(free.getByRole('link', { name: 'Start free' }).className).toMatch(/secondary/)
+    expect(document.querySelectorAll('main a[class*="primary"], main button[class*="primary"]')).toHaveLength(1)
+    expect(screen.queryByRole('link', { name: 'Compare plans in detail' })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Monthly' }))
+    expect(premium.getByText(price(monthly))).toBeInTheDocument()
+  })
+
+  test('answers the common questions in a short FAQ that opens and closes', async () => {
+    visit('/pricing')
+
+    const faq = within(await screen.findByRole('region', { name: 'Questions' }))
+    const questions = faq.getAllByRole('group')
+    expect(questions).toHaveLength(6)
+    expect(questions.map((details) => details.querySelector('summary')?.textContent)).toEqual([
+      'Is Free really free?',
+      'Do I need a card?',
+      'What happens if I go back to Free?',
+      'Where is my data stored?',
+      'Why does it cost less than other budgeting apps?',
+      'When can I buy Premium?',
+    ])
+    const where = questions[3] as HTMLDetailsElement
+    expect(where.open).toBe(false)
+    await userEvent.click(faq.getByText('Where is my data stored?'))
+    expect(where.open).toBe(true)
+    expect(within(where).getByText(/Australia East region \(Sydney\)/)).toBeInTheDocument()
+    expect(within(where).getByRole('link', { name: 'privacy policy' })).toHaveAttribute('href', '/privacy')
+    expect(within(questions[0]).getByText(new RegExp(`up to ${CATALOGUE.free.maxCategoriesPerCycle} categories`), { exact: false })).toBeInTheDocument()
+    expect(within(questions[5]).getByText(/cannot be bought yet/)).toBeInTheDocument()
   })
 
   test('matches decision D3', () => {

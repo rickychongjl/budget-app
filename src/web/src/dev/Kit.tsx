@@ -69,6 +69,7 @@ function Toasts() {
 export default function Kit() {
   const [theme, setTheme] = useState<ThemePreference>(getPreference)
   const [type, setType] = useState<'debit' | 'credit'>('debit')
+  const [billing, setBilling] = useState<'yearly' | 'monthly'>('yearly')
   const [sheet, setSheet] = useState(false)
   const [dialog, setDialog] = useState(false)
   const [pending, setPending] = useState(false)
@@ -124,6 +125,12 @@ export default function Kit() {
 
         <Section title="Segmented control">
           <SegmentedControl label="Type" options={[{ value: 'debit', label: 'Spending' }, { value: 'credit', label: 'Income' }]} value={type} onChange={setType} />
+          <SegmentedControl
+            label="Billing period (with a tag)"
+            options={[{ value: 'yearly', label: 'Yearly', tag: 'Save 37%' }, { value: 'monthly', label: 'Monthly' }]}
+            value={billing}
+            onChange={setBilling}
+          />
         </Section>
 
         <Section title="Category rows (status, MASTER 3.3)">

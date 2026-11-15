@@ -12,5 +12,10 @@ export function price(amount: number, currency = CATALOGUE.premiumPrice.currency
   return `${prefix}${amount.toFixed(2)}`
 }
 
-// Said wherever Premium is priced: nothing can be bought yet.
+// What the pages say while Premium cannot be bought. Everything that changes when store billing lands is here, so the
+// switch is one edit: Premium's button must not promise a purchase or a trial that cannot start yet.
 export const BILLING_SOON = 'Premium is coming with the mobile apps, billed through the App Store and Google Play. It cannot be bought yet.'
+export const FREE_CTA = { label: 'Start free', to: '/signin' } as const
+export const PREMIUM_CTA = { label: 'Start free, upgrade later', to: '/signin' } as const
+export const PREMIUM_NOTE = 'Premium is coming with the mobile apps.'
+export const premiumTrial = (days: number) => `${days}-day free trial when Premium launches`

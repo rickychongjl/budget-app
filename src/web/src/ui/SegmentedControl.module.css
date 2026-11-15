@@ -24,13 +24,26 @@
 }
 
 .text {
-  display: grid;
-  place-items: center;
-  padding: 0 var(--space-3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1) var(--space-2);
+  padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-sm);
   font: var(--text-label);
   color: var(--color-text-muted);
   transition: background var(--dur-fast);
+}
+
+/* An aside, not a status: brand tint with body text (MASTER 3.1), never green. */
+.tag {
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-primary-soft);
+  color: var(--color-text);
+  font: var(--text-caption);
+  white-space: nowrap;
 }
 
 .input:checked + .text {

@@ -134,6 +134,20 @@ describe('SegmentedControl', () => {
 
     expect(onChange).toHaveBeenCalledWith('debit')
   })
+
+  test('a segment can carry a short tag, which is part of its name', () => {
+    render(
+      <SegmentedControl
+        label="Billing period"
+        options={[{ value: 'yearly', label: 'Yearly', tag: 'Save 37%' }, { value: 'monthly', label: 'Monthly' }]}
+        value="yearly"
+        onChange={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('radio', { name: 'Yearly Save 37%' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Monthly' })).not.toBeChecked()
+  })
 })
 
 describe('ProgressBar', () => {

@@ -5,7 +5,8 @@ type Props<T extends string> = {
   // Names the group for a screen reader; not drawn.
   label: string
   // At most four (MASTER 9). More than that is a chip row.
-  options: readonly { value: T; label: string }[]
+  // A tag is a short aside drawn as a pill beside the label ("Save 37%"); it is read as part of the segment's name.
+  options: readonly { value: T; label: string; tag?: string }[]
   value: T
   onChange: (value: T) => void
 }
@@ -26,7 +27,11 @@ export function SegmentedControl<T extends string>({ label, options, value, onCh
             checked={option.value === value}
             onChange={() => onChange(option.value)}
           />
-          <span className={styles.text}>{option.label}</span>
+          <span className={styles.text}>
+            {option.label}
+            {/* The space keeps the name "Yearly Save 37%" rather than "YearlySave 37%"; flex layout does not draw it. */}
+            {option.tag && <> <span className={styles.tag}>{option.tag}</span></>}
+          </span>
         </label>
       ))}
     </div>

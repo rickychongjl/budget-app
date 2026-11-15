@@ -6,12 +6,14 @@ import { useOnline } from '../../shell/useOnline'
 import { Button } from '../../ui/Button'
 import buttonStyles from '../../ui/Button.module.css'
 import { Card } from '../../ui/Card'
-import { CATALOGUE } from './catalogue'
+import { yearlyPerMonth } from './billing'
+import { CATALOGUE, price } from './catalogue'
+import { PlanPicker } from './PlanCards'
 import styles from './Public.module.css'
 import { PublicLayout } from './PublicLayout'
 import { usePageMeta } from './usePageMeta'
 
-const DESCRIPTION = 'A 30-day budget you can keep up with from your phone. Works offline, installs on your home screen, free to start.'
+const DESCRIPTION = `A 30-day budget you can keep up with from your phone. Works offline and installs on your home screen. Free to start; Premium from ${price(yearlyPerMonth(CATALOGUE.premiumPrice.yearly))} a month.`
 
 const FEATURES: { icon: LucideIcon; title: string; text: string }[] = [
   {
@@ -33,7 +35,7 @@ const FEATURES: { icon: LucideIcon; title: string; text: string }[] = [
 
 type Props = { onSignedIn: () => Promise<void> }
 
-// "/" for someone signed out: what it is, three features, and the two ways in. "Start free" goes to the sign-in screen,
+// "/" for someone signed out: what it is, the two ways in, three features and the plans. "Start free" goes to the sign-in screen,
 // which carries Google's own button (MASTER 8), rather than a second Google button here.
 export function Landing({ onSignedIn }: Props) {
   usePageMeta({ title: 'Tight Arse', description: DESCRIPTION, path: '/' })
@@ -89,12 +91,16 @@ export function Landing({ onSignedIn }: Props) {
         </ul>
       </section>
 
-      <p className={styles.text}>
-        Free for up to {CATALOGUE.free.maxCategoriesPerCycle} categories in a cycle, with export and account deletion always included.{' '}
-        <Link to="/pricing" className={styles.inlineLink}>
-          See pricing
+      <section aria-labelledby="landing-pricing" className={styles.section}>
+        <h2 id="landing-pricing" className={styles.heading}>
+          Free to start. Cheap to keep.
+        </h2>
+        <p className={styles.muted}>Free is a plan, not a trial, and needs no card. Premium adds unlimited categories, every past cycle and the trend chart.</p>
+        <PlanPicker headingLevel={3} primaryCta={false} />
+        <Link to="/pricing" className={styles.moreLink}>
+          Compare plans in detail
         </Link>
-      </p>
+      </section>
     </PublicLayout>
   )
 }
