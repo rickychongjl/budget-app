@@ -15,7 +15,8 @@ public sealed class BudgetDbContext(DbContextOptions<BudgetDbContext> options, I
     public DbSet<Transaction> Transactions => Set<Transaction>();
 
     // A property, not the constructor parameter, so EF re-reads it per query instead of baking one user into the cached model.
-    private Guid CurrentUserId => currentUser.Id;
+    // Internal so UserRepository.DeleteAccountAsync can apply the same rule to the User row, which has no filter.
+    internal Guid CurrentUserId => currentUser.Id;
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configuration) =>
         configuration.Properties<decimal>().HavePrecision(18, 2);

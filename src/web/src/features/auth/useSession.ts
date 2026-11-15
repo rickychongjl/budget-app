@@ -1,7 +1,13 @@
 import { createContext, useContext } from 'react'
 import type { Me } from '../../api/types'
 
-export type Session = { me: Me; signOut: () => Promise<void> }
+export type SignOutOptions = {
+  // The server has already ended the session because the account was deleted: nothing is posted to /auth/logout, and
+  // queued changes are dropped as well, since there is no account left for them to land in.
+  accountDeleted?: boolean
+}
+
+export type Session = { me: Me; signOut: (options?: SignOutOptions) => Promise<void> }
 
 export const SessionContext = createContext<Session | null>(null)
 

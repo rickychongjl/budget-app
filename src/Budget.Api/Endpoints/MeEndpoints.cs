@@ -1,4 +1,7 @@
+using System.Text.Json;
 using Budget.Application;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 
 namespace Budget.Api;
 
@@ -24,5 +27,33 @@ internal static class MeEndpoints
             response.Headers.CacheControl = "no-store";
             return Results.Stream(archive, ExportArchive.ContentType);
         }).RequireRateLimiting(RateLimiting.ExportPolicy);
+
+        // Decision D5: gone at once, after the person types the confirmation. Under the /api group, so antiforgery-checked.
+        // The body is read by hand rather than bound: a bound JSON body makes routing skip this endpoint for a request
+        // without a JSON content type, and the /api fallback then answers 404. Missing or unreadable is refused like a wrong
+        // word (422 with the code). The session ends whether the account was deleted now or was already gone.
+        api.MapDelete("/me", async (HttpContext context, DeleteAccount deleteAccount, CancellationToken ct) =>
+        {
+            await deleteAccount.RunAsync(await ReadDeleteRequestAsync(context.Request, ct), ct);
+            await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return Results.NoContent();
+        });
+    }
+
+    private static async Task<DeleteAccountRequest?> ReadDeleteRequestAsync(HttpRequest request, CancellationToken ct)
+    {
+        if (!request.HasJsonContentType())
+        {
+            return null;
+        }
+
+        try
+        {
+            return await request.ReadFromJsonAsync<DeleteAccountRequest>(ct);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 }

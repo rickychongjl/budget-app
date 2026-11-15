@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
@@ -10,7 +10,7 @@ import { db } from '../../offline/db'
 import { stopOutbox } from '../../offline/outbox'
 import { server } from '../../test/server'
 import { ToastProvider } from '../../ui/Toast'
-import { SessionContext } from '../auth/useSession'
+import { SessionContext, type Session } from '../auth/useSession'
 import { Settings } from './Settings'
 
 const RICKY: Me = { id: 'u1', displayName: 'Ricky', timeZone: 'Australia/Sydney', currency: 'AUD', isDemo: false, cycleLengthDays: 30 }
@@ -19,11 +19,11 @@ const SUMMARY: CycleSummary = {
   rollup: { categories: [], debitsBudgeted: 0, debitsActual: 0, creditsBudgeted: 0, creditsActual: 0, net: 0, accrued: null },
 }
 
-function renderSettings(me: Me = RICKY) {
+function renderSettings(me: Me = RICKY, signOut: Session['signOut'] = async () => undefined) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={client}>
-      <SessionContext value={{ me, signOut: async () => undefined }}>
+      <SessionContext value={{ me, signOut }}>
         <ToastProvider>
           <MemoryRouter>
             <Settings />
@@ -39,6 +39,9 @@ beforeEach(async () => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-09-20T02:00:00Z'))
   resetCsrf()
+  // An offline test's 'offline' event also tells TanStack's global onlineManager, which then pauses every later mutation
+  // in this file until an 'online' event that never comes.
+  onlineManager.setOnline(true)
   stopOutbox()
   await db.outbox.clear()
   await db.cache.clear()
@@ -235,5 +238,146 @@ describe('export my data', () => {
 
     expect(account().getByRole('button', { name: 'Export my data' })).toBeDisabled()
     expect(account().getByText('Needs a connection.')).toBeInTheDocument()
+  })
+})
+
+// Settings → Account: decision D5, an immediate hard delete once the word is typed. The sheet says what goes, offers the
+// export first, and signs this device out the way sign-out does once the server has done it.
+describe('delete my account', () => {
+  const account = () => within(screen.getByRole('region', { name: 'Account' }))
+  const sheet = async () => within(await screen.findByRole('dialog', { name: 'Delete your account?' }))
+
+  async function open() {
+    await userEvent.click(account().getByRole('button', { name: 'Delete account' }))
+    return sheet()
+  }
+
+  test('explains what is deleted, and Delete stays off until DELETE is typed', async () => {
+    renderSettings()
+    const dialog = await open()
+
+    expect(dialog.getByText(/every cycle, category and transaction, and your profile/)).toBeInTheDocument()
+    expect(dialog.getByText(/can't be undone/)).toBeInTheDocument()
+    expect(dialog.getByText('Copies in our backups are gone within 7 days.')).toBeInTheDocument()
+    const confirm = dialog.getByRole('button', { name: 'Delete account' })
+    expect(confirm).toBeDisabled()
+
+    await userEvent.type(dialog.getByLabelText('Type DELETE to confirm'), 'delete')
+    expect(confirm).toBeDisabled()
+
+    await userEvent.clear(dialog.getByLabelText('Type DELETE to confirm'))
+    await userEvent.type(dialog.getByLabelText('Type DELETE to confirm'), 'DELETE')
+    expect(confirm).toBeEnabled()
+  })
+
+  test('Cancel sends nothing and the typed word does not survive a reopen', async () => {
+    let sent = false
+    server.use(http.delete('/api/me', () => ((sent = true), new HttpResponse(null, { status: 204 }))))
+    renderSettings()
+    const dialog = await open()
+
+    await userEvent.type(dialog.getByLabelText('Type DELETE to confirm'), 'DELETE')
+    await userEvent.click(dialog.getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect((await open()).getByLabelText('Type DELETE to confirm')).toHaveValue('')
+    expect(sent).toBe(false)
+  })
+
+  test('sends the confirmation with the anti-forgery token, then signs out locally and says it is done', async () => {
+    let request: { body: unknown; token: string | null } | undefined
+    server.use(
+      http.delete('/api/me', async ({ request: sent }) => {
+        request = { body: await sent.json(), token: sent.headers.get('X-XSRF-TOKEN') }
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    const signOut = vi.fn(async () => undefined)
+    renderSettings(RICKY, signOut)
+    const dialog = await open()
+
+    await userEvent.type(dialog.getByLabelText('Type DELETE to confirm'), 'DELETE')
+    await userEvent.click(dialog.getByRole('button', { name: 'Delete account' }))
+
+    await waitFor(() => expect(signOut).toHaveBeenCalledWith({ accountDeleted: true }))
+    expect(request).toEqual({ body: { confirm: 'DELETE' }, token: 't' })
+    expect(await screen.findByText('Your account and all its data have been deleted.')).toBeInTheDocument()
+  })
+
+  test('Enter in the field submits once the word is right', async () => {
+    let sent = 0
+    server.use(http.delete('/api/me', () => ((sent += 1), new HttpResponse(null, { status: 204 }))))
+    renderSettings()
+    const dialog = await open()
+
+    await userEvent.type(dialog.getByLabelText('Type DELETE to confirm'), 'DELET{Enter}')
+    expect(sent).toBe(0)
+
+    await userEvent.type(dialog.getByLabelText('Type DELETE to confirm'), 'E{Enter}')
+    await waitFor(() => expect(sent).toBe(1))
+  })
+
+  test('a refusal is shown in the sheet and nothing is signed out', async () => {
+    server.use(http.delete('/api/me', () => HttpResponse.json({ status: 422, code: 'account.delete.unconfirmed', detail: 'Type DELETE to confirm.' }, { status: 422 })))
+    const signOut = vi.fn(async () => undefined)
+    renderSettings(RICKY, signOut)
+    const dialog = await open()
+
+    await userEvent.type(dialog.getByLabelText('Type DELETE to confirm'), 'DELETE')
+    await userEvent.click(dialog.getByRole('button', { name: 'Delete account' }))
+
+    expect(await dialog.findByRole('alert')).toHaveTextContent('Type DELETE to confirm.')
+    expect(signOut).not.toHaveBeenCalled()
+  })
+
+  test('a dropped connection says so and keeps the sheet open to try again', async () => {
+    server.use(http.delete('/api/me', () => HttpResponse.error()))
+    renderSettings()
+    const dialog = await open()
+
+    await userEvent.type(dialog.getByLabelText('Type DELETE to confirm'), 'DELETE')
+    await userEvent.click(dialog.getByRole('button', { name: 'Delete account' }))
+
+    expect(await dialog.findByRole('alert')).toHaveTextContent("Couldn't delete your account. Check your connection and try again.")
+    expect(dialog.getByRole('button', { name: 'Delete account' })).toBeEnabled()
+  })
+
+  test('"Export my data first" closes the sheet and moves to the export button', async () => {
+    renderSettings()
+    const dialog = await open()
+
+    await userEvent.click(dialog.getByRole('button', { name: 'Export my data first' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await waitFor(() => expect(account().getByRole('button', { name: 'Export my data' })).toHaveFocus())
+  })
+
+  test('offline, it cannot be opened and the reason is on screen', () => {
+    renderSettings()
+
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    act(() => void window.dispatchEvent(new Event('offline')))
+
+    expect(account().getByRole('button', { name: 'Delete account' })).toBeDisabled()
+    expect(account().getByText('Deleting your account needs a connection.')).toBeInTheDocument()
+  })
+
+  test('losing the connection with the sheet open turns Delete off and says why', async () => {
+    renderSettings()
+    const dialog = await open()
+    await userEvent.type(dialog.getByLabelText('Type DELETE to confirm'), 'DELETE')
+
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    act(() => void window.dispatchEvent(new Event('offline')))
+
+    expect(dialog.getByRole('button', { name: 'Delete account' })).toBeDisabled()
+    expect(dialog.getByLabelText('Type DELETE to confirm')).toHaveAccessibleDescription('Deleting your account needs a connection.')
+  })
+
+  test('the shared demo is not offered it, and is told why', () => {
+    renderSettings({ ...RICKY, displayName: 'Demo', isDemo: true })
+
+    expect(account().queryByRole('button', { name: 'Delete account' })).not.toBeInTheDocument()
+    expect(account().getByText("The demo is shared, so it can't be deleted.")).toBeInTheDocument()
   })
 })
