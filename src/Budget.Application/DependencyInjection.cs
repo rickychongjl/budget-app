@@ -19,6 +19,7 @@ public static class DependencyInjection
         .AddScoped<Transactions>()
         .AddScoped<Sync>()
         .AddScoped<Me>()
+        .AddScoped<ExportData>()
         .AddScoped<RolloverCycles>()
         .AddScoped<Reports>()
         .AddScoped<Cycles>();

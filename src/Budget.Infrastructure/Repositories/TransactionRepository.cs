@@ -12,6 +12,12 @@ public sealed class TransactionRepository(BudgetDbContext db) : ITransactionRepo
             .OrderByDescending(t => t.OccurredOn).ThenByDescending(t => t.CreatedAt)
             .ToListAsync(ct);
 
+    // Read-only, so untracked; the tenant filter applies as to any query.
+    public async Task<IReadOnlyList<Transaction>> ListAllAsync(CancellationToken ct = default) =>
+        await db.Transactions.AsNoTracking()
+            .OrderBy(t => t.OccurredOn).ThenBy(t => t.CreatedAt)
+            .ToListAsync(ct);
+
     // One GROUP BY over Transaction (UserId, CycleId, CategoryId); the tenant filter applies as to any query.
     public async Task<IReadOnlyList<CategoryTotal>> SumByCategoryAsync(CancellationToken ct = default) =>
         await db.Transactions

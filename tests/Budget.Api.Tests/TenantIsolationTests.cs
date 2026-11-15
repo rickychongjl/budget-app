@@ -44,6 +44,8 @@ public sealed class TenantIsolationTests(ApiFactory api)
         "GET /api/categories",
         // Every cycle of the caller and nothing else; ReportTests aims one user's report at another's data.
         "GET /api/reports/cycles",
+        // Everything the caller has entered and nothing else; proved below by The_export_holds_only_the_callers_rows.
+        "GET /api/me/export",
     ];
 
     // Takes ids, but answers 200 with a refusal per item rather than 404, so its attack lives in SyncTests.
@@ -64,6 +66,31 @@ public sealed class TenantIsolationTests(ApiFactory api)
         response.StatusCode.Should().Be(HttpStatusCode.NotFound, route);
         response.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
         (await SnapshotAsync(victimClient, victim)).Should().Be(before);
+    }
+
+    // Both users have data, so an export that ignored the tenant filter would show it. Checked by ids and by values, in every file.
+    [Fact]
+    public async Task The_export_holds_only_the_callers_rows()
+    {
+        var (victim, victimClient) = await SeedVictimAsync();
+        var attacker = await api.NewUserAsync();
+        var cycle = new Cycle(attacker.Id, DateOnly.Parse(Today).AddDays(-2));
+        cycle.Confirm();
+        var category = new Category(attacker.Id, CategoryType.Debit, DateTimeOffset.UtcNow);
+        var transaction = new Transaction(cycle, category.Id, 17.25m, cycle.StartDate, "theirs", Guid.NewGuid(), DateTimeOffset.UtcNow);
+        await api.SeedAsync(attacker, cycle, category, new CycleCategory(cycle, category.Id, "Fuel", "fuel", "teal", 0, 150m), transaction);
+
+        var attackerFiles = await ExportZip.ReadAsync(await api.ClientFor(attacker).GetAsync("/api/me/export"));
+        var victimFiles = await ExportZip.ReadAsync(await victimClient.GetAsync("/api/me/export"));
+
+        var attackerExport = string.Concat(attackerFiles.Values);
+        attackerExport.Should().ContainAll(cycle.Id.ToString(), category.Id.ToString(), transaction.Id.ToString(), "Fuel", "theirs", "17.25");
+        attackerExport.Should().NotContainAny(
+            victim.CycleId.ToString(), victim.CategoryId.ToString(), victim.TransactionId.ToString(), "Groceries", "mine", "42.00", "600.00");
+
+        var victimExport = string.Concat(victimFiles.Values);
+        victimExport.Should().ContainAll(victim.CycleId.ToString(), victim.TransactionId.ToString(), "Groceries", "mine", "42.00");
+        victimExport.Should().NotContainAny(cycle.Id.ToString(), category.Id.ToString(), transaction.Id.ToString(), "Fuel", "theirs", "17.25");
     }
 
     [Fact]

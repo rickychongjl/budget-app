@@ -176,3 +176,31 @@ describe('failures', () => {
     expect(gone).toHaveBeenCalledOnce()
   })
 })
+
+describe('downloads', () => {
+  test('a file comes back as a blob with the name the server gave it, and a GET fetches no token', async () => {
+    const csrf = csrfEndpoint()
+    server.use(
+      http.get('/api/me/export', () =>
+        new HttpResponse(new Uint8Array([80, 75, 3, 4]), {
+          headers: { 'Content-Type': 'application/zip', 'Content-Disposition': 'attachment; filename="tightarse-export-2026-09-20.zip"' },
+        }),
+      ),
+    )
+
+    const file = await api.download('/api/me/export')
+
+    expect(file.fileName).toBe('tightarse-export-2026-09-20.zip')
+    expect(file.blob.size).toBe(4)
+    expect(csrf.fetched).toBe(0)
+  })
+
+  test('a refusal is a ProblemError like any other request', async () => {
+    server.use(http.get('/api/me/export', () => HttpResponse.json({ code: 'rate-limited', detail: 'Too many requests. Try again shortly.' }, { status: 429 })))
+
+    const error = await api.download('/api/me/export').catch((e: unknown) => e)
+
+    expect(error).toBeInstanceOf(ProblemError)
+    expect(error).toMatchObject({ status: 429, code: 'rate-limited', message: 'Too many requests. Try again shortly.' })
+  })
+})

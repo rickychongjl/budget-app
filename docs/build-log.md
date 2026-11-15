@@ -111,3 +111,41 @@ dark at 360 and 430 wide, landscape, 200% zoom, and a device in Perth and in Lon
 real phone (iOS's select wheel with about 400 entries, safe areas in standalone mode). The .NET test runs only in CI.
 
 **What Ricky must do.** Nothing.
+
+## L3 — Export my data · 15 Nov 2026 · PR into `multi-user`
+
+**Built.** `GET /api/me/export` returns `application/zip` with `Content-Disposition: attachment; filename="tightarse-export-YYYY-MM-DD.zip"`
+(the date is the user's "today" in their time zone) and `Cache-Control: no-store`. The ZIP holds `profile.csv`, `cycles.csv`,
+`categories.csv` (one row per cycle-category snapshot), `transactions.csv` and `export.json` (everything, nested by cycle, with ids).
+Application: `src/Budget.Application/Export/` (`ExportData` use case, `ExportCsv` cell encoding, `ExportArchive` ZIP writer).
+One new read method, `ITransactionRepository.ListAllAsync` (oldest first, untracked); everything else uses existing repository
+methods, so the tenant filter does the isolation. The route is in `TenantIsolationTests.TakesNoIds` with a two-user test that
+checks ids and values in every file both ways. Settings → Account has "Export my data" (secondary button, Lucide `download`),
+disabled offline with "Needs a connection.", a spinner while pending, a toast when done or refused.
+
+**Formats.** Dates `YYYY-MM-DD`; timestamps ISO 8601 UTC (`2026-11-15T01:02:03Z` in CSV, `+00:00` in JSON); amounts plain invariant
+decimals with two places (`-2.50`); CSVs UTF-8 with BOM, CRLF rows, RFC 4180 quoting. Text cells starting with `=`, `+`, `-`, `@`,
+tab or CR get a leading `'`; amounts, dates and enum values are never guarded, so a reversal stays a number. JSON values are
+exactly as stored (no guard), camelCase, enums as strings.
+
+**Assumptions the plan did not make for me.**
+- The archive is built in a `MemoryStream` and then streamed, rather than written straight into the response: `ZipArchive`
+  writes synchronously, which Kestrel refuses, and buffering means a failure is a problem response, not a truncated file. Rows
+  are still written row by row into each entry, never as one big string. A user has at most a few thousand rows.
+- CSVs carry no ids (they are for people; rows join on cycle start date and category name). `export.json` carries every id.
+- Category type is written as `Debit` / `Credit` (the data model's words) in both CSV and JSON, not the UI's Spending / Income.
+- A transaction's category name is the one from its own cycle's snapshot, so a later rename does not rewrite history.
+- Rate limit: a new `export` policy, 5 a minute per client address (`RateLimiting:ExportPermitLimit`), fixed window, on top of the
+  global limit. Per address, not per user, because the limiter runs before authentication, like the `auth` policy.
+- The button fetches through `api.download` (a new helper in `api/client.ts`) and saves via an object URL, instead of a plain
+  link, so a 429 or a lost session is a toast and a 401 goes back to sign-in, rather than an error saved as a file.
+- The demo user can export like anyone (it is a normal user); its export is the shared demo data.
+
+**Not verified here.** .NET build and tests run only in CI (no NuGet or Docker here). The export code and Domain were compiled
+locally against the SDK alone and run through a harness that printed every file; the xUnit tests were not run locally. The
+button was not checked in a browser against MASTER 14 (themes, widths, text size, standalone mode). Whether an iPhone in
+standalone (home-screen) mode saves the ZIP from an object URL cleanly needs a check on a real device. Opening the CSVs in
+Excel and Google Sheets is the plan's "done when" and needs a person.
+
+**What Ricky must do.** Download an export from Settings on a phone and a desktop, open the CSVs in Excel and Google Sheets,
+and check the iPhone home-screen app saves the file.
