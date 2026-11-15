@@ -1,0 +1,5 @@
+{
+  "free": { "maxCategoriesPerCycle": 6, "pastCyclesInReports": 1, "trendChart": false },
+  "premium": { "maxCategoriesPerCycle": null, "pastCyclesInReports": null, "trendChart": true },
+  "premiumPrice": { "currency": "AUD", "monthly": 3.99, "yearly": 29.99, "trialDays": 14 }
+}

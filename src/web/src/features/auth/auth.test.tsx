@@ -7,6 +7,7 @@ import { resetCsrf } from '../../api/client'
 import type { Me, SignInMethod, SyncItem } from '../../api/types'
 import { db } from '../../offline/db'
 import { server } from '../../test/server'
+import { BrowserRouter } from 'react-router'
 import { SessionGate } from './SessionGate'
 import { useSession } from './useSession'
 
@@ -53,9 +54,11 @@ function renderGate() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={client}>
-      <SessionGate>
-        <Inside />
-      </SessionGate>
+      <BrowserRouter>
+        <SessionGate>
+          <Inside />
+        </SessionGate>
+      </BrowserRouter>
     </QueryClientProvider>,
   )
 }
@@ -64,7 +67,8 @@ beforeEach(async () => {
   await db.cache.clear()
   await db.outbox.clear()
   resetCsrf()
-  history.replaceState(null, '', '/')
+  // The sign-in screen's own path; "/" signed out is the landing page (public.test.tsx).
+  history.replaceState(null, '', '/signin')
 })
 
 describe('signed out', () => {

@@ -69,16 +69,16 @@ async function renderOnboarding() {
   await configureOutbox({ userId: 'u1', refresh: async () => undefined })
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <SessionGate>
-        <ToastProvider>
-          <MemoryRouter initialEntries={['/onboarding']}>
+      <MemoryRouter initialEntries={['/onboarding']}>
+        <SessionGate>
+          <ToastProvider>
             <Routes>
               <Route path="/onboarding" element={<Onboarding />} />
               <Route path="/" element={<p>Home screen</p>} />
             </Routes>
-          </MemoryRouter>
-        </ToastProvider>
-      </SessionGate>
+          </ToastProvider>
+        </SessionGate>
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
