@@ -313,3 +313,45 @@ address, or his own account becomes Free (it keeps its data, but can add no cate
 the latest past cycle). Confirm the Free/Premium split.
 
 Work started by the L5 task agent; finished by the orchestrator after the agent stopped on a usage limit.
+
+## L9 — Public pages · 15 Nov 2026 · PR into `multi-user`
+
+**Built.** Signed-out pages inside the SPA (decision D4), in a new `src/web/src/features/public/`:
+- `/` signed out: the landing page (name, one-line pitch, three feature cards, "Start free", "Try the demo", a link to
+  pricing). The note under the buttons says plainly that the demo is one shared account everyone can see and that it resets
+  every night. With no connection at all, `/` still shows it, with the demo button off and "Signing in and the demo need a
+  connection."
+- `/pricing`: Free and Premium cards and a comparison table, every number worked out from `plans.json`, a copy of
+  `GET /api/plans` (L5's `Plans`). "Premium is coming with the mobile apps ... It cannot be bought yet."
+- `/privacy` and `/terms`: the L10 drafts (#40 had merged), drawn by a small Markdown renderer (`legalText.ts` parses,
+  `Markdown.tsx` draws React elements, never HTML strings), including the "DRAFT — not legal advice" line at the top.
+- Per-route `document.title`, `description` and Open Graph tags (`usePageMeta`), put back when the page goes.
+Routing: `App.tsx` now has the router outermost. `/pricing`, `/privacy` and `/terms` sit outside `SessionGate`, so they render
+for anyone, signed in or out, without asking the server, and offline from the precached shell (the service worker already
+serves `index.html` for any navigation outside `/api`, `/auth`, `/health`, so `vite.config.ts` is unchanged). Everything else
+goes through `SessionGate` as before; signed out, `/` is the landing page and any other path is the existing sign-in screen
+(`/signin?error=...` unchanged).
+
+**Choices the plan left open.**
+- The pages read copies kept in the SPA (`plans.json`, `legal/privacy.md`, `legal/terms.md`) instead of fetching, because the
+  Docker image builds the SPA from `src/web` alone (docs/ is in `.dockerignore`) and the pages must work offline.
+  `tests/Budget.Api.Tests/PublicPagesTests.cs` keeps them honest in CI: `plans.json` must equal what `GET /api/plans` serves,
+  and each legal copy must equal `docs/legal/<file>` up to the "Claims and where they are true" heading. That section (the
+  claims table and the list of things in the code that cut against the policy, including the SQL firewall rule) is Ricky's
+  working notes, so it is left out of the copy and never ships in the bundle. **After editing `docs/legal`, copy the text
+  above that heading into `src/web/src/features/public/legal/`**, or CI fails.
+- "Start free" goes to `/signin`, where Google's own "Continue with Google" button is (MASTER 8), rather than putting a second,
+  differently worded Google button on the landing page. One extra tap.
+- No screenshots on the landing page (the plan's section 3 mentions them; the brief did not). Add them once the UI settles.
+- Open Graph tags are set from script, so link previews from crawlers that run no JavaScript still see `index.html`'s
+  defaults. A static page or server-side tags would be needed for rich previews (the D4 trade-off).
+- Legal text and the pages are in the entry chunk (about 25 KB more); fine for now.
+
+**Outside the Owns line.** `features/auth/auth.test.tsx` and `features/onboarding/onboarding.test.tsx` now wrap
+`SessionGate` in a router (it reads the path); `auth.test.tsx` starts at `/signin` instead of `/`.
+
+**Not verified here.** The C# test runs in CI only. Not checked in a browser against MASTER 14 (themes, 360/430px, 200% text,
+standalone mode); the pages use only tokens and the existing button styles.
+
+**What Ricky must do.** Fill in the legal placeholders and approve the drafts (L10), then re-copy them as above. Once live, add
+`/privacy` and `/` to the Google OAuth consent screen.
