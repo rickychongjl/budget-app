@@ -65,6 +65,7 @@ public sealed class MeTests
         await sut.Invoking(s => s.UpdateAsync(new UpdateMeRequest("  ", null))).Should().ThrowAsync<ValidationException>();
         await sut.Invoking(s => s.UpdateAsync(new UpdateMeRequest(new string('x', 101), null))).Should().ThrowAsync<ValidationException>();
         (await sut.Invoking(s => s.UpdateAsync(new UpdateMeRequest(null, "Mars/Olympus_Mons"))).Should().ThrowAsync<DomainException>()).Which.Code.Should().Be("user.timezone.unknown");
+        (await sut.Invoking(s => s.UpdateAsync(new UpdateMeRequest(null, "AUS Eastern Standard Time"))).Should().ThrowAsync<DomainException>()).Which.Code.Should().Be("user.timezone.unknown");
         _store.Saves.Should().Be(0);
     }
 

@@ -75,12 +75,15 @@ The "Try the demo" button opens one shared demo account that anyone can use with
 - **Anything you type in the demo can be seen by other visitors.** Don't enter real or personal information there.
 - The demo is wiped and reset every night, and anything typed there is deleted.
 - A demo session ends after four hours.
+- The demo account can't be deleted.
 
 ## On your device
 
 So the app works with no signal, it keeps a copy of your budget on your device. This copy includes your budget figures, transactions and notes, and any changes you made offline that haven't been sent yet.
 
 - **When you sign out**, the copy of your budget is removed from that device. Changes that haven't been sent yet are kept until you sign back in and they are sent, or until someone else signs in on that device, when they are deleted.
+- **If your session ends on its own** (it expires, or you signed out somewhere else), the copy is removed the next time the app reaches our server, in the same way.
+- **When you delete your account** in the app, the copy and any unsent changes are removed from that device too.
 - **If you just close the app**, the copy stays so you can open it offline later.
 - The device also remembers a few preferences that never leave it: light or dark theme, your favourite and last-used categories, your chart filter, and whether you dismissed the install hint. These stay after you sign out.
 
@@ -123,16 +126,16 @@ We may also share information if the law requires it, for example under a court 
 ## How long we keep it
 
 - **While you have an account:** we keep your data so the app can show your history.
-- **When you delete your account:** your account and every budget, category, cycle and transaction are deleted from the live database straight away. This cannot be undone.
+- **When you delete your account:** your account and every budget, category, cycle and transaction, and any record of your plan, are deleted from the live database straight away, all together. This cannot be undone.
 - **Backups:** the database is backed up automatically so it can be restored to any moment in the last 7 days. Deleted data stays in these backups until they expire, normally within 7 days and at most about two weeks. If we ever restore a backup, we will delete again any account that was deleted after that backup was made.
-- **Request records:** kept for 30 days, then deleted. They don't contain your email or budget figures.
+- **Request records:** kept for 30 days, then deleted. They don't contain your email or budget figures. Deleting your account doesn't delete them early; they expire on the same 30-day schedule.
 - **Emails you send us:** kept as long as we need them to help you. [Ricky to confirm.]
 
 ## Your choices and rights
 
 - **See and correct your data.** Everything you type is in the app, and you can edit it there. Change your display name and time zone in Settings. Your email comes from Google; change it there and we'll pick it up next time you sign in.
-- **Export it.** In Settings you can download all your data as CSV files (they open in Excel or Google Sheets) and as one JSON file.
-- **Delete it.** In Settings you can delete your account. You type a confirmation, and everything is deleted immediately. If you sign in again with the same Google account, you start with a new, empty account.
+- **Export it.** In Settings you can download all your data as one ZIP file: CSV files of your profile, cycles, categories and transactions (they open in Excel or Google Sheets), and one JSON file with everything. This needs a connection.
+- **Delete it.** In Settings you can delete your account. You type DELETE to confirm, and everything is deleted immediately and you are signed out. If you sign in again with the same Google account, you start with a new, empty account.
 - **Ask us.** Email support@tightarse.app to ask what we hold about you, or for help with any of the above. We will reply within 30 days.
 
 We don't charge for any of this.

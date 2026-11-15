@@ -33,11 +33,23 @@ export function SessionGate({ children }: { children: ReactNode }) {
     staleTime: Infinity,
   })
 
-  // A 401 from any request means the session has gone (expired, or signed out in another tab).
-  useEffect(() => {
-    onUnauthorized(() => client.setQueryData(ME, null))
-    return () => onUnauthorized(() => undefined)
+  // Nothing of this user's is left on screen or on disk for the next person on this device: cached answers in IndexedDB,
+  // the service worker's copy of /api/me, and the queries in memory. The outbox is kept: it is theirs if they sign back
+  // in, and configureOutbox discards it if someone else does. The anti-forgery token belonged to the old session.
+  const forget = useCallback(async () => {
+    resetCsrf()
+    client.setQueryData(ME, null)
+    client.removeQueries({ predicate: (query) => query.queryKey[0] !== ME[0] })
+    await Promise.all([db.cache.clear(), clearSessionCache()])
   }, [client])
+
+  // A 401 from any request means the session has gone (expired, or signed out in another tab). It is forgotten the way
+  // sign-out forgets it, so an expired session does not leave the last person's budget readable on the device, and the
+  // worker's cached /api/me cannot reopen the app offline for a session the server has ended.
+  useEffect(() => {
+    onUnauthorized(() => void forget())
+    return () => onUnauthorized(() => undefined)
+  }, [forget])
 
   // Either way the anti-forgery token was issued to whoever the caller was before, so it is dropped.
   const signedIn = useCallback(async () => {
@@ -45,20 +57,15 @@ export function SessionGate({ children }: { children: ReactNode }) {
     await client.invalidateQueries({ queryKey: ME })
   }, [client])
 
+  // A deleted account never signs back in, so then the outbox goes too.
   const signOut = useCallback(
     async ({ accountDeleted = false }: SignOutOptions = {}) => {
       if (!accountDeleted) {
         await api.post('/auth/logout')
       }
-      resetCsrf()
-      client.setQueryData(ME, null)
-      // Nothing of this user's is left on screen or on disk for the next person on this device. The outbox is kept: it is
-      // theirs if they sign back in, and configureOutbox discards it if someone else does. A deleted account never signs
-      // back in, so then it goes too.
-      client.removeQueries({ predicate: (query) => query.queryKey[0] !== ME[0] })
-      await Promise.all([db.cache.clear(), clearSessionCache(), accountDeleted && db.outbox.clear()])
+      await Promise.all([forget(), accountDeleted && db.outbox.clear()])
     },
-    [client],
+    [forget],
   )
 
   const session = useMemo(() => (me.data ? { me: me.data, signOut } : null), [me.data, signOut])

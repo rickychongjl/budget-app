@@ -54,7 +54,7 @@ Premium is not on sale yet. When it is, these terms apply.
 
 None of this limits your rights under the Australian Consumer Law (see below). If you think something is wrong with Premium, email us as well.
 
-**If you stop paying.** If your Premium ends, you go back to Free. We don't delete anything: data beyond the Free limits becomes read-only until you upgrade again or remove it yourself.
+**If you stop paying.** If your Premium ends, you go back to Free. We don't delete anything: you keep every category and can still edit or remove them, but you can't add more than the Free plan allows, and older past cycles are left off the Cycles page (they stay in your account and your export) until you upgrade again.
 
 **Price changes.** If we change the price, we will tell you before it applies to you, and the store will ask for or notify you of the change under its rules. You can cancel before the new price starts.
 

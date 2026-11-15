@@ -47,12 +47,16 @@ public sealed class User
     }
 
     // Changes what "today" is from now on. Stored cycles keep their dates; only which one is current can shift.
-    public void ChangeTimeZone(string timeZone) => TimeZone = Known(timeZone);
+    // IANA ids only. The system also resolves a Windows id ("AUS Eastern Standard Time"), but the web app's "today" reads the
+    // zone with Intl, which knows only IANA ids and would fall back to UTC, so the two ends would disagree about the date.
+    // The constructor checks only that the zone exists, because EF builds every stored row through it.
+    public void ChangeTimeZone(string timeZone) =>
+        TimeZone = TimeZoneInfo.TryFindSystemTimeZoneById(timeZone, out var zone) && zone.HasIanaId ? timeZone : throw Unknown(timeZone);
 
     private static string Known(string timeZone) =>
-        TimeZoneInfo.TryFindSystemTimeZoneById(timeZone, out _)
-            ? timeZone
-            : throw new DomainException("user.timezone.unknown", $"'{timeZone}' is not a known IANA time zone.");
+        TimeZoneInfo.TryFindSystemTimeZoneById(timeZone, out _) ? timeZone : throw Unknown(timeZone);
+
+    private static DomainException Unknown(string timeZone) => new("user.timezone.unknown", $"'{timeZone}' is not a known IANA time zone.");
 
     // "Today" decides which cycle is current, so it is always the user's local date.
     public DateOnly Today(TimeProvider clock)

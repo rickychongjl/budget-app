@@ -231,4 +231,20 @@ describe('signed in', () => {
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Try the demo' })).toBeInTheDocument())
   })
+
+  // L12: an expired session is forgotten like a sign-out, so the last person's budget is not left readable on the device.
+  test('an expired session clears the cached reads and keeps the outbox', async () => {
+    const state = backend({ signedIn: true })
+    await seedDevice()
+    renderGate()
+    await screen.findByText('Hello Demo')
+
+    state.signedIn = false
+    const { api } = await import('../../api/client')
+    await api.get('/api/me').catch(() => undefined)
+
+    await waitFor(async () => expect(await db.cache.count()).toBe(0))
+    expect(await db.outbox.count()).toBe(1)
+    expect(state.logouts).toBe(0)
+  })
 })
