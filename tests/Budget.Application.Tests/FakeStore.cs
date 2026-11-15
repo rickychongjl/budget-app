@@ -4,13 +4,14 @@ namespace Budget.Application.Tests;
 
 // Every repository, the unit of work and the current user over plain lists. Tenant rows are filtered by the
 // current user like the real DbContext, so a use case that forgets whose data it is fails here too.
-internal sealed class FakeStore : ICurrentUser, IUnitOfWork, IUserRepository, ICycleRepository, ICategoryRepository, ITransactionRepository
+internal sealed class FakeStore : ICurrentUser, IUnitOfWork, IUserRepository, ICycleRepository, ICategoryRepository, ITransactionRepository, ISubscriptionRepository
 {
     public List<User> Users { get; } = [];
     public List<Cycle> Cycles { get; } = [];
     public List<Category> Categories { get; } = [];
     public List<CycleCategory> CycleCategories { get; } = [];
     public List<Transaction> Transactions { get; } = [];
+    public List<Subscription> Subscriptions { get; } = [];
 
     public Guid Id { get; set; }
     public int Saves { get; private set; }
@@ -25,9 +26,9 @@ internal sealed class FakeStore : ICurrentUser, IUnitOfWork, IUserRepository, IC
     // Thrown by the next DeleteAccountAsync before it changes anything: the real one is a single transaction.
     public Exception? FailNextAccountDelete { get; set; }
 
-    public User SignIn(string timeZone = "Australia/Sydney", bool isDemo = false)
+    public User SignIn(string timeZone = "Australia/Sydney", bool isDemo = false, string? email = null)
     {
-        var user = new User("Test", timeZone, "AUD", DateTimeOffset.UnixEpoch, isDemo: isDemo);
+        var user = new User("Test", timeZone, "AUD", DateTimeOffset.UnixEpoch, isDemo: isDemo, email: email);
         Users.Add(user);
         Id = user.Id;
         return user;
@@ -62,6 +63,7 @@ internal sealed class FakeStore : ICurrentUser, IUnitOfWork, IUserRepository, IC
         CycleCategories.RemoveAll(c => c.UserId == userId && c.UserId == Id);
         Cycles.RemoveAll(c => c.UserId == userId && c.UserId == Id);
         Categories.RemoveAll(c => c.UserId == userId && c.UserId == Id);
+        Subscriptions.RemoveAll(s => s.UserId == userId && s.UserId == Id);
         return Task.CompletedTask;
     }
 
@@ -83,6 +85,21 @@ internal sealed class FakeStore : ICurrentUser, IUnitOfWork, IUserRepository, IC
         Users.RemoveAll(u => u.Id == userId);
         Steps.Add("delete user");
     }
+
+    // The current user's plan as the use cases see it; complimentaryEmails is Plans:ComplimentaryPremiumEmails.
+    public Entitlements Entitlements(TimeProvider clock, string? complimentaryEmails = null) => new(this, this, this, new PlanSettings(complimentaryEmails), clock);
+
+    // An active subscription for the current user, so a test that is not about plans is not held to Free's limits.
+    public Subscription GoPremium(DateTimeOffset now)
+    {
+        var subscription = new Subscription(Id, SubscriptionSource.Manual, null, SubscriptionStatus.Active, null, null, now);
+        Subscriptions.Add(subscription);
+        return subscription;
+    }
+
+    Task<IReadOnlyList<Subscription>> ISubscriptionRepository.ListAsync(CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<Subscription>>([.. Subscriptions.Where(s => s.UserId == Id).OrderByDescending(s => s.CreatedAt)]);
+    public void Add(Subscription subscription) => Subscriptions.Add(subscription);
 
     Task<IReadOnlyList<Cycle>> ICycleRepository.ListAsync(CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<Cycle>>([.. Cycles.Where(c => c.UserId == Id).OrderBy(c => c.StartDate)]);

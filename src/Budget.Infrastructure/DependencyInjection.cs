@@ -18,5 +18,6 @@ public static class DependencyInjection
         .AddScoped<IUserRepository, UserRepository>()
         .AddScoped<ICycleRepository, CycleRepository>()
         .AddScoped<ICategoryRepository, CategoryRepository>()
-        .AddScoped<ITransactionRepository, TransactionRepository>();
+        .AddScoped<ITransactionRepository, TransactionRepository>()
+        .AddScoped<ISubscriptionRepository, SubscriptionRepository>();
 }

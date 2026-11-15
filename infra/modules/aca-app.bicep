@@ -11,6 +11,7 @@ param googleClientId string
 @secure()
 param googleClientSecret string
 param adoptLegacyUserEmail string
+param complimentaryPremiumEmails string
 param storageAccountName string
 param dataProtectionBlobUri string
 param appInsightsConnectionString string
@@ -61,6 +62,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             [
               { name: 'ConnectionStrings__Budget', secretRef: 'sql-connection' }
               { name: 'Auth__AdoptLegacyUserEmail', value: adoptLegacyUserEmail }
+              { name: 'Plans__ComplimentaryPremiumEmails', value: complimentaryPremiumEmails }
               { name: 'DataProtection__BlobUri', value: dataProtectionBlobUri }
               { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }
             ],

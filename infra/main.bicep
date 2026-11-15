@@ -35,6 +35,8 @@ param googleClientId string = ''
 param googleClientSecret string = ''
 @description('The verified email whose first Google sign-in takes over the original Entra-era account (Auth:AdoptLegacyUserEmail). Empty switches it off.')
 param adoptLegacyUserEmail string = ''
+@description('Comma-separated verified emails whose accounts get Premium without a subscription (Plans:ComplimentaryPremiumEmails). Empty grants nothing.')
+param complimentaryPremiumEmails string = ''
 
 @description('Custom domain, once its DNS points here (runbook step 6). Empty until then.')
 param customDomain string = ''
@@ -126,6 +128,7 @@ module app 'modules/aca-app.bicep' = {
     googleClientId: googleClientId
     googleClientSecret: googleClientSecret
     adoptLegacyUserEmail: adoptLegacyUserEmail
+    complimentaryPremiumEmails: complimentaryPremiumEmails
     storageAccountName: storage.outputs.name
     dataProtectionBlobUri: storage.outputs.dataProtectionBlobUri
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString

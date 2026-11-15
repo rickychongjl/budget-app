@@ -22,6 +22,8 @@ namespace Budget.Api.Tests;
 // each creates its own user, so the tenant filter keeps them apart.
 public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    public const string ComplimentaryEmail = "complimentary@plans.test";
+
     private readonly MsSqlContainer _container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
 
     public async Task InitializeAsync()
@@ -51,6 +53,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Google:ClientId", "");
         builder.UseSetting("Google:ClientSecret", "");
         builder.UseSetting("Auth:AdoptLegacyUserEmail", "");
+        // Fixed, so a developer's own address in user-secrets never makes a test user Premium. PlanTests use this one.
+        builder.UseSetting("Plans:ComplimentaryPremiumEmails", ComplimentaryEmail);
 
         builder.ConfigureTestServices(services => services
             .AddAuthentication(TestAuth.SchemeName)

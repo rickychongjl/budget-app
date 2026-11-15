@@ -48,6 +48,8 @@ public sealed class TenantIsolationTests(ApiFactory api)
         "GET /api/me/export",
         // Deletes the caller's account and nothing else; proved below by Deleting_my_account_leaves_everyone_else_alone.
         "DELETE /api/me",
+        // The plan catalogue: the same for everyone, signed in or not, and it reads no user data.
+        "GET /api/plans",
     ];
 
     // Takes ids, but answers 200 with a refusal per item rather than 404, so its attack lives in SyncTests.

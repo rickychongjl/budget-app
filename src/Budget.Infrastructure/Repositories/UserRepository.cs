@@ -34,6 +34,7 @@ public sealed class UserRepository(BudgetDbContext db) : IUserRepository
         await db.CycleCategories.Where(c => c.UserId == userId).ExecuteDeleteAsync(ct);
         await db.Cycles.Where(c => c.UserId == userId).ExecuteDeleteAsync(ct);
         await db.Categories.Where(c => c.UserId == userId).ExecuteDeleteAsync(ct);
+        await db.Subscriptions.Where(s => s.UserId == userId).ExecuteDeleteAsync(ct);
     }
 
     // The User row has no query filter, so this checks what the filter would: as anyone else, DeleteDataAsync deletes

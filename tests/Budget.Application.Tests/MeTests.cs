@@ -7,7 +7,7 @@ public sealed class MeTests
 {
     private readonly FakeStore _store = new();
 
-    private Me Sut() => new(_store, _store, _store);
+    private Me Sut() => new(_store, _store, _store, _store.Entitlements(TimeProvider.System));
 
     [Fact]
     public async Task Get_returns_the_current_users_profile()
@@ -16,7 +16,7 @@ public sealed class MeTests
 
         var me = await Sut().GetAsync();
 
-        me.Should().Be(new MeDto(user.Id, "Test", "Australia/Sydney", "AUD", IsDemo: true, CycleLengthDays: 30));
+        me.Should().Be(new MeDto(user.Id, "Test", "Australia/Sydney", "AUD", IsDemo: true, CycleLengthDays: 30, "premium", "demo", Plans.Premium));
     }
 
     [Fact]

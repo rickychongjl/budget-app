@@ -277,3 +277,39 @@ same facts.
 
 **Not verified here.** The deployed Azure region, the retention settings in the portal, and Cloudflare's dashboard settings are
 not in the repo.
+
+## L5 — Plans and entitlements · 15 Nov 2026 · PR into `multi-user`
+
+**Built.** Domain `Subscriptions/`: `Plans` is the one class holding D3's numbers (Free: 6 categories per cycle, the most
+recent past cycle in reports, no trend chart; Premium: no limits; A$3.99/month, A$29.99/year, 14-day trial; 3-day grace),
+`Subscription` (tenant row: `Source` `app_store`/`google_play`/`manual`, `ExternalId`, `Status`, `Plan`, `CurrentPeriodEnd`,
+`TrialEnd`, `CancelAtPeriodEnd`; stored as text codes with check constraints) and `Entitlement.Resolve` (demo → Premium,
+complimentary email → Premium, a subscription that still `GrantsPremium` → Premium, otherwise Free). Application
+`Subscriptions/`: `Entitlements` (per request, never stored), `PlanSettings`, `ISubscriptionRepository`, `PlanCatalogueDto`.
+Gates: `CycleCategories.AddAsync` refuses the 7th category on Free (`422 plan.limit.categories`); `Reports.ListAsync` trims
+`GET /api/reports/cycles` to the cycles Free may see. Downgrade never deletes: over-limit cycles keep every category, older
+cycles stay in the database, `GET /api/cycles` and the export. `GET /api/me` now carries `plan`, `planSource` and `limits`.
+New anonymous `GET /api/plans` returns the catalogue from `Plans` for the public pricing page (L9 reads it there).
+Migration `SubscriptionTable` (expand only). `Subscription` is in `UserRepository.DeleteDataAsync`. Rebased onto L4: account
+deletion removes `Subscription` rows, and L4's deletion tests at all three tiers now seed and check one. The check
+constraints compare in `Latin1_General_100_BIN2`, because the database's default collation ignores case and `Active`
+would otherwise be stored and then fail to read back. Web: `features/plans/`
+(Plan section in Settings, `PremiumNote`), category limit note and lock in Categories, locked trend on Cycles for Free.
+
+**Departures and choices.**
+- Store sources (`app_store`, `google_play`, `manual`) instead of `stripe`, per section 6 (paid product is a native app).
+- `Plans:ComplimentaryPremiumEmails` (comma-separated, matched to the verified `User.Email`) gives an account Premium without
+  a subscription, so Ricky's own account, which has more than six categories and months of history, is not cut down to Free
+  at launch. This needed `infra/` (a Bicep parameter, the Container App env var, `PLANS_COMPLIMENTARY_PREMIUM_EMAILS` in
+  `prod.bicepparam`), outside the Owns line. Empty by default; no address is committed.
+- The demo is Premium (it shows every feature; `DemoCaps` still bounds it).
+- No purchase UI: "Premium is coming soon in the app".
+
+**Not verified here.** .NET builds and tests (including the hand-written migration against `MigrationTests`) run in CI only.
+UI not checked in a browser against MASTER 14.
+
+**What Ricky must do.** Before promoting to `main`, set `PLANS_COMPLIMENTARY_PREMIUM_EMAILS` (deploy env) to his Google
+address, or his own account becomes Free (it keeps its data, but can add no category past six and the Cycles page shows only
+the latest past cycle). Confirm the Free/Premium split.
+
+Work started by the L5 task agent; finished by the orchestrator after the agent stopped on a usage limit.

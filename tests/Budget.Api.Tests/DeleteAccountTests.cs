@@ -28,7 +28,8 @@ public sealed class DeleteAccountTests(ApiFactory api)
         cycle.Confirm();
         var category = new Category(user.Id, CategoryType.Debit, DateTimeOffset.UtcNow);
         await api.SeedAsync(user, cycle, category, new CycleCategory(cycle, category.Id, "Groceries", "shopping-cart", "blue", 0, 600m),
-            new Transaction(cycle, category.Id, 9m, cycle.StartDate, null, Guid.NewGuid(), DateTimeOffset.UtcNow));
+            new Transaction(cycle, category.Id, 9m, cycle.StartDate, null, Guid.NewGuid(), DateTimeOffset.UtcNow),
+            new Subscription(user.Id, SubscriptionSource.Manual, null, SubscriptionStatus.Active, null, null, DateTimeOffset.UtcNow));
         return user;
     }
 
@@ -68,6 +69,7 @@ public sealed class DeleteAccountTests(ApiFactory api)
         await using var asUser = new BudgetDbContext(options, new AsUser(user.Id));
         (await asUser.Cycles.AnyAsync()).Should().BeFalse();
         (await asUser.Transactions.AnyAsync()).Should().BeFalse();
+        (await asUser.Subscriptions.AnyAsync()).Should().BeFalse();
     }
 
     [Theory]

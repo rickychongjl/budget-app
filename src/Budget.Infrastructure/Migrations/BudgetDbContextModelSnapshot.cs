@@ -117,6 +117,64 @@ namespace Budget.Infrastructure.Migrations
                     b.ToTable("CycleCategory", (string)null);
                 });
 
+            modelBuilder.Entity("Budget.Domain.Subscription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("CancelAtPeriodEnd")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("CurrentPeriodEnd")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ExternalId")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<string>("Plan")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset?>("TrialEnd")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Source", "ExternalId")
+                        .IsUnique()
+                        .HasFilter("[ExternalId] IS NOT NULL");
+
+                    b.ToTable("Subscription", (string)null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Subscription_Plan", "[Plan] COLLATE Latin1_General_100_BIN2 IN ('premium')");
+
+                            t.HasCheckConstraint("CK_Subscription_Source", "[Source] COLLATE Latin1_General_100_BIN2 IN ('app_store', 'google_play', 'manual')");
+
+                            t.HasCheckConstraint("CK_Subscription_Status", "[Status] COLLATE Latin1_General_100_BIN2 IN ('trialing', 'active', 'past_due', 'cancelled', 'expired')");
+                        });
+                });
+
             modelBuilder.Entity("Budget.Domain.Transaction", b =>
                 {
                     b.Property<Guid>("Id")
@@ -237,6 +295,15 @@ namespace Budget.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("UserId", "CycleId")
                         .HasPrincipalKey("UserId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Budget.Domain.Subscription", b =>
+                {
+                    b.HasOne("Budget.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

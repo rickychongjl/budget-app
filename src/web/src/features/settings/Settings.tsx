@@ -17,6 +17,7 @@ import { Sheet } from '../../ui/Sheet'
 import { useToast } from '../../ui/useToast'
 import { useSession } from '../auth/useSession'
 import { useCurrentCycle } from '../home/useCurrentCycle'
+import { PlanSection } from '../plans/PlanSection'
 import styles from './Settings.module.css'
 import { saveFile } from './saveFile'
 
@@ -70,6 +71,8 @@ export function Settings() {
           <span className={styles.detail}>For the current cycle and the ones after it.</span>
         </Card>
       </section>
+
+      <PlanSection />
 
       {/* Only the current cycle's start can move (story "Settings 3"), and only once it is confirmed. Remounts when the
           saved date changes, so the field never shows a stale one. */}
