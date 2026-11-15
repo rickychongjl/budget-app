@@ -201,3 +201,79 @@ model, so whichever of L4 / L5 merges second is held to it.
 **Not verified here.** .NET builds and tests run in CI only. The sheet was not checked in a browser against MASTER 14.
 
 **What Ricky must do.** Nothing before merge. After promotion, delete a throwaway Google account end to end once.
+
+## L10 — Privacy policy and terms (drafts) · 15 Nov 2026 · branch `docs/l10-legal`
+
+**Built.** `docs/legal/privacy.md` and `docs/legal/terms.md`, plain-English drafts in short headed sections for reading on a
+phone. Both open with the "DRAFT — not legal advice" line. No code changed. Every claim was checked against the code on
+`multi-user` at `ed574fd` (after L1). `privacy.md` ends with a "Claims and where they are true" table (claim, file or setting,
+status) and a list of eight things in the code that cut against the policy. Remove both before publishing.
+
+**What the code check found** (details in the table and list at the end of `privacy.md`):
+- Region: `main.bicep` uses `resourceGroup().location`, and the runbook creates the group in `australiaeast`. The region is not
+  in code, so confirm it on the deployed resources.
+- Backups: `sql.bicep` sets no retention policy, so Azure's default 7-day point-in-time restore applies (Basic allows 1 to 7).
+  Backup storage is `Local`, so backups stay in the region. Azure keeps the full backup that a restore point depends on, so
+  deleted data can stay in backups past 7 days. The policy says "normally within 7 days and at most about two weeks".
+- Logs: Log Analytics `retentionInDays: 30`, and Application Insights is workspace-based, so request records last 30 days. They
+  are not deleted when an account is.
+- IP addresses: Application Insights keeps its default IP masking, so the IP is stored as `0.0.0.0` but city, state and country
+  are derived from it first. The policy discloses this. Behind Cloudflare and `UseForwardedHeaders` the location could be the
+  user's real one, so check it.
+- Cookies: `budget.session` (30 days sliding, 4 hours for the demo), `budget.csrf` (browser session), and the OpenID Connect
+  handler's short-lived correlation and nonce cookies. Nothing else in the app. Whether Cloudflare sets a cookie is not in the repo.
+- On the device: IndexedDB `budget` (cached answers and the outbox) and the service worker's `session` cache (`/api/me`). Sign-out
+  clears the cache, but the outbox stays until it syncs or another account signs in. `localStorage` preferences (theme,
+  favourite and last-used category ids, chart filter, install hint) survive sign-out. If a session simply expires, the copy stays.
+- The app's own log calls carry no personal data. EF Core logs SQL text at Information without values. An unhandled exception's
+  message could in theory echo a value.
+- The SQL firewall's `AllowAllWindowsAzureIps` rule admits any Azure-hosted caller. The policy says only that the database needs a
+  password, not that only the app can reach it.
+
+**Decisions taken (conservative, for Ricky to overrule).**
+- Minimum age is **18** in both documents. It is the safest choice: no question of a minor's capacity to contract or to subscribe,
+  and it keeps clear of the OAIC's Children's Online Privacy Code, which is being developed for services likely to be used by
+  under-18s. Google accounts are open to 13-year-olds in Australia, and nothing in the app checks age.
+- Export and delete are described as Settings features, which is true only after **L3 and L4**. If the policy is published
+  before then, say instead "email support@tightarse.app and we'll export or delete your data within 30 days", and Ricky must
+  do it by hand.
+- Premium, store billing and Sign in with Apple are all marked "planned". Billing, cancellation and refunds are left to the
+  Apple and Google terms, and the Australian Consumer Law guarantees are kept.
+- Liability: indirect loss is excluded, and otherwise liability is capped at the past 12 months' fees, all "to the extent
+  permitted by law". The ACL guarantees, fraud and deliberate wrongdoing are carved out. A lawyer should check the cap against
+  the unfair contract terms rules, which carry penalties since November 2023.
+- Notice periods: 14 days for significant changes to the terms, 30 days before the service closes. Requests are answered within
+  30 days (APP 12 asks for a "reasonable period"; the OAIC treats 30 days as the usual guide). The policy commits to telling users about a serious breach even if the business is exempt.
+- If a backup is ever restored, the policy commits to deleting again any account deleted after that backup was made. No code does
+  this; it is a manual step.
+- The terms include a short "App Store and Google Play" section for when the phone apps ship. Apple requires either its
+  Standard EULA or a custom EULA with its minimum terms. Pick one when L1b or L6 starts.
+
+**Open questions for Ricky.**
+1. **Legal name** for `[OPERATOR LEGAL NAME]`, and the **effective date**.
+2. **ABN**: do you have one, and should it appear? An ABN is optional for a sole trader, but it is useful once Premium
+   earns money.
+3. **Business name**: trading as "Tight Arse" under anything other than your own name generally means registering it as a
+   business name with ASIC. Also consider whether app store review will accept the name.
+4. **Refunds**: is it store refunds only, or will you also refund directly in some cases (for example the unused part of a year
+   if you close the service)? Terms "Ending" has a placeholder.
+5. **Minimum age**: keep 18, or allow 16 and 17 with a parent's permission?
+6. **Cloudflare cookies and logs**: is Bot Fight Mode or any feature on that sets `__cf_bm` or similar? Fill in or delete the
+   bracketed line under Cookies.
+7. **Support mailbox**: does `support@tightarse.app` exist, which provider hosts it, and how long are emails kept? The privacy
+   policy has a placeholder.
+8. **Application Insights location**: run `requests | take 20 | project client_City, client_IP` in App Insights. If it shows
+   users' cities and you would rather not keep them, a span processor that drops `client.address` removes them (a code change,
+   outside L10).
+9. **Commitments with no code behind them**: not selling data, the 30-day reply, breach notification, re-deleting after a
+   restore. Are you happy to be held to them?
+10. A lawyer's review before taking money, as the plan says.
+
+**What Ricky must do by hand.** Answer the questions above, fill in the placeholders, delete the claims table and the flags
+from `privacy.md`, and approve both documents (launch plan section 5). L9 then publishes them at `/privacy` and `/terms`. Once
+they are live: add the privacy policy and home page URLs to the Google OAuth consent screen (required before publishing it to
+External). When the phone apps ship, also fill in Apple's App Privacy details and Google Play's Data safety form from the
+same facts.
+
+**Not verified here.** The deployed Azure region, the retention settings in the portal, and Cloudflare's dashboard settings are
+not in the repo.
