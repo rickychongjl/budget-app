@@ -16,6 +16,11 @@ test('Onboarding 1 to 5: from nothing to a confirmed first cycle', async ({ page
     await page.goto('/')
     await page.getByRole('link', { name: 'Set up your first cycle' }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'Set up your budget' })).toBeVisible()
+    // A real first sign-in is asked for a name and time zone first (L2). The demo's profile is shared and read-only, so
+    // it goes straight to the cycle. The real-user path is covered by the web unit tests until a second user can sign
+    // in under Playwright (audit B7).
+    await expect(page.getByRole('heading', { level: 2, name: 'First, about you' })).toHaveCount(0)
+    await expect(page.getByLabel('Time zone')).toHaveCount(0)
   })
 
   await test.step('3 and 4: the start date and opening balance; the length is fixed', async () => {
