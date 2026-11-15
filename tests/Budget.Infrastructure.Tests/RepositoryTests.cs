@@ -5,15 +5,17 @@ namespace Budget.Infrastructure.Tests;
 [Collection(SqlServerCollection.Name)]
 public class RepositoryTests(SqlServerFixture sql)
 {
-    // Dated in the past, so "the oldest demo user" is the first one made here even if a job test has already made one with the real clock.
+    // Every test here shares one database, and others leave demo rows behind: the reset-demo job tests make one with the
+    // real clock, and the legacy-user test below makes one at TestData.Now. So this test dates its pair ten years before
+    // anything else in the suite; dating the first at TestData.Now tied with that legacy-test row and the result was a coin toss.
     [Fact]
     public async Task The_demo_user_is_the_oldest_user_flagged_as_demo()
     {
         await using var db = sql.NoUser();
         var users = new UserRepository(db);
 
-        var first = new User("Demo", "Australia/Sydney", "AUD", TestData.Now, isDemo: true);
-        var second = new User("Demo again", "Australia/Sydney", "AUD", TestData.Now.AddDays(1), isDemo: true);
+        var first = new User("Demo", "Australia/Sydney", "AUD", TestData.Now.AddYears(-10), isDemo: true);
+        var second = new User("Demo again", "Australia/Sydney", "AUD", TestData.Now.AddYears(-10).AddDays(1), isDemo: true);
         db.Users.AddRange(second, first);
         await db.SaveChangesAsync();
 

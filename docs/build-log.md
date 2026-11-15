@@ -149,3 +149,20 @@ Excel and Google Sheets is the plan's "done when" and needs a person.
 
 **What Ricky must do.** Download an export from Settings on a phone and a desktop, open the CSVs in Excel and Google Sheets,
 and check the iPhone home-screen app saves the file.
+
+## Fix — deterministic oldest-demo-user repository test · 15 Nov 2026 · PR into `multi-user`
+
+**Problem.** `RepositoryTests.The_demo_user_is_the_oldest_user_flagged_as_demo` failed intermittently (twice on #40). All
+Infrastructure tests share one database. The test made two demo users at `TestData.Now` and a day later and expected
+`GetDemoAsync` (oldest `CreatedAt` first) to return the first; since L1, `Legacy_users_are_the_non_demo_rows_whose_external_id_is_a_bare_oid`
+also leaves a demo user at `TestData.Now`, so the oldest was a tie and SQL Server picked either.
+
+**Changed.** Test only: the pair is now dated `TestData.Now.AddYears(-10)` and a day later, and the comment says why. Searched
+every test project for demo rows: in this database the only others are the legacy test (`TestData.Now`) and the reset-demo job
+tests (`DemoUser.EnsureExistsAsync` with the real clock, and only when no demo row exists yet); Api tests use their own container
+and the real clock and assert only `isDemo`, never which demo row. Nothing else is dated before 2026, so there is no new tie.
+
+**Decision.** `UserRepository.GetDemoAsync` is unchanged. Production has exactly one demo row (`migrate` ensures it), so adding
+`ThenBy(Id)` would only make an impossible tie pick an arbitrary-but-stable GUID, not a meaningful one.
+
+**What Ricky must do.** Nothing.
