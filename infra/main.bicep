@@ -29,13 +29,12 @@ param sqlAdminLogin string
 @secure()
 param sqlAdminPassword string
 
-@description('Entra sign-in. Leave empty for demo-only.')
-param entraTenantId string = ''
-param entraClientId string = ''
+@description('Google sign-in (docs/google_sign_in_setup.md). Leave empty for demo-only.')
+param googleClientId string = ''
 @secure()
-param entraClientSecret string = ''
-@description('Comma-separated Entra object ids allowed to sign in.')
-param allowedOids string = ''
+param googleClientSecret string = ''
+@description('The verified email whose first Google sign-in takes over the original Entra-era account (Auth:AdoptLegacyUserEmail). Empty switches it off.')
+param adoptLegacyUserEmail string = ''
 
 @description('Custom domain, once its DNS points here (runbook step 6). Empty until then.')
 param customDomain string = ''
@@ -124,10 +123,9 @@ module app 'modules/aca-app.bicep' = {
     environmentId: environment.outputs.id
     image: image
     sqlConnectionString: sqlConnectionString
-    entraTenantId: entraTenantId
-    entraClientId: entraClientId
-    entraClientSecret: entraClientSecret
-    allowedOids: allowedOids
+    googleClientId: googleClientId
+    googleClientSecret: googleClientSecret
+    adoptLegacyUserEmail: adoptLegacyUserEmail
     storageAccountName: storage.outputs.name
     dataProtectionBlobUri: storage.outputs.dataProtectionBlobUri
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
@@ -146,7 +144,6 @@ module jobs 'modules/aca-jobs.bicep' = {
     environmentId: environment.outputs.id
     image: image
     sqlConnectionString: sqlConnectionString
-    allowedOids: allowedOids
     actionGroupId: monitoring.outputs.actionGroupId
   }
 }

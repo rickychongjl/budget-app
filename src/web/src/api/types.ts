@@ -19,7 +19,7 @@ export type Me = {
 }
 
 // GET /auth/options
-export type SignInMethod = 'demo' | 'entra'
+export type SignInMethod = 'demo' | 'google'
 export type AuthOptions = { signIn: SignInMethod[] }
 
 // CycleDto

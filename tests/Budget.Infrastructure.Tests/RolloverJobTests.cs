@@ -29,7 +29,7 @@ public sealed class RolloverJobTests(SqlServerFixture sql)
             await db.SaveChangesAsync();
         }
 
-        await using var services = JobHost.BuildServices(sql.ConnectionString, allowedOids: null);
+        await using var services = JobHost.BuildServices(sql.ConnectionString);
 
         var exitCode = await JobHost.RolloverAsync(services);
 

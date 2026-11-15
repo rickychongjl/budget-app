@@ -88,6 +88,10 @@
   --cat-slate: #475569;
   /* 5 */
   --shadow-float: 0 8px 32px rgba(15, 23, 42, 0.16);
+  /* 8: Google's sign-in button, light theme (Google's values, not ours to change) */
+  --brand-google-fill: #ffffff;
+  --brand-google-stroke: #747775;
+  --brand-google-text: #1f1f1f;
 }
 
 :root[data-theme='dark'] {
@@ -122,4 +126,7 @@
   --cat-ochre: #facc15;
   --cat-slate: #cbd5e1;
   --shadow-float: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --brand-google-fill: #131314;
+  --brand-google-stroke: #8e918f;
+  --brand-google-text: #e3e3e3;
 }

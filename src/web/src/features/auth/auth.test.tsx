@@ -77,19 +77,39 @@ describe('signed out', () => {
     expect(title.parentElement!.querySelector('img[src="/favicon.svg"]')).toHaveAttribute('alt', '')
   })
 
-  test('offers Microsoft only when this deployment has it', async () => {
+  test('offers Google only when this deployment has it, and the demo is then the only action', async () => {
     backend({ signIn: ['demo'] })
     renderGate()
 
     await screen.findByRole('button', { name: 'Try the demo' })
-    expect(screen.queryByRole('link', { name: 'Sign in with Microsoft' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Continue with Google' })).not.toBeInTheDocument()
   })
 
-  test('Microsoft sign-in is a plain link to the server, which does the OpenID Connect round trip', async () => {
-    backend({ signIn: ['demo', 'entra'] })
+  test('Google sign-in is a plain link to the server, which does the OpenID Connect round trip', async () => {
+    backend({ signIn: ['demo', 'google'] })
     renderGate()
 
-    expect(await screen.findByRole('link', { name: 'Sign in with Microsoft' })).toHaveAttribute('href', '/auth/login')
+    const google = await screen.findByRole('link', { name: 'Continue with Google' })
+    expect(google).toHaveAttribute('href', '/auth/login')
+    // Google's "G" is part of the button, and adds nothing for a screen reader beyond the words.
+    expect(google.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  test('with Google offered it comes first, and the demo is still there under it', async () => {
+    backend({ signIn: ['demo', 'google'] })
+    renderGate()
+
+    const google = await screen.findByRole('link', { name: 'Continue with Google' })
+    const demo = screen.getByRole('button', { name: 'Try the demo' })
+    expect(google.compareDocumentPosition(demo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  test('there is no Microsoft sign-in any more', async () => {
+    backend({ signIn: ['demo', 'google'] })
+    renderGate()
+
+    await screen.findByRole('link', { name: 'Continue with Google' })
+    expect(screen.queryByText(/Microsoft/)).not.toBeInTheDocument()
   })
 
   test('Try the demo signs in with an anti-forgery token, then drops it because it was issued to nobody', async () => {
@@ -119,18 +139,19 @@ describe('signed out', () => {
   })
 })
 
-describe('a refused Microsoft sign-in lands on /signin?error=', () => {
+describe('a refused Google sign-in lands on /signin?error=', () => {
   test.each([
-    ['auth.not-allowed', "This account isn't allowed to use this app."],
+    ['auth.email-unverified', "Your Google account's email address isn't verified yet. Verify it with Google, then try again."],
     ['auth.failed', "The sign-in didn't complete. Please try again."],
     ['something.new', "The sign-in didn't complete. Please try again."],
   ])('%s', async (code, message) => {
     history.replaceState(null, '', `/signin?error=${code}`)
-    backend({ signIn: ['demo', 'entra'] })
+    backend({ signIn: ['demo', 'google'] })
     renderGate()
 
     expect(await screen.findByRole('alert')).toHaveTextContent(message)
     // The way forward is still there.
+    expect(await screen.findByRole('link', { name: 'Continue with Google' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Try the demo' })).toBeInTheDocument()
   })
 })

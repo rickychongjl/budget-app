@@ -13,7 +13,7 @@ if (string.IsNullOrWhiteSpace(connectionString))
     return 2;
 }
 
-await using var services = JobHost.BuildServices(connectionString, Environment.GetEnvironmentVariable("Auth__AllowedOids")?.Split(','));
+await using var services = JobHost.BuildServices(connectionString);
 
 switch (args)
 {
@@ -21,13 +21,12 @@ switch (args)
         await using (var scope = services.CreateAsyncScope())
         {
             await scope.ServiceProvider.GetRequiredService<BudgetDbContext>().Database.MigrateAsync();
-            // The app never creates users, so the rows a session signs in as have to exist before the API starts:
-            // the demo user, and one per allowlisted Entra oid.
+            // A demo session only looks its row up, so it has to exist before the API starts.
+            // Real users are created by their first sign-in (Login), not here.
             await scope.ServiceProvider.GetRequiredService<DemoUser>().EnsureExistsAsync();
-            await scope.ServiceProvider.GetRequiredService<RealUsers>().EnsureExistAsync();
         }
 
-        Console.WriteLine("Migrations applied; users present.");
+        Console.WriteLine("Migrations applied; demo user present.");
         // A first deploy should not show an empty demo until the nightly reset.
         return await JobHost.ResetDemoAsync(services, onlyIfEmpty: true);
 

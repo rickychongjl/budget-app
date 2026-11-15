@@ -88,12 +88,14 @@ public sealed class BudgetDbContext(DbContextOptions<BudgetDbContext> options, I
         {
             b.ToTable("User");
             b.Property(x => x.Id).ValueGeneratedNever();
-            b.Property(x => x.ExternalId).HasMaxLength(64);
+            b.Property(x => x.ExternalId).HasMaxLength(ExternalIdentity.MaxLength);
             b.Property(x => x.DisplayName).HasMaxLength(100);
             b.Property(x => x.IsDemo);
             b.Property(x => x.TimeZone).HasMaxLength(64);
             b.Property(x => x.Currency).HasMaxLength(3);
             b.Property(x => x.CreatedAt);
+            // The longest address SMTP allows. Nullable: Apple can withhold it, and rows from before Google sign-in have none.
+            b.Property(x => x.Email).HasMaxLength(254);
             b.HasIndex(x => x.ExternalId).IsUnique();
         });
 

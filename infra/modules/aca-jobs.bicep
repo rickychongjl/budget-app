@@ -8,7 +8,6 @@ param environmentId string
 param image string
 @secure()
 param sqlConnectionString string
-param allowedOids string
 param actionGroupId string
 
 // command is the Budget.Jobs argument (src/Budget.Jobs/Program.cs). It is not the resource name: the demo job is
@@ -43,7 +42,6 @@ resource job 'Microsoft.App/jobs@2024-03-01' = [for j in jobs: {
           resources: { cpu: json('0.25'), memory: '0.5Gi' }
           env: [
             { name: 'ConnectionStrings__Budget', secretRef: 'sql-connection' }
-            { name: 'Auth__AllowedOids', value: allowedOids }
           ]
         }
       ]

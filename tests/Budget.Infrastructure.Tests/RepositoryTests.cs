@@ -37,6 +37,47 @@ public class RepositoryTests(SqlServerFixture sql)
         (await users.ListAsync()).Select(u => u.Id).Should().Contain([user.Id, other.Id]);
     }
 
+    // Other tests in this database leave bare-oid rows behind, so this checks membership rather than an exact list.
+    [Fact]
+    public async Task Legacy_users_are_the_non_demo_rows_whose_external_id_is_a_bare_oid()
+    {
+        var legacy = await sql.NewUserAsync(Guid.NewGuid().ToString());
+        var qualified = await sql.NewUserAsync("google:" + Guid.NewGuid().ToString("N"));
+        var unlinked = await sql.NewUserAsync();
+        var demo = new User("Demo", "Australia/Sydney", "AUD", TestData.Now, isDemo: true);
+        await using (var write = sql.NoUser())
+        {
+            write.Users.Add(demo);
+            await write.SaveChangesAsync();
+        }
+
+        await using var db = sql.NoUser();
+        var ids = (await new UserRepository(db).ListLegacyAsync()).Select(u => u.Id).ToList();
+
+        ids.Should().Contain(legacy.Id).And.NotContain([qualified.Id, unlinked.Id, demo.Id]);
+    }
+
+    // The sign-in path in one go: a re-pointed ExternalId and a new Email are saved like any other change.
+    [Fact]
+    public async Task A_relinked_user_keeps_its_id_and_saves_the_new_external_id_and_email()
+    {
+        var user = await sql.NewUserAsync(Guid.NewGuid().ToString());
+        var googleId = "google:" + new string('9', 255);
+
+        await using (var db = sql.NoUser())
+        {
+            var row = (await new UserRepository(db).GetAsync(user.Id))!;
+            row.LinkTo(googleId);
+            row.ChangeEmail("someone@example.com");
+            await db.SaveChangesAsync();
+        }
+
+        await using var read = sql.NoUser();
+        var found = (await new UserRepository(read).GetByExternalIdAsync(googleId))!;
+        found.Id.Should().Be(user.Id);
+        found.Email.Should().Be("someone@example.com");
+    }
+
     [Fact]
     public async Task A_user_added_through_the_repository_is_saved_by_the_unit_of_work()
     {
