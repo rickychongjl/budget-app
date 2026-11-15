@@ -75,12 +75,15 @@ The "Try the demo" button opens one shared demo account that anyone can use with
 - **Anything you type in the demo can be seen by other visitors.** Don't enter real or personal information there.
 - The demo is wiped and reset every night, and anything typed there is deleted.
 - A demo session ends after four hours.
+- The demo account can't be deleted.
 
 ## On your device
 
 So the app works with no signal, it keeps a copy of your budget on your device. This copy includes your budget figures, transactions and notes, and any changes you made offline that haven't been sent yet.
 
 - **When you sign out**, the copy of your budget is removed from that device. Changes that haven't been sent yet are kept until you sign back in and they are sent, or until someone else signs in on that device, when they are deleted.
+- **If your session ends on its own** (it expires, or you signed out somewhere else), the copy is removed the next time the app reaches our server, in the same way.
+- **When you delete your account** in the app, the copy and any unsent changes are removed from that device too.
 - **If you just close the app**, the copy stays so you can open it offline later.
 - The device also remembers a few preferences that never leave it: light or dark theme, your favourite and last-used categories, your chart filter, and whether you dismissed the install hint. These stay after you sign out.
 
@@ -123,16 +126,16 @@ We may also share information if the law requires it, for example under a court 
 ## How long we keep it
 
 - **While you have an account:** we keep your data so the app can show your history.
-- **When you delete your account:** your account and every budget, category, cycle and transaction are deleted from the live database straight away. This cannot be undone.
+- **When you delete your account:** your account and every budget, category, cycle and transaction, and any record of your plan, are deleted from the live database straight away, all together. This cannot be undone.
 - **Backups:** the database is backed up automatically so it can be restored to any moment in the last 7 days. Deleted data stays in these backups until they expire, normally within 7 days and at most about two weeks. If we ever restore a backup, we will delete again any account that was deleted after that backup was made.
-- **Request records:** kept for 30 days, then deleted. They don't contain your email or budget figures.
+- **Request records:** kept for 30 days, then deleted. They don't contain your email or budget figures. Deleting your account doesn't delete them early; they expire on the same 30-day schedule.
 - **Emails you send us:** kept as long as we need them to help you. [Ricky to confirm.]
 
 ## Your choices and rights
 
 - **See and correct your data.** Everything you type is in the app, and you can edit it there. Change your display name and time zone in Settings. Your email comes from Google; change it there and we'll pick it up next time you sign in.
-- **Export it.** In Settings you can download all your data as CSV files (they open in Excel or Google Sheets) and as one JSON file.
-- **Delete it.** In Settings you can delete your account. You type a confirmation, and everything is deleted immediately. If you sign in again with the same Google account, you start with a new, empty account.
+- **Export it.** In Settings you can download all your data as one ZIP file: CSV files of your profile, cycles, categories and transactions (they open in Excel or Google Sheets), and one JSON file with everything. This needs a connection.
+- **Delete it.** In Settings you can delete your account. You type DELETE to confirm, and everything is deleted immediately and you are signed out. If you sign in again with the same Google account, you start with a new, empty account.
 - **Ask us.** Email support@tightarse.app to ask what we hold about you, or for help with any of the above. We will reply within 30 days.
 
 We don't charge for any of this.
@@ -205,9 +208,9 @@ For Ricky's review; remove this section before publishing. "L-n" is the launch-p
 | Cloudflare in front of the app | `infra/parameters/prod.bicepparam` `restrictIngressToCloudflare = true`; `Edge.cs` | True today |
 | Demo is shared, reset nightly, caps | `infra/modules/aca-jobs.bicep` `demo-reset` cron `0 17 * * *` (03:00 AEST); `Users/ResetDemo.cs`; `Users/DemoCaps.cs` | True today |
 | Accounts kept separate | `BudgetDbContext.cs` query filter and `EnforceTenant()`; `tests/Budget.Api.Tests/TenantIsolationTests.cs` | True today |
-| Export as CSV and JSON | L3 (`GET /api/me/export`) | True after L3 |
-| Delete account: immediate hard delete after typed confirmation | L4 (`DELETE /api/me`); `UserRepository.DeleteDataAsync` already exists | True after L4 |
-| Signing in again after deletion starts a new account | `Login.cs` provisions on unknown subject; L4 removes the row | True after L4 |
+| Export as a ZIP of CSV files and one JSON file | L3 (`GET /api/me/export`, `Application/Export/`) | True today (L3, #42) |
+| Delete account: immediate hard delete after typed confirmation, plan records included, signed out | L4 (`DELETE /api/me`, `Users/DeleteAccount.cs`, `UserRepository.DeleteAccountAsync` in one transaction); `Subscription` in `DeleteDataAsync` (L5) | True today (L4, #43) |
+| Signing in again after deletion starts a new account | `Login.cs` provisions on unknown subject; L4 removes the row; `GoogleSignInTests` | True today (L4, #43) |
 | Plans and Premium purchases through Apple and Google | L5 (entitlements), L6 to L8 (store billing, parked) | True after L5 and L6 to L8 |
 | Contact address works | `support@tightarse.app` mailbox (launch plan section 5) | Ricky to confirm |
 | Reply within 30 days; breach notice | Commitments, no code | Ricky to confirm |
@@ -218,7 +221,7 @@ For Ricky's review; remove this section before publishing. "L-n" is the launch-p
 1. **Approximate location in telemetry.** Application Insights derives city, state and country from the client IP for each request, then stores `0.0.0.0` as the IP. The policy discloses this. Whether the location is the user's or an Azure address depends on whether the OpenTelemetry distro sends `client.address` (behind Cloudflare and `UseForwardedHeaders` it would be the user's real IP). Check with `requests | take 20 | project client_City, client_IP` in App Insights. If it is the user's city and Ricky does not want it, a span processor that drops `client.address` removes it (outside this task).
 2. **Telemetry outlives account deletion.** Request records are kept 30 days and are not touched by account deletion. They carry no email, name or amounts, but URLs carry cycle and transaction ids. The policy says records last 30 days; it does not say they are deleted with the account.
 3. **Framework logs.** Beyond the app's own log calls, ASP.NET Core and EF Core write to console logs (sent to Log Analytics) and App Insights. EF logs SQL text at Information, without parameter values. An unhandled exception is logged with its message; a SQL Server error message can echo a value (for example a truncated string). Validation caps lengths, so this should not happen in practice, but "never" is not guaranteed by code.
-4. **Device copy outlives a session.** If a session expires or the account is deleted on another device, the copy on this device stays until someone signs out or another account signs in there. The policy tells users to sign out on shared devices. L4 could clear the device copy on the deleting device; other devices keep theirs until next opened.
+4. **Device copy outlives a session.** Resolved for the online case by L4 and L12: deleting the account clears the deleting device (outbox included), and any 401 (session expired, signed out elsewhere, account deleted elsewhere) now clears the cached copy and the service worker's `/api/me` the next time the app reaches the server. A device that stays offline keeps its copy until then.
 5. **Preferences survive sign-out.** Favourite and last-used category ids, theme and chart filter stay in `localStorage`. They are ids, not names or amounts. Disclosed.
 6. **Backups beyond 7 days.** Azure keeps the full backup a restore point depends on, so deleted data can sit in backups longer than 7 days. The policy says "normally within 7 days and at most about two weeks".
 7. **Database firewall.** `sql.bicep`'s `AllowAllWindowsAzureIps` rule admits connections from any Azure-hosted resource, including other Azure customers', so the password is the real barrier. The policy says only that the database needs a password; it does not claim the database is reachable only by the app.

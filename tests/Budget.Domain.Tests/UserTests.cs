@@ -29,6 +29,33 @@ public class UserTests
         act.Should().Throw<DomainException>().Which.Code.Should().Be("user.timezone.unknown");
     }
 
+    // L12 (from L2's note): the server and the web app must agree on "today", and the web app knows only IANA ids.
+    [Theory]
+    [InlineData("AUS Eastern Standard Time")]
+    [InlineData("W. Australia Standard Time")]
+    public void A_windows_time_zone_id_is_refused_as_a_change(string windowsId)
+    {
+        var user = Sydney();
+
+        var change = () => user.ChangeTimeZone(windowsId);
+
+        change.Should().Throw<DomainException>().Which.Code.Should().Be("user.timezone.unknown");
+        user.TimeZone.Should().Be("Australia/Sydney");
+    }
+
+    [Theory]
+    [InlineData("Australia/Perth")]
+    [InlineData("Etc/UTC")]
+    [InlineData("Australia/Lord_Howe")]
+    public void Iana_ids_are_accepted(string ianaId)
+    {
+        var user = Sydney();
+
+        user.ChangeTimeZone(ianaId);
+
+        user.TimeZone.Should().Be(ianaId);
+    }
+
     [Fact]
     public void Real_user_has_an_external_id_and_demo_user_does_not()
     {

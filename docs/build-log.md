@@ -355,3 +355,38 @@ standalone mode); the pages use only tokens and the existing button styles.
 
 **What Ricky must do.** Fill in the legal placeholders and approve the drafts (L10), then re-copy them as above. Once live, add
 `/privacy` and `/` to the Google OAuth consent screen.
+
+## L12 — Security pass · 15 Nov 2026 · PR into `multi-user`
+
+**Built.** `docs/security-review.md`: every route added by L1 to L9 checked for auth, antiforgery, rate limit and tenant
+isolation, plus open redirects on sign-in, logs, CSP, demo handling, dependencies and the privacy flags from L10. Fifteen
+findings: two fixed here, four open for Ricky (S2, S11, S12, S13), the rest OK.
+
+**Fixed (small, with tests).**
+- **S4, time zones (L2's note).** `User.ChangeTimeZone` now accepts only IANA ids (`TimeZoneInfo.HasIanaId`), so a Windows id
+  sent by hand is refused with `user.timezone.unknown`. The constructor still checks only that the zone exists, because EF
+  materialises stored rows through it and an existing row must always load. Tests: `UserTests`, `MeTests`.
+- **S10, device copy after a session ends (L10 flag 4).** Any 401 now forgets the session the way sign-out does: cached reads
+  in IndexedDB, in-memory queries, the service worker's `/api/me` and the antiforgery token. The outbox is kept, as on sign-out.
+  Test: `auth.test.tsx`. (`features/auth/SessionGate.tsx` is outside L12's Owns line beyond "small hardening fixes"; the change
+  only moves sign-out's clearing into a shared `forget` and calls it on 401.)
+
+**docs/legal corrected for factual accuracy** (as asked; wording and tone otherwise untouched; the SPA copies re-synced):
+- privacy, "The demo account": added "The demo account can't be deleted." (L4 refuses it.)
+- privacy, "On your device": added what happens when a session ends on its own (S10) and when the account is deleted (L4 clears
+  the copy and unsent changes on that device).
+- privacy, "How long we keep it": deletion also removes plan records (L5's `Subscription` in `DeleteDataAsync`) and happens all
+  together (one transaction); request records are not deleted early by account deletion (S11).
+- privacy, "Your choices and rights": export is one ZIP with CSV files of profile, cycles, categories and transactions plus one
+  JSON file, and needs a connection (L3); deletion is confirmed by typing DELETE and signs you out (L4).
+- privacy, claims table and flag 4: L3/L4 rows now "True today", flag 4 marked resolved for the online case.
+- terms, "If you stop paying": "becomes read-only" was wrong for L5. Over-limit categories stay editable and removable (only
+  adding is blocked), and older past cycles are left off the Cycles page but kept in the account and the export.
+- Backups: what the drafts say still matches the code (L3/L4 do not touch backups); no change.
+
+**Open for Ricky** (details in `docs/security-review.md` section 3): S2 no daily cap on new accounts per address; S11 request
+records outlive deletion by up to 30 days; S12 `AllowAllWindowsAzureIps` on the SQL server; S13 approximate location in
+Application Insights.
+
+**Not verified here.** .NET tests run in CI only. `HasIanaId` behaviour was checked locally against the .NET 10 runtime
+(`Australia/Sydney` true, `AUS Eastern Standard Time` false). NuGet vulnerability audit runs only in CI.
