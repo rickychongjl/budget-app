@@ -25,6 +25,7 @@ public sealed class DeleteAccountTests
         _store.Categories.Add(category);
         _store.CycleCategories.Add(new CycleCategory(cycle, category.Id, "Groceries", "shopping-cart", "blue", 0, 600m));
         _store.Transactions.Add(new Transaction(cycle, category.Id, 12m, cycle.StartDate, null, Guid.NewGuid(), DateTimeOffset.UnixEpoch));
+        _store.Subscriptions.Add(new Subscription(user.Id, SubscriptionSource.Manual, null, SubscriptionStatus.Active, null, null, DateTimeOffset.UnixEpoch));
     }
 
     private User Bystander()
@@ -50,6 +51,7 @@ public sealed class DeleteAccountTests
         _store.Categories.Should().BeEmpty();
         _store.CycleCategories.Should().BeEmpty();
         _store.Transactions.Should().BeEmpty();
+        _store.Subscriptions.Should().BeEmpty();
     }
 
     [Fact]
@@ -66,6 +68,7 @@ public sealed class DeleteAccountTests
         _store.Categories.Should().ContainSingle().Which.UserId.Should().Be(other.Id);
         _store.CycleCategories.Should().ContainSingle().Which.UserId.Should().Be(other.Id);
         _store.Transactions.Should().ContainSingle().Which.UserId.Should().Be(other.Id);
+        _store.Subscriptions.Should().ContainSingle().Which.UserId.Should().Be(other.Id);
     }
 
     [Theory]

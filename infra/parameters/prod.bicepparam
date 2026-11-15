@@ -18,6 +18,7 @@ param sqlAdminPassword = readEnvironmentVariable('SQL_ADMIN_PASSWORD')
 param googleClientId = readEnvironmentVariable('GOOGLE_CLIENT_ID', '')
 param googleClientSecret = readEnvironmentVariable('GOOGLE_CLIENT_SECRET', '')
 param adoptLegacyUserEmail = readEnvironmentVariable('AUTH_ADOPT_LEGACY_USER_EMAIL', '')
+param complimentaryPremiumEmails = readEnvironmentVariable('PLANS_COMPLIMENTARY_PREMIUM_EMAILS', '')
 
 // Runbook steps 6 to 8 (docs/plans/m9-infra.md) fill these in, in that order.
 param customDomain = 'tightarse.app'

@@ -3,7 +3,10 @@ using FluentValidation;
 
 namespace Budget.Application;
 
-public sealed record MeDto(Guid Id, string DisplayName, string TimeZone, string Currency, bool IsDemo, int CycleLengthDays);
+// Plan is "free" or "premium"; PlanSource says why Premium ("demo", "complimentary", "subscription") and is null on Free.
+// Limits are the effective plan's (Plans), so the SPA can draw locks; the server enforces them either way.
+public sealed record MeDto(
+    Guid Id, string DisplayName, string TimeZone, string Currency, bool IsDemo, int CycleLengthDays, string Plan, string? PlanSource, PlanLimits Limits);
 
 // A null field is left as it is.
 public sealed record UpdateMeRequest(string? DisplayName, string? TimeZone);
@@ -23,9 +26,13 @@ internal sealed class UpdateMeValidator : AbstractValidator<UpdateMeRequest>
     }
 }
 
-public sealed class Me(ICurrentUser currentUser, IUserRepository users, IUnitOfWork unitOfWork)
+public sealed class Me(ICurrentUser currentUser, IUserRepository users, IUnitOfWork unitOfWork, Entitlements entitlements)
 {
-    public async Task<MeDto> GetAsync(CancellationToken ct = default) => ToDto(await FindAsync(ct));
+    public async Task<MeDto> GetAsync(CancellationToken ct = default)
+    {
+        var user = await FindAsync(ct);
+        return ToDto(user, await entitlements.ForAsync(user, ct));
+    }
 
     public async Task<MeDto> UpdateAsync(UpdateMeRequest request, CancellationToken ct = default)
     {
@@ -49,11 +56,20 @@ public sealed class Me(ICurrentUser currentUser, IUserRepository users, IUnitOfW
         }
 
         await unitOfWork.SaveChangesAsync(ct);
-        return ToDto(user);
+        return ToDto(user, await entitlements.ForAsync(user, ct));
     }
 
     private async Task<User> FindAsync(CancellationToken ct) =>
         await users.GetAsync(currentUser.Id, ct) ?? throw new NotFoundException("user.not-found", "User not found.");
 
-    private static MeDto ToDto(User user) => new(user.Id, user.DisplayName, user.TimeZone, user.Currency, user.IsDemo, Cycle.LengthInDays);
+    private static MeDto ToDto(User user, Entitlement entitlement) => new(
+        user.Id,
+        user.DisplayName,
+        user.TimeZone,
+        user.Currency,
+        user.IsDemo,
+        Cycle.LengthInDays,
+        entitlement.Plan.ToString().ToLowerInvariant(),
+        entitlement.Source?.ToString().ToLowerInvariant(),
+        entitlement.Limits);
 }

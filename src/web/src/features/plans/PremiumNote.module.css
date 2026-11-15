@@ -1,0 +1,15 @@
+.note {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: start;
+  gap: var(--space-2);
+}
+
+.title {
+  font: var(--text-heading);
+}
+
+.text {
+  font: var(--text-label);
+  color: var(--color-text-muted);
+}

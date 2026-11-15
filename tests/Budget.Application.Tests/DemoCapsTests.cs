@@ -11,7 +11,7 @@ public sealed class DemoCapsTests
 
     private CycleFinder Finder() => new(_store, new UserToday(_store, _store, _clock));
     private DemoCaps Caps() => new(_store, _store, _store, _store);
-    private CycleCategories Categories() => new(_store, _store, _store, _store, Finder(), Caps(), _clock);
+    private CycleCategories Categories() => new(_store, _store, _store, _store, Finder(), Caps(), _store.Entitlements(_clock), _clock);
     private Transactions Transactions() => new(_store, _store, _store, Finder(), Caps(), _clock);
 
     private (Cycle Cycle, Guid CategoryId) Seed(bool isDemo, int categories = 1, int transactions = 0)
@@ -88,6 +88,8 @@ public sealed class DemoCapsTests
     public async Task A_real_user_is_never_capped()
     {
         var real = Seed(isDemo: false, categories: 20, transactions: 500);
+        // Premium, so Free's own category limit (EntitlementsTests) does not get in the way of what this test is about.
+        _store.GoPremium(Now);
 
         await Categories().AddAsync(real.Cycle.Id, NewCategory);
         var result = await Transactions().CreateAsync(Spend(real.Cycle, real.CategoryId, new string('x', 280)));

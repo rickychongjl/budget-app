@@ -26,7 +26,7 @@ public sealed class SyncTests
         var clock = new FixedClock(Now);
         var finder = new CycleFinder(_store, new UserToday(_store, _store, clock));
         var caps = new DemoCaps(_store, _store, _store, _store);
-        return new Sync(new Transactions(_store, _store, _store, finder, caps, clock), new CycleCategories(_store, _store, _store, _store, finder, caps, clock), _store);
+        return new Sync(new Transactions(_store, _store, _store, finder, caps, clock), new CycleCategories(_store, _store, _store, _store, finder, caps, _store.Entitlements(clock), clock), _store);
     }
 
     private SyncItem Create(Guid clientId, decimal amount = 10m) =>

@@ -16,6 +16,8 @@ import { IconChip } from '../../ui/IconChip'
 import { Skeleton } from '../../ui/Skeleton'
 import { useSession } from '../auth/useSession'
 import { useCycle } from '../cycles/useCycle'
+import { categoriesLeft, limitsOf } from '../plans/plan'
+import { PremiumNote } from '../plans/PremiumNote'
 import styles from './Categories.module.css'
 import { CategorySheet } from './CategorySheet'
 
@@ -94,6 +96,10 @@ export function CategoryList({ cycleId, online }: { cycleId: string; online: boo
   const cycle = useCycle(cycleId)
   const [editing, setEditing] = useState<CategoryRollup | 'new' | null>(null)
   const rows = cycle.data?.rollup.categories ?? []
+  // The Free plan's limit is per cycle; the server refuses the next one (plan.limit.categories), this only says so first.
+  // A cycle already over it (a downgraded user) keeps every row, and editing and removing them still work.
+  const max = limitsOf(me).maxCategoriesPerCycle
+  const full = categoriesLeft(me, rows.length) === 0
 
   // The rollup is in sort order but does not carry the numbers, so a move renumbers the whole cycle to its new order.
   // That is exact whatever the stored values were. Through the outbox: reordering works offline (design section 7).
@@ -158,9 +164,20 @@ export function CategoryList({ cycleId, online }: { cycleId: string; online: boo
       })}
 
       {cycle.data && (
-        <Button variant="secondary" icon={Plus} disabled={!online} onClick={() => setEditing('new')}>
+        <Button variant="secondary" icon={Plus} disabled={!online || full} onClick={() => setEditing('new')}>
           Add category
         </Button>
+      )}
+      {cycle.data && max !== null && !full && (
+        <p className={styles.reason}>
+          {rows.length} of {max} categories on the Free plan.
+        </p>
+      )}
+      {cycle.data && max !== null && full && (
+        <PremiumNote title={`Up to ${max} categories in a cycle`}>
+          {rows.length > max ? `This cycle has ${rows.length}, more than the ${max} the Free plan allows.` : `This cycle has all ${max} the Free plan allows.`} Every category stays
+          and can still be edited or removed. Premium has no limit.
+        </PremiumNote>
       )}
       {/* Said plainly, not hidden and not left to fail on tap (design section 7). */}
       {!online && <p className={styles.reason}>Adding or removing a category needs a connection.</p>}

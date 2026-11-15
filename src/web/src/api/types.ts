@@ -8,7 +8,14 @@ export type CycleStatus = 'Draft' | 'Confirmed'
 export type CyclePhase = 'Past' | 'Current' | 'Future'
 export type RollupStatus = 'OnTrack' | 'Over' | 'Ahead'
 
-// MeDto
+// PlanLimits (Budget.Domain/Subscriptions/Plans.cs). null means no limit.
+export type PlanLimits = { maxCategoriesPerCycle: number | null; pastCyclesInReports: number | null; trendChart: boolean }
+export type PlanName = 'free' | 'premium'
+// Why the plan is Premium; null on Free.
+export type PremiumSource = 'demo' | 'complimentary' | 'subscription'
+
+// MeDto. The plan fields are optional only because an answer the service worker cached before plans existed has none;
+// features/plans/plan.ts reads them so that a missing answer locks nothing (the server still enforces the plan).
 export type Me = {
   id: string
   displayName: string
@@ -16,6 +23,16 @@ export type Me = {
   currency: string
   isDemo: boolean
   cycleLengthDays: number
+  plan?: PlanName
+  planSource?: PremiumSource | null
+  limits?: PlanLimits
+}
+
+// PlanCatalogueDto: GET /api/plans, public. Prices are for display; the stores charge.
+export type PlanCatalogue = {
+  free: PlanLimits
+  premium: PlanLimits
+  premiumPrice: { currency: string; monthly: number; yearly: number; trialDays: number }
 }
 
 // GET /auth/options

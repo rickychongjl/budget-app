@@ -15,7 +15,8 @@ public sealed class DeleteAccountTests(SqlServerFixture sql)
         var cycle = TestData.Confirmed(user);
         var category = new Category(user.Id, CategoryType.Debit, TestData.Now);
         await using var db = sql.ContextFor(user);
-        db.AddRange(cycle, category, TestData.Groceries(cycle, category), new Transaction(cycle, category.Id, 10m, TestData.Jan1, "mine", Guid.NewGuid(), TestData.Now));
+        db.AddRange(cycle, category, TestData.Groceries(cycle, category), new Transaction(cycle, category.Id, 10m, TestData.Jan1, "mine", Guid.NewGuid(), TestData.Now),
+            new Subscription(user.Id, SubscriptionSource.AppStore, "txn-" + Guid.NewGuid(), SubscriptionStatus.Active, TestData.Now.AddDays(30), null, TestData.Now));
         await db.SaveChangesAsync();
     }
 
@@ -53,7 +54,7 @@ public sealed class DeleteAccountTests(SqlServerFixture sql)
         await SeedAsync(bystander);
         var bystanderBefore = await TenantRowsAsync(bystander.Id);
         var userBefore = await TenantRowsAsync(user.Id);
-        userBefore.Should().ContainKeys("Cycle", "Category", "CycleCategory", "Transaction");
+        userBefore.Should().ContainKeys("Cycle", "Category", "CycleCategory", "Transaction", "Subscription");
         userBefore.Values.Should().OnlyContain(n => n > 0, "otherwise this test would prove nothing for that table");
 
         await using (var db = sql.ContextFor(user))
