@@ -199,6 +199,37 @@ public sealed class GoogleSignInTests(ApiFactory api)
         (await b.GetFromJsonAsync<JsonElement>("/api/cycles")).GetArrayLength().Should().Be(0);
     }
 
+    // Decision D5 and L4: a deleted account is gone for good. The same Google account signing in again is a stranger to the
+    // database, so Login provisions a brand-new, empty user.
+    [Fact]
+    public async Task After_deleting_the_account_the_same_google_sign_in_starts_a_fresh_empty_one()
+    {
+        var subject = NewSubject();
+        var tokens = new TokenEndpoint();
+        await using var host = Host(tokens);
+        var client = host.CsrfClient(Https);
+        await SignInAsync(client, tokens, subject);
+        var firstId = (await client.GetFromJsonAsync<JsonElement>("/api/me")).GetProperty("id").GetGuid();
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeBySystemTimeZoneId(DateTime.UtcNow, "Australia/Sydney"));
+        (await client.PostAsJsonAsync("/api/cycles", new { startDate = today.ToString("yyyy-MM-dd") })).StatusCode.Should().Be(HttpStatusCode.Created);
+        (await client.GetFromJsonAsync<JsonElement>("/api/cycles")).GetArrayLength().Should().Be(1);
+
+        var deleted = await client.SendAsync(DeleteAccountTests.Delete(DeleteAccountTests.Confirmed));
+
+        deleted.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        DeleteAccountTests.ShouldClearTheSession(deleted);
+        (await client.GetAsync("/api/me")).StatusCode.Should().Be(HttpStatusCode.Unauthorized, "the session cookie went with the account");
+        (await UserByExternalIdAsync("google:" + subject)).Should().BeNull();
+
+        await SignInAsync(client, tokens, subject);
+
+        var me = await client.GetFromJsonAsync<JsonElement>("/api/me");
+        me.GetProperty("id").GetGuid().Should().NotBe(firstId);
+        me.GetProperty("displayName").GetString().Should().Be("Someone Real");
+        (await client.GetFromJsonAsync<JsonElement>("/api/cycles")).GetArrayLength().Should().Be(0);
+        (await UserByExternalIdAsync("google:" + subject))!.Id.Should().Be(me.GetProperty("id").GetGuid());
+    }
+
     // The original account, still keyed by its Entra oid, is taken over by its owner's first Google sign-in.
     // The other adoption cases (wrong email, ambiguous rows, already linked) are in LoginTests and LegacyAccountAdoptionTests.
     [Fact]

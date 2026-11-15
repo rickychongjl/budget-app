@@ -4,7 +4,8 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { resetCsrf } from '../../api/client'
-import type { Me, SignInMethod } from '../../api/types'
+import type { Me, SignInMethod, SyncItem } from '../../api/types'
+import { db } from '../../offline/db'
 import { server } from '../../test/server'
 import { SessionGate } from './SessionGate'
 import { useSession } from './useSession'
@@ -17,8 +18,11 @@ function Inside() {
   return (
     <>
       <p>Hello {me.displayName}</p>
-      <button type="button" onClick={signOut}>
+      <button type="button" onClick={() => void signOut()}>
         Sign out
+      </button>
+      <button type="button" onClick={() => void signOut({ accountDeleted: true })}>
+        Account deleted
       </button>
     </>
   )
@@ -26,7 +30,7 @@ function Inside() {
 
 // signedIn is mutable so a handler can flip it, the way the server's cookie would.
 function backend({ signIn = ['demo'] as SignInMethod[], signedIn = false } = {}) {
-  const state = { signedIn, demoTokens: [] as (string | null)[], csrfFetches: 0 }
+  const state = { signedIn, demoTokens: [] as (string | null)[], csrfFetches: 0, logouts: 0 }
   server.use(
     http.get('/auth/options', () => HttpResponse.json({ signIn })),
     http.get('/auth/csrf', () => HttpResponse.json({ token: `token-${++state.csrfFetches}` })),
@@ -37,6 +41,7 @@ function backend({ signIn = ['demo'] as SignInMethod[], signedIn = false } = {})
       return new HttpResponse(null, { status: 204 })
     }),
     http.post('/auth/logout', () => {
+      state.logouts += 1
       state.signedIn = false
       return new HttpResponse(null, { status: 204 })
     }),
@@ -55,7 +60,9 @@ function renderGate() {
   )
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  await db.cache.clear()
+  await db.outbox.clear()
   resetCsrf()
   history.replaceState(null, '', '/')
 })
@@ -172,6 +179,40 @@ describe('signed in', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Sign out' }))
 
     expect(await screen.findByRole('button', { name: 'Try the demo' })).toBeInTheDocument()
+  })
+
+  // Both clear what this device holds about the person. Only sign-out keeps the outbox, for when they come back.
+  async function seedDevice() {
+    await db.cache.put({ key: 'cycles', userId: 'u1', json: [], at: 1 })
+    await db.outbox.add({ userId: 'u1', item: { type: 'transaction.delete', clientId: 't1' } satisfies SyncItem })
+  }
+
+  test('sign out clears the cached reads and keeps the outbox', async () => {
+    backend({ signedIn: true })
+    await seedDevice()
+    renderGate()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Sign out' }))
+
+    expect(await screen.findByRole('button', { name: 'Try the demo' })).toBeInTheDocument()
+    await waitFor(async () => expect(await db.cache.count()).toBe(0))
+    expect(await db.outbox.count()).toBe(1)
+  })
+
+  test('after the account is deleted it signs out locally only, and the outbox goes too', async () => {
+    const state = backend({ signedIn: true })
+    await seedDevice()
+    renderGate()
+    await screen.findByText('Hello Demo')
+
+    // The server ended the session when it deleted the account.
+    state.signedIn = false
+    await userEvent.click(await screen.findByRole('button', { name: 'Account deleted' }))
+
+    expect(await screen.findByRole('button', { name: 'Try the demo' })).toBeInTheDocument()
+    await waitFor(async () => expect(await db.outbox.count()).toBe(0))
+    expect(await db.cache.count()).toBe(0)
+    expect(state.logouts).toBe(0)
   })
 
   test('a session that expires mid-use drops back to sign-in', async () => {

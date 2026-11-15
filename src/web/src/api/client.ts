@@ -110,6 +110,6 @@ export const api = {
   get: <T>(path: string) => send<T>('GET', path),
   post: <T = void>(path: string, body?: unknown) => send<T>('POST', path, body),
   patch: <T = void>(path: string, body?: unknown) => send<T>('PATCH', path, body),
-  delete: <T = void>(path: string) => send<T>('DELETE', path),
+  delete: <T = void>(path: string, body?: unknown) => send<T>('DELETE', path, body),
   download,
 }

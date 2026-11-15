@@ -10,7 +10,7 @@ import { EmptyState } from '../../ui/EmptyState'
 import { Skeleton } from '../../ui/Skeleton'
 import styles from './SignIn.module.css'
 import { SignIn } from './SignIn'
-import { SessionContext } from './useSession'
+import { SessionContext, type SignOutOptions } from './useSession'
 
 const ME = ['me']
 
@@ -42,15 +42,21 @@ export function SessionGate({ children }: { children: ReactNode }) {
     await client.invalidateQueries({ queryKey: ME })
   }, [client])
 
-  const signOut = useCallback(async () => {
-    await api.post('/auth/logout')
-    resetCsrf()
-    client.setQueryData(ME, null)
-    // Nothing of this user's is left on screen or on disk for the next person on this device. The outbox is kept: it is
-    // theirs if they sign back in, and configureOutbox discards it if someone else does.
-    client.removeQueries({ predicate: (query) => query.queryKey[0] !== ME[0] })
-    await Promise.all([db.cache.clear(), clearSessionCache()])
-  }, [client])
+  const signOut = useCallback(
+    async ({ accountDeleted = false }: SignOutOptions = {}) => {
+      if (!accountDeleted) {
+        await api.post('/auth/logout')
+      }
+      resetCsrf()
+      client.setQueryData(ME, null)
+      // Nothing of this user's is left on screen or on disk for the next person on this device. The outbox is kept: it is
+      // theirs if they sign back in, and configureOutbox discards it if someone else does. A deleted account never signs
+      // back in, so then it goes too.
+      client.removeQueries({ predicate: (query) => query.queryKey[0] !== ME[0] })
+      await Promise.all([db.cache.clear(), clearSessionCache(), accountDeleted && db.outbox.clear()])
+    },
+    [client],
+  )
 
   const session = useMemo(() => (me.data ? { me: me.data, signOut } : null), [me.data, signOut])
 

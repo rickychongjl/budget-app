@@ -166,3 +166,38 @@ and the real clock and assert only `isDemo`, never which demo row. Nothing else 
 `ThenBy(Id)` would only make an impossible tie pick an arbitrary-but-stable GUID, not a meaningful one.
 
 **What Ricky must do.** Nothing.
+
+## L4 — Delete my account · 15 Nov 2026 · PR into `multi-user`
+
+**Built.** `DELETE /api/me` with body `{ "confirm": "DELETE" }` (under `/api`, so antiforgery-checked). Application:
+`Users/DeleteAccount.cs` refuses anything but the typed word (`422 account.delete.unconfirmed`; surrounding spaces forgiven,
+case not), refuses the demo (`422 demo.account.undeletable`), then calls `IBilling.CancelForDeletionAsync` (new port in
+`Application/Billing/`, registered as the no-op `NoBilling` in Infrastructure until a store integration replaces it), then
+`IUserRepository.DeleteAccountAsync`. That runs `DeleteDataAsync` and deletes the `User` row in one database transaction inside
+the EF execution strategy, so a failure leaves the account whole and a retry starts again from the top. It refuses unless the
+scope is running as that user, because the `User` table has no query filter. An account that is already gone returns
+`AlreadyGone` and the endpoint still answers 204 and clears the session cookie. Log lines carry no ids.
+Settings → Account: "Delete account" (destructive button) opens a Sheet that says what goes, offers "Export my data first",
+and enables Delete only once `DELETE` is typed; disabled offline with "needs a connection". On success the device is cleared
+the way sign-out clears it, without posting `/auth/logout` (the server already ended the session), and the offline outbox is
+dropped too. The demo sees "The demo is shared, so it can't be deleted." instead of the button.
+
+**Tests.** Application (order: billing, data, user; confirmation; demo; already gone; failure part-way then retry);
+Infrastructure (every table with a `UserId`, read from the EF model so a tenant table added later and forgotten fails, holds no
+row for the deleted user; bystander untouched; rollback when the `User` delete fails; refusing another user's account); API
+(204 + cookie cleared, 422s, demo, 400 without antiforgery, 401 signed out, repeat delete); `TenantIsolationTests` lists the
+route with an attack; `GoogleSignInTests` proves the same Google account signing in again gets a fresh empty account. Web:
+the sheet and the local-only sign-out.
+
+**Outside the Owns line.** `features/auth/SessionGate.tsx` and `useSession.ts` (sign-out takes `{ accountDeleted }`), and
+`api/client.ts` (`api.delete` takes an optional body). `BudgetDbContext.CurrentUserId` became `internal` so the repository can
+apply the same rule to the `User` row.
+
+**Assumptions.** The confirmation word is `DELETE` in capitals. Deleting also drops queued offline changes on that device.
+Request logs and Application Insights telemetry are not touched by deletion (for L12 and the privacy policy).
+The `Subscription` table from L5 must also be in `DeleteDataAsync`; the Infrastructure test enumerates tenant tables from the
+model, so whichever of L4 / L5 merges second is held to it.
+
+**Not verified here.** .NET builds and tests run in CI only. The sheet was not checked in a browser against MASTER 14.
+
+**What Ricky must do.** Nothing before merge. After promotion, delete a throwaway Google account end to end once.

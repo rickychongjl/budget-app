@@ -1,4 +1,7 @@
 using Budget.Application;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Budget.Api;
 
@@ -24,5 +27,15 @@ internal static class MeEndpoints
             response.Headers.CacheControl = "no-store";
             return Results.Stream(archive, ExportArchive.ContentType);
         }).RequireRateLimiting(RateLimiting.ExportPolicy);
+
+        // Decision D5: gone at once, after the person types the confirmation. Under the /api group, so antiforgery-checked.
+        // The body is optional to the binder so that a missing one is refused like a wrong word (422 with the code), not as
+        // an unreadable request. The session ends whether the account was deleted now or was already gone.
+        api.MapDelete("/me", async ([FromBody] DeleteAccountRequest? request, DeleteAccount deleteAccount, HttpContext context, CancellationToken ct) =>
+        {
+            await deleteAccount.RunAsync(request, ct);
+            await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return Results.NoContent();
+        });
     }
 }

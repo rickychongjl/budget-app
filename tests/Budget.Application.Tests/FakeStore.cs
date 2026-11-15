@@ -19,6 +19,12 @@ internal sealed class FakeStore : ICurrentUser, IUnitOfWork, IUserRepository, IC
     // Runs when FailNextSave fires: stands in for what the real unit of work and a concurrent writer do to the store.
     public Action? OnFailedSave { get; set; }
 
+    // What DeleteAccountAsync did, in order, alongside anything else a test records here (such as a billing call).
+    public List<string> Steps { get; } = [];
+
+    // Thrown by the next DeleteAccountAsync before it changes anything: the real one is a single transaction.
+    public Exception? FailNextAccountDelete { get; set; }
+
     public User SignIn(string timeZone = "Australia/Sydney", bool isDemo = false)
     {
         var user = new User("Test", timeZone, "AUD", DateTimeOffset.UnixEpoch, isDemo: isDemo);
@@ -57,6 +63,25 @@ internal sealed class FakeStore : ICurrentUser, IUnitOfWork, IUserRepository, IC
         Cycles.RemoveAll(c => c.UserId == userId && c.UserId == Id);
         Categories.RemoveAll(c => c.UserId == userId && c.UserId == Id);
         return Task.CompletedTask;
+    }
+
+    async Task IUserRepository.DeleteAccountAsync(Guid userId, CancellationToken ct)
+    {
+        if (userId != Id)
+        {
+            throw new InvalidOperationException("An account can only be deleted by a scope running as that user.");
+        }
+
+        if (FailNextAccountDelete is { } failure)
+        {
+            FailNextAccountDelete = null;
+            throw failure;
+        }
+
+        await ((IUserRepository)this).DeleteDataAsync(userId, ct);
+        Steps.Add("delete data");
+        Users.RemoveAll(u => u.Id == userId);
+        Steps.Add("delete user");
     }
 
     Task<IReadOnlyList<Cycle>> ICycleRepository.ListAsync(CancellationToken ct) =>
