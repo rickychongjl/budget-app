@@ -40,6 +40,21 @@ public sealed class MeTests
         _store.Saves.Should().Be(2);
     }
 
+    [Theory]
+    [InlineData("Australia/Perth")]
+    [InlineData("Australia/Brisbane")]
+    [InlineData("Australia/Lord_Howe")]
+    public async Task First_run_saves_the_name_and_the_device_time_zone_in_one_go(string timeZone)
+    {
+        var user = _store.SignIn();
+
+        var me = await Sut().UpdateAsync(new UpdateMeRequest("Sam", timeZone));
+
+        me.Should().BeEquivalentTo(new { DisplayName = "Sam", TimeZone = timeZone });
+        user.TimeZone.Should().Be(timeZone);
+        _store.Saves.Should().Be(1);
+    }
+
     [Fact]
     public async Task Update_rejects_an_empty_request_a_blank_name_and_an_unknown_time_zone()
     {

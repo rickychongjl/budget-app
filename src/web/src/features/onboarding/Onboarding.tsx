@@ -1,9 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { CircleAlert, CloudOff } from 'lucide-react'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router'
-import { api } from '../../api/client'
-import type { Cycle } from '../../api/types'
+import { api, ProblemError } from '../../api/client'
+import type { Cycle, Me } from '../../api/types'
 import { addDays, formatDate, todayIn } from '../../format/dates'
 import { parseMoney } from '../../format/money'
 import { useCachedQuery } from '../../offline/useCachedQuery'
@@ -17,13 +17,19 @@ import { useSession } from '../auth/useSession'
 import { CategoryList } from '../categories/Categories'
 import { useCycle } from '../cycles/useCycle'
 import styles from './Onboarding.module.css'
+import { TimeZoneField } from './TimeZoneField'
+import { detectTimeZone } from './timeZones'
 
 // /onboarding: stories "Onboarding 1 to 5". The first cycle is a Draft until it is confirmed, and takes no transactions
 // until then. The draft has to exist before a category can be added to it, so the start date and opening balance come
 // first; the draft is saved on the server at each step, so leaving and coming back picks up where it was left.
 // Everything here needs a connection: there is no cycle id to queue anything against until the server has made one.
+// Before any of it, a new user confirms their name and time zone (AboutYou), because the time zone decides "today" and
+// so the suggested start date and which cycle is current.
 export function Onboarding() {
+  const { me } = useSession()
   const cycles = useCachedQuery<Cycle[]>(['cycles', 'list'], () => api.get<Cycle[]>('/api/cycles'))
+  const [profileSaved, setProfileSaved] = useState(false)
 
   if (cycles.isError) {
     return (
@@ -48,13 +54,114 @@ export function Onboarding() {
     return <Navigate to="/" replace />
   }
 
+  // Only before the first cycle exists: anyone with a draft is past this, or signed up before it was asked. The demo's
+  // profile is shared and read-only (demo.profile.readonly). The step is not remembered across a reload; asking again
+  // before there is a cycle costs one tap, and remembering it would need a server flag.
+  if (cycles.data.length === 0 && !me.isDemo && !profileSaved) {
+    return (
+      <Screen title="Set up your budget">
+        <AboutYou onSaved={() => setProfileSaved(true)} />
+      </Screen>
+    )
+  }
+
   const draft = cycles.data.find((cycle) => cycle.status === 'Draft')
   return (
     <Screen title="Set up your budget">
-      {/* Remounts when the draft first appears, so the form starts from what the server saved. */}
-      <Start key={draft?.id ?? 'new'} draft={draft} />
+      {/* Remounts when the draft first appears, so the form starts from what the server saved, and when the saved zone
+          changes (AboutYou's answer reaches the session a moment after it is saved), so "today" is the new zone's. */}
+      <Start key={`${draft?.id ?? 'new'}:${me.timeZone}`} draft={draft} />
       {draft && <Finish draft={draft} />}
     </Screen>
+  )
+}
+
+type ProfileErrors = { displayName?: string; timeZone?: string }
+
+function AboutYou({ onSaved }: { onSaved: () => void }) {
+  const { me } = useSession()
+  const client = useQueryClient()
+  const online = useOnline()
+  const nameField = useRef<HTMLInputElement>(null)
+  const zoneField = useRef<HTMLSelectElement>(null)
+  // Read once: the suggestion should not move under the user while they are choosing.
+  const [detected] = useState(detectTimeZone)
+  const keep = useMemo(() => [me.timeZone, ...(detected ? [detected] : [])], [me.timeZone, detected])
+  const [displayName, setDisplayName] = useState(me.displayName)
+  const [timeZone, setTimeZone] = useState(detected ?? me.timeZone)
+  const [errors, setErrors] = useState<ProfileErrors>({})
+  const [problem, setProblem] = useState<string>()
+
+  const save = useMutation({
+    mutationFn: (body: { displayName: string; timeZone: string }) => api.patch<Me>('/api/me', body),
+    onSuccess: (saved) => {
+      // The session's copy at once, then a fresh GET, which also replaces the service worker's cached answer.
+      client.setQueryData(['me'], saved)
+      onSaved()
+      void client.invalidateQueries({ queryKey: ['me'] })
+    },
+    onError: (error: Error) => {
+      // The browser's zone list can be newer than the server's tz database.
+      if (error instanceof ProblemError && error.code === 'user.timezone.unknown') {
+        setErrors({ timeZone: "The server doesn't recognise this time zone. Choose a nearby city." })
+        zoneField.current?.focus()
+        return
+      }
+      setProblem(error.message)
+    },
+  })
+
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    setProblem(undefined)
+    const name = displayName.trim()
+    if (!name) {
+      setErrors({ displayName: 'Enter your name.' })
+      return nameField.current?.focus()
+    }
+    setErrors({})
+    // Both, even if unchanged: the stored values came from the sign-in token and a default, not from the user.
+    save.mutate({ displayName: name, timeZone })
+  }
+
+  return (
+    <form className={styles.section} onSubmit={submit} noValidate>
+      <h2 className={styles.heading}>First, about you</h2>
+      <p className={styles.lead}>Your time zone decides which day is "today", and so when each cycle starts and ends.</p>
+
+      {problem && (
+        <p role="alert" className={styles.summary}>
+          <CircleAlert aria-hidden="true" className={styles.summaryIcon} />
+          {problem}
+        </p>
+      )}
+
+      <Field
+        ref={nameField}
+        label="Your name"
+        autoComplete="name"
+        maxLength={100}
+        value={displayName}
+        error={errors.displayName}
+        onChange={(event) => setDisplayName(event.target.value)}
+      />
+      <TimeZoneField
+        ref={zoneField}
+        value={timeZone}
+        keep={keep}
+        error={errors.timeZone}
+        hint={timeZone === detected ? "This device's time zone. Change it if you live somewhere else." : undefined}
+        onChange={(zone) => {
+          setTimeZone(zone)
+          setErrors((current) => ({ ...current, timeZone: undefined }))
+        }}
+      />
+
+      <Button type="submit" pending={save.isPending} disabled={!online}>
+        Continue
+      </Button>
+      {!online && <p className={styles.reason}>Saving this needs a connection.</p>}
+    </form>
   )
 }
 
