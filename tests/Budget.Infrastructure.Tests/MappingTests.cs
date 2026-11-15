@@ -9,7 +9,12 @@ public class MappingTests(SqlServerFixture sql)
     [Fact]
     public async Task User_round_trips()
     {
-        var user = await sql.NewUserAsync(externalId: Guid.NewGuid().ToString());
+        var user = new User("Test", "Australia/Sydney", "AUD", TestData.Now, "google:" + Guid.NewGuid().ToString("N"), email: "someone@example.com");
+        await using (var write = sql.NoUser())
+        {
+            write.Users.Add(user);
+            await write.SaveChangesAsync();
+        }
 
         await using var db = sql.NoUser();
         var read = await db.Users.SingleAsync(u => u.Id == user.Id);

@@ -4,21 +4,31 @@ namespace Budget.Application.Tests;
 
 // Every repository, the unit of work and the current user over plain lists. Tenant rows are filtered by the
 // current user like the real DbContext, so a use case that forgets whose data it is fails here too.
-internal sealed class FakeStore : ICurrentUser, IUnitOfWork, IUserRepository, ICycleRepository, ICategoryRepository, ITransactionRepository
+internal sealed class FakeStore : ICurrentUser, IUnitOfWork, IUserRepository, ICycleRepository, ICategoryRepository, ITransactionRepository, ISubscriptionRepository
 {
     public List<User> Users { get; } = [];
     public List<Cycle> Cycles { get; } = [];
     public List<Category> Categories { get; } = [];
     public List<CycleCategory> CycleCategories { get; } = [];
     public List<Transaction> Transactions { get; } = [];
+    public List<Subscription> Subscriptions { get; } = [];
 
     public Guid Id { get; set; }
     public int Saves { get; private set; }
     public Exception? FailNextSave { get; set; }
 
-    public User SignIn(string timeZone = "Australia/Sydney", bool isDemo = false)
+    // Runs when FailNextSave fires: stands in for what the real unit of work and a concurrent writer do to the store.
+    public Action? OnFailedSave { get; set; }
+
+    // What DeleteAccountAsync did, in order, alongside anything else a test records here (such as a billing call).
+    public List<string> Steps { get; } = [];
+
+    // Thrown by the next DeleteAccountAsync before it changes anything: the real one is a single transaction.
+    public Exception? FailNextAccountDelete { get; set; }
+
+    public User SignIn(string timeZone = "Australia/Sydney", bool isDemo = false, string? email = null)
     {
-        var user = new User("Test", timeZone, "AUD", DateTimeOffset.UnixEpoch, isDemo: isDemo);
+        var user = new User("Test", timeZone, "AUD", DateTimeOffset.UnixEpoch, isDemo: isDemo, email: email);
         Users.Add(user);
         Id = user.Id;
         return user;
@@ -29,6 +39,8 @@ internal sealed class FakeStore : ICurrentUser, IUnitOfWork, IUserRepository, IC
         if (FailNextSave is { } failure)
         {
             FailNextSave = null;
+            OnFailedSave?.Invoke();
+            OnFailedSave = null;
             throw failure;
         }
 
@@ -40,6 +52,8 @@ internal sealed class FakeStore : ICurrentUser, IUnitOfWork, IUserRepository, IC
     Task<User?> IUserRepository.GetByExternalIdAsync(string externalId, CancellationToken ct) => Task.FromResult(Users.SingleOrDefault(u => u.ExternalId == externalId));
     Task<User?> IUserRepository.GetDemoAsync(CancellationToken ct) => Task.FromResult(Users.Where(u => u.IsDemo).OrderBy(u => u.CreatedAt).FirstOrDefault());
     Task<IReadOnlyList<User>> IUserRepository.ListAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<User>>(Users);
+    Task<IReadOnlyList<User>> IUserRepository.ListLegacyAsync(CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<User>>([.. Users.Where(u => !u.IsDemo && u.ExternalId is { } id && !ExternalIdentity.IsQualified(id))]);
     public void Add(User user) => Users.Add(user);
 
     // Like the real one, it is filtered by the current user as well as by the id it is given.
@@ -49,8 +63,43 @@ internal sealed class FakeStore : ICurrentUser, IUnitOfWork, IUserRepository, IC
         CycleCategories.RemoveAll(c => c.UserId == userId && c.UserId == Id);
         Cycles.RemoveAll(c => c.UserId == userId && c.UserId == Id);
         Categories.RemoveAll(c => c.UserId == userId && c.UserId == Id);
+        Subscriptions.RemoveAll(s => s.UserId == userId && s.UserId == Id);
         return Task.CompletedTask;
     }
+
+    async Task IUserRepository.DeleteAccountAsync(Guid userId, CancellationToken ct)
+    {
+        if (userId != Id)
+        {
+            throw new InvalidOperationException("An account can only be deleted by a scope running as that user.");
+        }
+
+        if (FailNextAccountDelete is { } failure)
+        {
+            FailNextAccountDelete = null;
+            throw failure;
+        }
+
+        await ((IUserRepository)this).DeleteDataAsync(userId, ct);
+        Steps.Add("delete data");
+        Users.RemoveAll(u => u.Id == userId);
+        Steps.Add("delete user");
+    }
+
+    // The current user's plan as the use cases see it; complimentaryEmails is Plans:ComplimentaryPremiumEmails.
+    public Entitlements Entitlements(TimeProvider clock, string? complimentaryEmails = null) => new(this, this, this, new PlanSettings(complimentaryEmails), clock);
+
+    // An active subscription for the current user, so a test that is not about plans is not held to Free's limits.
+    public Subscription GoPremium(DateTimeOffset now)
+    {
+        var subscription = new Subscription(Id, SubscriptionSource.Manual, null, SubscriptionStatus.Active, null, null, now);
+        Subscriptions.Add(subscription);
+        return subscription;
+    }
+
+    Task<IReadOnlyList<Subscription>> ISubscriptionRepository.ListAsync(CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<Subscription>>([.. Subscriptions.Where(s => s.UserId == Id).OrderByDescending(s => s.CreatedAt)]);
+    public void Add(Subscription subscription) => Subscriptions.Add(subscription);
 
     Task<IReadOnlyList<Cycle>> ICycleRepository.ListAsync(CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<Cycle>>([.. Cycles.Where(c => c.UserId == Id).OrderBy(c => c.StartDate)]);
@@ -75,6 +124,8 @@ internal sealed class FakeStore : ICurrentUser, IUnitOfWork, IUserRepository, IC
         Task.FromResult<IReadOnlyList<Transaction>>([.. Transactions
             .Where(t => t.UserId == Id && t.CycleId == cycleId && (categoryId is null || t.CategoryId == categoryId))
             .OrderByDescending(t => t.OccurredOn).ThenByDescending(t => t.CreatedAt)]);
+    Task<IReadOnlyList<Transaction>> ITransactionRepository.ListAllAsync(CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<Transaction>>([.. Transactions.Where(t => t.UserId == Id).OrderBy(t => t.OccurredOn).ThenBy(t => t.CreatedAt)]);
     Task<IReadOnlyList<CategoryTotal>> ITransactionRepository.SumByCategoryAsync(CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<CategoryTotal>>([.. Transactions
             .Where(t => t.UserId == Id)

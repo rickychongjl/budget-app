@@ -44,6 +44,12 @@ public sealed class TenantIsolationTests(ApiFactory api)
         "GET /api/categories",
         // Every cycle of the caller and nothing else; ReportTests aims one user's report at another's data.
         "GET /api/reports/cycles",
+        // Everything the caller has entered and nothing else; proved below by The_export_holds_only_the_callers_rows.
+        "GET /api/me/export",
+        // Deletes the caller's account and nothing else; proved below by Deleting_my_account_leaves_everyone_else_alone.
+        "DELETE /api/me",
+        // The plan catalogue: the same for everyone, signed in or not, and it reads no user data.
+        "GET /api/plans",
     ];
 
     // Takes ids, but answers 200 with a refusal per item rather than 404, so its attack lives in SyncTests.
@@ -64,6 +70,50 @@ public sealed class TenantIsolationTests(ApiFactory api)
         response.StatusCode.Should().Be(HttpStatusCode.NotFound, route);
         response.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
         (await SnapshotAsync(victimClient, victim)).Should().Be(before);
+    }
+
+    // Both users have data, so an export that ignored the tenant filter would show it. Checked by ids and by values, in every file.
+    [Fact]
+    public async Task The_export_holds_only_the_callers_rows()
+    {
+        var (victim, victimClient) = await SeedVictimAsync();
+        var attacker = await api.NewUserAsync();
+        var cycle = new Cycle(attacker.Id, DateOnly.Parse(Today).AddDays(-2));
+        cycle.Confirm();
+        var category = new Category(attacker.Id, CategoryType.Debit, DateTimeOffset.UtcNow);
+        var transaction = new Transaction(cycle, category.Id, 17.25m, cycle.StartDate, "theirs", Guid.NewGuid(), DateTimeOffset.UtcNow);
+        await api.SeedAsync(attacker, cycle, category, new CycleCategory(cycle, category.Id, "Fuel", "fuel", "teal", 0, 150m), transaction);
+
+        var attackerFiles = await ExportZip.ReadAsync(await api.ClientFor(attacker).GetAsync("/api/me/export"));
+        var victimFiles = await ExportZip.ReadAsync(await victimClient.GetAsync("/api/me/export"));
+
+        var attackerExport = string.Concat(attackerFiles.Values);
+        attackerExport.Should().ContainAll(cycle.Id.ToString(), category.Id.ToString(), transaction.Id.ToString(), "Fuel", "theirs", "17.25");
+        attackerExport.Should().NotContainAny(
+            victim.CycleId.ToString(), victim.CategoryId.ToString(), victim.TransactionId.ToString(), "Groceries", "mine", "42.00", "600.00");
+
+        var victimExport = string.Concat(victimFiles.Values);
+        victimExport.Should().ContainAll(victim.CycleId.ToString(), victim.TransactionId.ToString(), "Groceries", "mine", "42.00");
+        victimExport.Should().NotContainAny(cycle.Id.ToString(), category.Id.ToString(), transaction.Id.ToString(), "Fuel", "theirs", "17.25");
+    }
+
+    // The route takes no id, so the attack is to delete one's own account while someone else has data, and check theirs is
+    // all still there and still theirs.
+    [Fact]
+    public async Task Deleting_my_account_leaves_everyone_else_alone()
+    {
+        var (victim, victimClient) = await SeedVictimAsync();
+        var before = await SnapshotAsync(victimClient, victim);
+        var victimMe = await victimClient.GetStringAsync("/api/me");
+        var attacker = await api.NewUserAsync();
+        await api.SeedAsync(attacker, new Category(attacker.Id, CategoryType.Debit, DateTimeOffset.UtcNow));
+
+        var response = await api.ClientFor(attacker).SendAsync(DeleteAccountTests.Delete(DeleteAccountTests.Confirmed));
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await SnapshotAsync(victimClient, victim)).Should().Be(before);
+        (await victimClient.GetStringAsync("/api/me")).Should().Be(victimMe);
+        (await api.ClientFor(attacker).GetAsync("/api/me")).StatusCode.Should().Be(HttpStatusCode.NotFound, "the caller's own account is the one that went");
     }
 
     [Fact]

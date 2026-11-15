@@ -4,21 +4,27 @@ namespace Budget.Application;
 
 public static class DependencyInjection
 {
-    // allowedOids comes from each host's configuration (Auth:AllowedOids). Left out, nobody can sign in with Entra.
-    public static IServiceCollection AddApplication(this IServiceCollection services, IEnumerable<string>? allowedOids = null) => services
+    // adoptLegacyUserEmail is the Api's Auth:AdoptLegacyUserEmail (LegacyAccountAdoption). Left out, nothing is adopted.
+    // complimentaryPremiumEmails is Plans:ComplimentaryPremiumEmails (PlanSettings). Left out, nobody is complimentary.
+    public static IServiceCollection AddApplication(
+        this IServiceCollection services, string? adoptLegacyUserEmail = null, string? complimentaryPremiumEmails = null) => services
         .AddSingleton(TimeProvider.System)
-        .AddSingleton(new AllowedOids(allowedOids ?? []))
+        .AddSingleton(new LegacyAccountSettings(adoptLegacyUserEmail))
+        .AddSingleton(new PlanSettings(complimentaryPremiumEmails))
+        .AddScoped<Entitlements>()
+        .AddScoped<LegacyAccountAdoption>()
         .AddScoped<UserToday>()
         .AddScoped<CycleFinder>()
         .AddScoped<DemoCaps>()
         .AddScoped<DemoUser>()
-        .AddScoped<RealUsers>()
         .AddScoped<ResetDemo>()
         .AddScoped<Login>()
         .AddScoped<CycleCategories>()
         .AddScoped<Transactions>()
         .AddScoped<Sync>()
         .AddScoped<Me>()
+        .AddScoped<ExportData>()
+        .AddScoped<DeleteAccount>()
         .AddScoped<RolloverCycles>()
         .AddScoped<Reports>()
         .AddScoped<Cycles>();

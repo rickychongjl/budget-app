@@ -5,15 +5,17 @@ namespace Budget.Infrastructure.Tests;
 [Collection(SqlServerCollection.Name)]
 public class RepositoryTests(SqlServerFixture sql)
 {
-    // Dated in the past, so "the oldest demo user" is the first one made here even if a job test has already made one with the real clock.
+    // Every test here shares one database, and others leave demo rows behind: the reset-demo job tests make one with the
+    // real clock, and the legacy-user test below makes one at TestData.Now. So this test dates its pair ten years before
+    // anything else in the suite; dating the first at TestData.Now tied with that legacy-test row and the result was a coin toss.
     [Fact]
     public async Task The_demo_user_is_the_oldest_user_flagged_as_demo()
     {
         await using var db = sql.NoUser();
         var users = new UserRepository(db);
 
-        var first = new User("Demo", "Australia/Sydney", "AUD", TestData.Now, isDemo: true);
-        var second = new User("Demo again", "Australia/Sydney", "AUD", TestData.Now.AddDays(1), isDemo: true);
+        var first = new User("Demo", "Australia/Sydney", "AUD", TestData.Now.AddYears(-10), isDemo: true);
+        var second = new User("Demo again", "Australia/Sydney", "AUD", TestData.Now.AddYears(-10).AddDays(1), isDemo: true);
         db.Users.AddRange(second, first);
         await db.SaveChangesAsync();
 
@@ -35,6 +37,47 @@ public class RepositoryTests(SqlServerFixture sql)
         (await users.GetByExternalIdAsync(externalId))!.Id.Should().Be(user.Id);
         (await users.GetByExternalIdAsync("nobody")).Should().BeNull();
         (await users.ListAsync()).Select(u => u.Id).Should().Contain([user.Id, other.Id]);
+    }
+
+    // Other tests in this database leave bare-oid rows behind, so this checks membership rather than an exact list.
+    [Fact]
+    public async Task Legacy_users_are_the_non_demo_rows_whose_external_id_is_a_bare_oid()
+    {
+        var legacy = await sql.NewUserAsync(Guid.NewGuid().ToString());
+        var qualified = await sql.NewUserAsync("google:" + Guid.NewGuid().ToString("N"));
+        var unlinked = await sql.NewUserAsync();
+        var demo = new User("Demo", "Australia/Sydney", "AUD", TestData.Now, isDemo: true);
+        await using (var write = sql.NoUser())
+        {
+            write.Users.Add(demo);
+            await write.SaveChangesAsync();
+        }
+
+        await using var db = sql.NoUser();
+        var ids = (await new UserRepository(db).ListLegacyAsync()).Select(u => u.Id).ToList();
+
+        ids.Should().Contain(legacy.Id).And.NotContain([qualified.Id, unlinked.Id, demo.Id]);
+    }
+
+    // The sign-in path in one go: a re-pointed ExternalId and a new Email are saved like any other change.
+    [Fact]
+    public async Task A_relinked_user_keeps_its_id_and_saves_the_new_external_id_and_email()
+    {
+        var user = await sql.NewUserAsync(Guid.NewGuid().ToString());
+        var googleId = "google:" + new string('9', 255);
+
+        await using (var db = sql.NoUser())
+        {
+            var row = (await new UserRepository(db).GetAsync(user.Id))!;
+            row.LinkTo(googleId);
+            row.ChangeEmail("someone@example.com");
+            await db.SaveChangesAsync();
+        }
+
+        await using var read = sql.NoUser();
+        var found = (await new UserRepository(read).GetByExternalIdAsync(googleId))!;
+        found.Id.Should().Be(user.Id);
+        found.Email.Should().Be("someone@example.com");
     }
 
     [Fact]
@@ -160,9 +203,11 @@ public class RepositoryTests(SqlServerFixture sql)
             (await transactions.AnyForCategoryAsync(cycle.Id, fuel.Id)).Should().BeTrue();
             (await transactions.AnyForCategoryAsync(next.Id, fuel.Id)).Should().BeFalse();
             (await transactions.CountAsync()).Should().Be(4);
+            (await transactions.ListAllAsync()).Select(t => t.Id).Should().Equal(early.Id, late.Id, sameDayLater.Id, elsewhere.Id);
             await using (var nobodyElse = sql.ContextFor(await sql.NewUserAsync()))
             {
                 (await new TransactionRepository(nobodyElse).CountAsync()).Should().Be(0);
+                (await new TransactionRepository(nobodyElse).ListAllAsync()).Should().BeEmpty();
             }
 
             transactions.Remove((await transactions.GetAsync(late.Id))!);

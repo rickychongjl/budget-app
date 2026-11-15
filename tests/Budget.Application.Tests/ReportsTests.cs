@@ -11,8 +11,11 @@ public sealed class ReportsTests
     private UserToday Today(int year, int month, int day) =>
         new(_store, _store, new FixedClock(new DateTimeOffset(year, month, day, 1, 0, 0, TimeSpan.Zero)));
 
-    private Reports At(int year, int month, int day) =>
-        new(_store, _store, new CycleFinder(_store, Today(year, month, day)));
+    private Reports At(int year, int month, int day)
+    {
+        var clock = new FixedClock(new DateTimeOffset(year, month, day, 1, 0, 0, TimeSpan.Zero));
+        return new(_store, _store, new CycleFinder(_store, new UserToday(_store, _store, clock)), _store.Entitlements(clock));
+    }
 
     // The same data through the single-cycle endpoint, to compare against.
     private Cycles CyclesAt(int year, int month, int day)

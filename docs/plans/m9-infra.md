@@ -35,18 +35,18 @@ Checked against a real stack, not only tests: this branch's production image on 
 
 PowerShell, from the repo root, once. Steps 6 to 8 need a domain; the app is reachable on its Azure hostname after step 5.
 
-**Before you start:** a pay-as-you-go subscription; the Entra tenant and app registration from `docs/tenant_app_registration_setup.md` (optional: without `ENTRA_*` the app is demo-only); `az login`; `gh auth login`.
+**Before you start:** a pay-as-you-go subscription; the Google OAuth client from `docs/google_sign_in_setup.md` (optional: without `GOOGLE_*` the app is demo-only; Entra until L1); `az login`; `gh auth login`.
 
 1. **Merge this PR.** `deploy.yml` runs on `main`: tests, then the image to `ghcr.io/rickychongjl/budget-app`; the deploy job is skipped. Check the package is public at github.com/rickychongjl/budget-app/pkgs/container/budget-app (Package settings → Change visibility, if it is not).
 2. **Resource group.**
    ```
    az group create -n bgt-prod-rg -l australiaeast --tags project=budget env=prod owner=ricky
    ```
-3. **Secrets in the shell**, never in a file. The Entra values are the local ones; the client secret is a new one, `budget-prod`, on the same app registration.
+3. **Secrets in the shell**, never in a file. Google: the production OAuth client, `budget-prod` (not the local one). The adopt email is needed only until the owner's first Google sign-in (L1).
    ```
    $env:SQL_ADMIN_PASSWORD = '<16+ chars, upper, lower, digit, symbol>'
    $env:ALERT_EMAIL = '<you>'
-   $env:ENTRA_TENANT_ID = '<directory id>'; $env:ENTRA_CLIENT_ID = '<application id>'; $env:ENTRA_CLIENT_SECRET = '<budget-prod>'; $env:AUTH_ALLOWED_OIDS = '<your object id>'
+   $env:GOOGLE_CLIENT_ID = '<budget-prod client id>'; $env:GOOGLE_CLIENT_SECRET = '<budget-prod client secret>'; $env:AUTH_ADOPT_LEGACY_USER_EMAIL = '<your Google address>'
    ```
 4. **Review, then deploy.** About ten minutes; SQL and the environment are the slow ones.
    ```
@@ -83,4 +83,4 @@ PowerShell, from the repo root, once. Steps 6 to 8 need a domain; the app is rea
 az containerapp update -n bgt-prod-api -g bgt-prod-rg --image ghcr.io/rickychongjl/budget-app:<previous sha>
 ```
 
-**Not one-time:** the Entra client secret expires (12 months): create a new one, update `$env:ENTRA_CLIENT_SECRET`, deploy. Cloudflare's IP ranges change rarely; when they do, update the list in `main.bicep` and deploy.
+**Not one-time:** rotate the Google client secret if it may have leaked: add a new one on the client, update `$env:GOOGLE_CLIENT_SECRET`, deploy, then delete the old one. Cloudflare's IP ranges change rarely; when they do, update the list in `main.bicep` and deploy.

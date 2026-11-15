@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.DataProtection;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services
-    .AddApplication(builder.Configuration["Auth:AllowedOids"]?.Split(','))
+    .AddApplication(builder.Configuration["Auth:AdoptLegacyUserEmail"], builder.Configuration["Plans:ComplimentaryPremiumEmails"])
     .AddInfrastructure(builder.Configuration.GetConnectionString("Budget"))
     .AddHttpContextAccessor()
     .AddScoped<ICurrentUser, HttpCurrentUser>();
@@ -38,7 +38,7 @@ if (builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"] is { Length: 
     builder.Services.AddOpenTelemetry().UseAzureMonitor();
 }
 
-// Recognises a session on every request. Issuing one is separate: /auth/demo, and Entra through /auth/login.
+// Recognises a session on every request. Issuing one is separate: /auth/demo, and Google through /auth/login.
 // An API answers 401 and 403; it never redirects to a login page.
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(o =>
 {
@@ -53,7 +53,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     o.Cookie.SameSite = SameSiteMode.Strict;
     o.Events.OnRedirectToLogin = context => Status(context.Response, StatusCodes.Status401Unauthorized);
     o.Events.OnRedirectToAccessDenied = context => Status(context.Response, StatusCodes.Status403Forbidden);
-}).AddEntraSignIn(builder.Configuration);
+}).AddOidcSignIn(builder.Configuration);
 builder.Services.AddAuthorization();
 builder.Services.AddCsrf(builder.Environment);
 builder.Services.AddBudgetRateLimiting(builder.Configuration);
@@ -84,6 +84,7 @@ api.MapMe();
 api.MapCycles();
 api.MapCategories();
 api.MapReports();
+api.MapPlans();
 api.MapTransactions();
 // An unmatched /api path is a 404 for a signed-in caller and a 401 for anyone else, never the SPA's index.html.
 api.MapFallback(() => Results.NotFound());

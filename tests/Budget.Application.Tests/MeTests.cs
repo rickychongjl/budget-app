@@ -7,7 +7,7 @@ public sealed class MeTests
 {
     private readonly FakeStore _store = new();
 
-    private Me Sut() => new(_store, _store, _store);
+    private Me Sut() => new(_store, _store, _store, _store.Entitlements(TimeProvider.System));
 
     [Fact]
     public async Task Get_returns_the_current_users_profile()
@@ -16,7 +16,7 @@ public sealed class MeTests
 
         var me = await Sut().GetAsync();
 
-        me.Should().Be(new MeDto(user.Id, "Test", "Australia/Sydney", "AUD", IsDemo: true, CycleLengthDays: 30));
+        me.Should().Be(new MeDto(user.Id, "Test", "Australia/Sydney", "AUD", IsDemo: true, CycleLengthDays: 30, "premium", "demo", Plans.Premium));
     }
 
     [Fact]
@@ -40,6 +40,21 @@ public sealed class MeTests
         _store.Saves.Should().Be(2);
     }
 
+    [Theory]
+    [InlineData("Australia/Perth")]
+    [InlineData("Australia/Brisbane")]
+    [InlineData("Australia/Lord_Howe")]
+    public async Task First_run_saves_the_name_and_the_device_time_zone_in_one_go(string timeZone)
+    {
+        var user = _store.SignIn();
+
+        var me = await Sut().UpdateAsync(new UpdateMeRequest("Sam", timeZone));
+
+        me.Should().BeEquivalentTo(new { DisplayName = "Sam", TimeZone = timeZone });
+        user.TimeZone.Should().Be(timeZone);
+        _store.Saves.Should().Be(1);
+    }
+
     [Fact]
     public async Task Update_rejects_an_empty_request_a_blank_name_and_an_unknown_time_zone()
     {
@@ -50,6 +65,7 @@ public sealed class MeTests
         await sut.Invoking(s => s.UpdateAsync(new UpdateMeRequest("  ", null))).Should().ThrowAsync<ValidationException>();
         await sut.Invoking(s => s.UpdateAsync(new UpdateMeRequest(new string('x', 101), null))).Should().ThrowAsync<ValidationException>();
         (await sut.Invoking(s => s.UpdateAsync(new UpdateMeRequest(null, "Mars/Olympus_Mons"))).Should().ThrowAsync<DomainException>()).Which.Code.Should().Be("user.timezone.unknown");
+        (await sut.Invoking(s => s.UpdateAsync(new UpdateMeRequest(null, "AUS Eastern Standard Time"))).Should().ThrowAsync<DomainException>()).Which.Code.Should().Be("user.timezone.unknown");
         _store.Saves.Should().Be(0);
     }
 

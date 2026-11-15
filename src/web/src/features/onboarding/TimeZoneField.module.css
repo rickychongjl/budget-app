@@ -1,0 +1,54 @@
+/* The same box as ui/Field, for a select. */
+.field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-1);
+}
+
+.label {
+  font: var(--text-label);
+  color: var(--color-text-muted);
+}
+
+.select {
+  width: 100%;
+  min-width: 0;
+  height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  /* 16px, or iOS zooms the page on focus. */
+  font: var(--text-body);
+  color: var(--color-text);
+}
+
+.select[aria-invalid='true'] {
+  border-color: var(--color-negative);
+}
+
+.select:disabled {
+  opacity: 0.4;
+}
+
+.hint,
+.error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font: var(--text-label);
+}
+
+.hint {
+  color: var(--color-text-muted);
+}
+
+.error {
+  color: var(--color-negative);
+}
+
+.icon {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  flex: none;
+}

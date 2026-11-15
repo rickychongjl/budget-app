@@ -15,6 +15,7 @@ public sealed class CycleCategories(
     ITransactionRepository transactions,
     CycleFinder finder,
     DemoCaps demoCaps,
+    Entitlements entitlements,
     TimeProvider clock)
 {
     public async Task<CycleCategoryDto> AddAsync(Guid cycleId, AddCategoryRequest request, CancellationToken ct = default)
@@ -23,6 +24,10 @@ public sealed class CycleCategories(
 
         var (cycle, timeline, today) = await finder.FindAsync(cycleId, ct);
         timeline.EnsureCanEdit(cycle, CycleEdit.Categories, today);
+
+        // Per cycle, so onboarding's draft is held to it too. Counted from what the cycle has now, so a downgraded
+        // user over the limit keeps everything and is only stopped from adding.
+        (await entitlements.GetAsync(ct)).EnsureCanAddCategory((await categories.ListForCycleAsync(cycleId, ct)).Count);
 
         Category category;
         if (request.CategoryId is { } existingId)

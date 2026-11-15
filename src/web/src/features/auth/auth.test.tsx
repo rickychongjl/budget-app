@@ -4,8 +4,10 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { resetCsrf } from '../../api/client'
-import type { Me, SignInMethod } from '../../api/types'
+import type { Me, SignInMethod, SyncItem } from '../../api/types'
+import { db } from '../../offline/db'
 import { server } from '../../test/server'
+import { BrowserRouter } from 'react-router'
 import { SessionGate } from './SessionGate'
 import { useSession } from './useSession'
 
@@ -17,8 +19,11 @@ function Inside() {
   return (
     <>
       <p>Hello {me.displayName}</p>
-      <button type="button" onClick={signOut}>
+      <button type="button" onClick={() => void signOut()}>
         Sign out
+      </button>
+      <button type="button" onClick={() => void signOut({ accountDeleted: true })}>
+        Account deleted
       </button>
     </>
   )
@@ -26,7 +31,7 @@ function Inside() {
 
 // signedIn is mutable so a handler can flip it, the way the server's cookie would.
 function backend({ signIn = ['demo'] as SignInMethod[], signedIn = false } = {}) {
-  const state = { signedIn, demoTokens: [] as (string | null)[], csrfFetches: 0 }
+  const state = { signedIn, demoTokens: [] as (string | null)[], csrfFetches: 0, logouts: 0 }
   server.use(
     http.get('/auth/options', () => HttpResponse.json({ signIn })),
     http.get('/auth/csrf', () => HttpResponse.json({ token: `token-${++state.csrfFetches}` })),
@@ -37,6 +42,7 @@ function backend({ signIn = ['demo'] as SignInMethod[], signedIn = false } = {})
       return new HttpResponse(null, { status: 204 })
     }),
     http.post('/auth/logout', () => {
+      state.logouts += 1
       state.signedIn = false
       return new HttpResponse(null, { status: 204 })
     }),
@@ -48,16 +54,21 @@ function renderGate() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={client}>
-      <SessionGate>
-        <Inside />
-      </SessionGate>
+      <BrowserRouter>
+        <SessionGate>
+          <Inside />
+        </SessionGate>
+      </BrowserRouter>
     </QueryClientProvider>,
   )
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  await db.cache.clear()
+  await db.outbox.clear()
   resetCsrf()
-  history.replaceState(null, '', '/')
+  // The sign-in screen's own path; "/" signed out is the landing page (public.test.tsx).
+  history.replaceState(null, '', '/signin')
 })
 
 describe('signed out', () => {
@@ -77,19 +88,39 @@ describe('signed out', () => {
     expect(title.parentElement!.querySelector('img[src="/favicon.svg"]')).toHaveAttribute('alt', '')
   })
 
-  test('offers Microsoft only when this deployment has it', async () => {
+  test('offers Google only when this deployment has it, and the demo is then the only action', async () => {
     backend({ signIn: ['demo'] })
     renderGate()
 
     await screen.findByRole('button', { name: 'Try the demo' })
-    expect(screen.queryByRole('link', { name: 'Sign in with Microsoft' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Continue with Google' })).not.toBeInTheDocument()
   })
 
-  test('Microsoft sign-in is a plain link to the server, which does the OpenID Connect round trip', async () => {
-    backend({ signIn: ['demo', 'entra'] })
+  test('Google sign-in is a plain link to the server, which does the OpenID Connect round trip', async () => {
+    backend({ signIn: ['demo', 'google'] })
     renderGate()
 
-    expect(await screen.findByRole('link', { name: 'Sign in with Microsoft' })).toHaveAttribute('href', '/auth/login')
+    const google = await screen.findByRole('link', { name: 'Continue with Google' })
+    expect(google).toHaveAttribute('href', '/auth/login')
+    // Google's "G" is part of the button, and adds nothing for a screen reader beyond the words.
+    expect(google.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  test('with Google offered it comes first, and the demo is still there under it', async () => {
+    backend({ signIn: ['demo', 'google'] })
+    renderGate()
+
+    const google = await screen.findByRole('link', { name: 'Continue with Google' })
+    const demo = screen.getByRole('button', { name: 'Try the demo' })
+    expect(google.compareDocumentPosition(demo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  test('there is no Microsoft sign-in any more', async () => {
+    backend({ signIn: ['demo', 'google'] })
+    renderGate()
+
+    await screen.findByRole('link', { name: 'Continue with Google' })
+    expect(screen.queryByText(/Microsoft/)).not.toBeInTheDocument()
   })
 
   test('Try the demo signs in with an anti-forgery token, then drops it because it was issued to nobody', async () => {
@@ -119,18 +150,19 @@ describe('signed out', () => {
   })
 })
 
-describe('a refused Microsoft sign-in lands on /signin?error=', () => {
+describe('a refused Google sign-in lands on /signin?error=', () => {
   test.each([
-    ['auth.not-allowed', "This account isn't allowed to use this app."],
+    ['auth.email-unverified', "Your Google account's email address isn't verified yet. Verify it with Google, then try again."],
     ['auth.failed', "The sign-in didn't complete. Please try again."],
     ['something.new', "The sign-in didn't complete. Please try again."],
   ])('%s', async (code, message) => {
     history.replaceState(null, '', `/signin?error=${code}`)
-    backend({ signIn: ['demo', 'entra'] })
+    backend({ signIn: ['demo', 'google'] })
     renderGate()
 
     expect(await screen.findByRole('alert')).toHaveTextContent(message)
     // The way forward is still there.
+    expect(await screen.findByRole('link', { name: 'Continue with Google' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Try the demo' })).toBeInTheDocument()
   })
 })
@@ -153,6 +185,40 @@ describe('signed in', () => {
     expect(await screen.findByRole('button', { name: 'Try the demo' })).toBeInTheDocument()
   })
 
+  // Both clear what this device holds about the person. Only sign-out keeps the outbox, for when they come back.
+  async function seedDevice() {
+    await db.cache.put({ key: 'cycles', userId: 'u1', json: [], at: 1 })
+    await db.outbox.add({ userId: 'u1', item: { type: 'transaction.delete', clientId: 't1' } satisfies SyncItem })
+  }
+
+  test('sign out clears the cached reads and keeps the outbox', async () => {
+    backend({ signedIn: true })
+    await seedDevice()
+    renderGate()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Sign out' }))
+
+    expect(await screen.findByRole('button', { name: 'Try the demo' })).toBeInTheDocument()
+    await waitFor(async () => expect(await db.cache.count()).toBe(0))
+    expect(await db.outbox.count()).toBe(1)
+  })
+
+  test('after the account is deleted it signs out locally only, and the outbox goes too', async () => {
+    const state = backend({ signedIn: true })
+    await seedDevice()
+    renderGate()
+    await screen.findByText('Hello Demo')
+
+    // The server ended the session when it deleted the account.
+    state.signedIn = false
+    await userEvent.click(await screen.findByRole('button', { name: 'Account deleted' }))
+
+    expect(await screen.findByRole('button', { name: 'Try the demo' })).toBeInTheDocument()
+    await waitFor(async () => expect(await db.outbox.count()).toBe(0))
+    expect(await db.cache.count()).toBe(0)
+    expect(state.logouts).toBe(0)
+  })
+
   test('a session that expires mid-use drops back to sign-in', async () => {
     const state = backend({ signedIn: true })
     renderGate()
@@ -164,5 +230,21 @@ describe('signed in', () => {
     await api.get('/api/me').catch(() => undefined)
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Try the demo' })).toBeInTheDocument())
+  })
+
+  // L12: an expired session is forgotten like a sign-out, so the last person's budget is not left readable on the device.
+  test('an expired session clears the cached reads and keeps the outbox', async () => {
+    const state = backend({ signedIn: true })
+    await seedDevice()
+    renderGate()
+    await screen.findByText('Hello Demo')
+
+    state.signedIn = false
+    const { api } = await import('../../api/client')
+    await api.get('/api/me').catch(() => undefined)
+
+    await waitFor(async () => expect(await db.cache.count()).toBe(0))
+    expect(await db.outbox.count()).toBe(1)
+    expect(state.logouts).toBe(0)
   })
 })

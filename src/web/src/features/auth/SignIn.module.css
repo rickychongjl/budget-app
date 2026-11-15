@@ -52,28 +52,30 @@
   gap: var(--space-3);
 }
 
-/* Shaped like the secondary Button, but a link: it navigates to the server. */
-.microsoft {
+/* Google's sign-in button (MASTER 8): their fill, stroke and text colours for each theme (the --brand-google-* tokens),
+   their "G" and their wording. Sized like our Button so it meets the 48px target; a link, because it navigates to the server. */
+.google {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-3);
   height: var(--control-height);
-  border: 1px solid var(--color-border-strong);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--brand-google-stroke);
   border-radius: var(--radius-md);
+  background: var(--brand-google-fill);
   font: var(--text-label);
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--brand-google-text);
   text-decoration: none;
-  transition:
-    transform var(--dur-press),
-    background var(--dur-press);
+  transition: transform var(--dur-press);
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
-.microsoft:active {
+/* Press feedback is a transform only: Google's colours are not ours to tint. */
+.google:active {
   transform: scale(0.98);
-  background: var(--color-surface-2);
 }
 
 .note {

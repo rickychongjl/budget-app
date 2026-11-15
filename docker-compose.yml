@@ -5,7 +5,6 @@ x-app: &app
     dockerfile: src/Budget.Api/Dockerfile
   environment:
     ConnectionStrings__Budget: Server=sql;Database=budget;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=true
-    Auth__AllowedOids: ${AUTH_ALLOWED_OIDS:-}
 
 services:
   sql:
@@ -37,7 +36,9 @@ services:
     <<: *app
     environment:
       ConnectionStrings__Budget: Server=sql;Database=budget;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=true
-      Auth__AllowedOids: ${AUTH_ALLOWED_OIDS:-}
+      # Optional Google sign-in from .env; empty leaves the stack demo-only.
+      Google__ClientId: ${GOOGLE_CLIENT_ID:-}
+      Google__ClientSecret: ${GOOGLE_CLIENT_SECRET:-}
       # Local only: lets the session cookie work over plain http. Production never sets this.
       ASPNETCORE_ENVIRONMENT: Development
       # Requests a minute per address, static files included. The Playwright suite reloads the app dozens of times a

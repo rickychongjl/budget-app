@@ -10,11 +10,14 @@ import { EmptyState } from '../../ui/EmptyState'
 import { Skeleton } from '../../ui/Skeleton'
 import { StatusBadge } from '../../ui/StatusBadge'
 import { useSession } from '../auth/useSession'
+import { limitsOf } from '../plans/plan'
+import { PremiumNote } from '../plans/PremiumNote'
 import { Accrued } from './Accrued'
 import styles from './Cycles.module.css'
 import { categoriesOf, toSeries, type TrendFilter } from './trend'
 import { readFilter, SPENDING, writeFilter } from './chartFilter'
 import { TrendFilterControl } from './TrendFilter'
+import trendStyles from './Trend.module.css'
 import { TrendSection } from './TrendSection'
 import { useCycleReport } from './useCycleReport'
 
@@ -43,6 +46,19 @@ function Trend({ report, currency, today }: { report: CycleSummary[]; currency: 
   )
 }
 
+// The Free plan's Cycles page: the report holds only the most recent past cycle (Plans.cs), so a line across cycles has
+// nothing to say. Kept as a section with its heading so the page reads the same on both plans.
+function LockedTrend() {
+  return (
+    <section aria-labelledby="trend" className={trendStyles.section}>
+      <h2 id="trend" className={trendStyles.title}>
+        Trend
+      </h2>
+      <PremiumNote title="Trend across every cycle">Premium charts your spending, one category or what you saved, cycle by cycle.</PremiumNote>
+    </section>
+  )
+}
+
 // Draft wins over the phase: a first cycle that has not been confirmed is not really "current" yet.
 const badge = (cycle: Cycle) =>
   cycle.status === 'Draft' ? <StatusBadge>Draft</StatusBadge> : cycle.phase === 'Current' ? <StatusBadge tone="primary">Current</StatusBadge> : <StatusBadge>{cycle.phase === 'Past' ? 'Past' : 'Upcoming'}</StatusBadge>
@@ -53,6 +69,7 @@ export function Cycles() {
   const { me } = useSession()
   const report = useCycleReport()
   const today = todayIn(me.timeZone)
+  const limits = limitsOf(me)
 
   if (report.isError) {
     return (
@@ -83,7 +100,7 @@ export function Cycles() {
   return (
     <Screen title="Cycles">
       {/* The chart is above the list, which grows for ever and would otherwise push it off the screen. */}
-      {newestFirst.length > 0 && <Trend report={report.data} currency={me.currency} today={today} />}
+      {newestFirst.length > 0 && (limits.trendChart ? <Trend report={report.data} currency={me.currency} today={today} /> : <LockedTrend />)}
 
       {newestFirst.length === 0 ? (
         <EmptyState icon={CalendarOff}>No cycles yet.</EmptyState>
@@ -107,6 +124,14 @@ export function Cycles() {
             </li>
           ))}
         </ul>
+      )}
+
+      {/* The server leaves older past cycles out of the report on Free; said only once there is a past cycle to be older than. */}
+      {limits.pastCyclesInReports !== null && newestFirst.some(({ cycle }) => cycle.phase === 'Past') && (
+        <p className={styles.reason}>
+          The Free plan lists {limits.pastCyclesInReports === 1 ? 'your most recent past cycle' : `your ${limits.pastCyclesInReports} most recent past cycles`}. Older
+          cycles are kept, not deleted, and are listed again with Premium.
+        </p>
       )}
     </Screen>
   )

@@ -44,3 +44,43 @@
 .select:disabled {
   opacity: 0.4;
 }
+
+.sheetBody {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.exportFirst {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-1);
+}
+
+.problem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-negative-soft);
+  color: var(--color-negative);
+  font: var(--text-label);
+}
+
+.problemIcon {
+  flex: none;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
+/* The safe choice first (MASTER 9). They share the row, and wrap one above the other when the text is large. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.actions > * {
+  flex: 1 1 auto;
+}

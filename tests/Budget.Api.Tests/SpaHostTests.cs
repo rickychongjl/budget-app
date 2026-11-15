@@ -32,7 +32,7 @@ public sealed class SpaHostTests : IDisposable
     [Theory]
     [InlineData("/")]
     [InlineData("/cycles/0b1f6c0e-7c65-4f0e-9d53-0d1c2b3a4e5f")]
-    [InlineData("/signin?error=auth.not-allowed")]
+    [InlineData("/signin?error=auth.email-unverified")]
     public async Task The_page_answers_the_root_and_any_client_side_route(string path)
     {
         var response = await _host.CreateClient().GetAsync(path);

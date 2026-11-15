@@ -122,6 +122,8 @@ public class ReportQueryTests(SqlServerFixture sql)
 
             await using (var db = sql.ContextFor(user))
             {
+                // Premium, so the report holds every cycle rather than Free's most recent past one.
+                db.Subscriptions.Add(new Subscription(user.Id, SubscriptionSource.Manual, null, SubscriptionStatus.Active, null, null, TestData.Now));
                 db.Cycles.AddRange(cycles);
                 db.Categories.Add(category);
                 foreach (var cycle in cycles)
@@ -138,7 +140,8 @@ public class ReportQueryTests(SqlServerFixture sql)
             var reports = new Reports(
                 new CategoryRepository(read),
                 new TransactionRepository(read),
-                new CycleFinder(new CycleRepository(read), new UserToday(new TestUser(user.Id), new UserRepository(read), TimeProvider.System)));
+                new CycleFinder(new CycleRepository(read), new UserToday(new TestUser(user.Id), new UserRepository(read), TimeProvider.System)),
+                new Entitlements(new TestUser(user.Id), new UserRepository(read), new SubscriptionRepository(read), new PlanSettings(), TimeProvider.System));
 
             (await reports.ListAsync()).Should().HaveCount(cycleCount);
             return counter.Count;

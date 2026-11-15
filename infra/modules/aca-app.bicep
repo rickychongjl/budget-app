@@ -7,11 +7,11 @@ param environmentId string
 param image string
 @secure()
 param sqlConnectionString string
-param entraTenantId string
-param entraClientId string
+param googleClientId string
 @secure()
-param entraClientSecret string
-param allowedOids string
+param googleClientSecret string
+param adoptLegacyUserEmail string
+param complimentaryPremiumEmails string
 param storageAccountName string
 param dataProtectionBlobUri string
 param appInsightsConnectionString string
@@ -19,7 +19,7 @@ param customDomain string
 param customDomainCertificateId string
 param allowedIpRanges array
 
-var hasEntra = !empty(entraClientSecret)
+var hasGoogle = !empty(googleClientId) && !empty(googleClientSecret)
 
 resource app 'Microsoft.App/containerApps@2024-03-01' = {
   name: name
@@ -49,7 +49,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
       }
       secrets: concat(
         [{ name: 'sql-connection', value: sqlConnectionString }],
-        hasEntra ? [{ name: 'entra-client-secret', value: entraClientSecret }] : []
+        hasGoogle ? [{ name: 'google-client-secret', value: googleClientSecret }] : []
       )
     }
     template: {
@@ -61,14 +61,14 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           env: concat(
             [
               { name: 'ConnectionStrings__Budget', secretRef: 'sql-connection' }
-              { name: 'Auth__AllowedOids', value: allowedOids }
+              { name: 'Auth__AdoptLegacyUserEmail', value: adoptLegacyUserEmail }
+              { name: 'Plans__ComplimentaryPremiumEmails', value: complimentaryPremiumEmails }
               { name: 'DataProtection__BlobUri', value: dataProtectionBlobUri }
               { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }
             ],
-            hasEntra ? [
-              { name: 'Entra__TenantId', value: entraTenantId }
-              { name: 'Entra__ClientId', value: entraClientId }
-              { name: 'Entra__ClientSecret', secretRef: 'entra-client-secret' }
+            hasGoogle ? [
+              { name: 'Google__ClientId', value: googleClientId }
+              { name: 'Google__ClientSecret', secretRef: 'google-client-secret' }
             ] : []
           )
           // Liveness only, and never the database: /health/ready is for dashboards (design section 12).

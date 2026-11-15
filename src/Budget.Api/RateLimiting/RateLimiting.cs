@@ -11,10 +11,14 @@ internal static class RateLimiting
     // carries none and shares the ingress's bucket. Locally it is the connection's, so per client.
     public const string AuthPolicy = "auth";
 
+    // GET /api/me/export reads every row the caller has and builds a ZIP, so it gets its own small allowance.
+    public const string ExportPolicy = "export";
+
     public static IServiceCollection AddBudgetRateLimiting(this IServiceCollection services, IConfiguration configuration)
     {
         var permitLimit = configuration.GetValue("RateLimiting:PermitLimit", 100);
         var authPermitLimit = configuration.GetValue("RateLimiting:AuthPermitLimit", 5);
+        var exportPermitLimit = configuration.GetValue("RateLimiting:ExportPermitLimit", 5);
         var window = TimeSpan.FromSeconds(configuration.GetValue("RateLimiting:WindowSeconds", 60));
 
         return services.AddRateLimiter(o =>
@@ -24,6 +28,12 @@ internal static class RateLimiting
             o.AddPolicy(AuthPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
                 context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = authPermitLimit, Window = window }));
+
+            // On top of the global limit, for the export: 5 a minute per address. It runs before authentication, so it is per
+            // address rather than per user, like the rest.
+            o.AddPolicy(ExportPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
+                context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = exportPermitLimit, Window = window }));
 
             o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
                 context.Request.Path.StartsWithSegments("/health")

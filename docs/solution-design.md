@@ -18,13 +18,13 @@
 1. Track a budget on a phone in fixed 30-day cycles: debit and credit categories, a budget amount per category per cycle, transactions against them, opening and closing balances, and a movable cycle start date.
 2. Show the current cycle's status per category (over or under budget), a list of all cycles, and a line graph of total spending, per-category spending and money accrued across cycles.
 3. Installable PWA that opens instantly and works offline, with background sync when connectivity returns.
-4. Single real user (Ricky) with strong authentication; a public, self-resetting demo account for interviewers.
+4. Open sign-up with Google (Apple to follow): anyone can create their own account, isolated from everyone else's; a public, self-resetting demo account for interviewers. (Revised 15 Nov 2026, L1: was a single real user on an Entra allowlist.)
 5. Production-grade engineering: TDD, full test pyramid, CI/CD, infrastructure as code, observability, security hardening — and a repository that reads well to a senior engineer.
 6. Running cost under roughly A$20/month.
 
 ### Non-goals (v1)
 
-- Public sign-up, billing, subscriptions, marketing site, app-store submission.
+- Billing, subscriptions, marketing site, app-store submission (being added by the multi-user launch plan, `docs/multi-user-launch-plan.md`; public sign-up arrived in L1).
 - Bank feeds, receipt scanning, shared/household budgets.
 - Multi-region, high availability, SLA.
 
@@ -63,7 +63,7 @@ Cloudflare (DNS, WAF, DDoS, caches /assets/*, hides origin)
    ▼
 Azure Container Apps — Consumption plan, Australia East
    ├── budget-api  (Container App, min replicas 1, max 3)
-   │      ASP.NET Core: React SPA + /api + Entra BFF auth
+   │      ASP.NET Core: React SPA + /api + BFF auth (Google OIDC)
    ├── budget-migrate  (Container Apps Job, manual trigger from pipeline)
    ├── budget-rollover  (Container Apps Job, cron hourly at :05, idempotent)
    └── budget-demo-reset  (Container Apps Job, cron 17:00 UTC = 03:00 AEST)
@@ -71,7 +71,7 @@ Azure Container Apps — Consumption plan, Australia East
    ├──▶ Azure SQL Database — Basic tier (5 DTU, 2 GB), provisioned
    ├──▶ Storage Account (LRS) — Data Protection key ring blob
    ├──▶ Application Insights → Log Analytics workspace (shared with ACA console logs)
-   └──▶ Microsoft Entra ID — single-tenant app registration (OIDC)
+   └──▶ Google — OAuth web client per environment (OIDC)
 
 GitHub → GitHub Actions → GitHub Container Registry → (OIDC) → Azure
 ```
@@ -100,7 +100,8 @@ Dependency direction is strictly inward. Domain has zero dependencies.
 ```
 User
   Id (Guid)               -- internal key
-  ExternalId (string)     -- Entra `oid`; null for demo user
+  ExternalId (string)     -- provider-qualified subject, "google:<sub>" (max 300); null for demo user. A bare value is a pre-Google Entra oid
+  Email (string, null)    -- from the sign-in token, refreshed each sign-in; never logged (max 254)
   DisplayName
   IsDemo (bool)
   TimeZone (string, IANA, "Australia/Sydney")  -- decides what "today" is for cycle rollover
@@ -186,9 +187,9 @@ All endpoints under `/api`, JSON, cookie-authenticated, versioned via URL prefix
 | `DELETE` | `/api/transactions/{id}` | Delete |
 | `POST` | `/api/sync` | Batch of offline mutations, applied in order, returns per-item result |
 | `GET` | `/api/reports/cycles` | Every cycle with its rollup, oldest first: the same `CycleSummaryDto` as `/api/cycles/{id}`, once per cycle, so the chart and the cycle list cannot disagree. Four queries however many cycles there are, because the per-category sums come from a `GROUP BY`. The client filters the line graph |
-| `GET` | `/auth/login` | Redirect to Entra (OIDC). `404` when Entra is not configured (local compose, tests) |
-| `POST` | `/auth/callback` | OIDC redirect URI (`form_post`), answered by the OpenID Connect middleware. A refused sign-in redirects to `/signin?error=<code>` (`auth.not-allowed`, `auth.failed`) with no session, because the callback is a top-level navigation and problem details would strand a person on raw JSON |
-| `GET` | `/auth/options` | `{ "signIn": ["demo", "entra"] }`: which sign-ins this deployment offers, so the SPA draws the Microsoft button only when it leads somewhere. Anonymous, global rate limit only |
+| `GET` | `/auth/login` | Redirect to Google (OIDC). `404` when Google is not configured (local compose, tests) |
+| `POST` | `/auth/callback` | OIDC redirect URI (`form_post`), answered by the OpenID Connect middleware. A refused sign-in redirects to `/signin?error=<code>` (`auth.email-unverified`, `auth.failed`) with no session, because the callback is a top-level navigation and problem details would strand a person on raw JSON |
+| `GET` | `/auth/options` | `{ "signIn": ["demo", "google"] }`: which sign-ins this deployment offers, so the SPA draws the Google button only when it leads somewhere. Anonymous, global rate limit only |
 | `GET` | `/auth/csrf` | Issue the antiforgery token pair for the current caller; the request token is returned in the JSON body (`{ "token": ... }`) for the page to hold in memory; the cookie token stays `HttpOnly` |
 | `POST` | `/auth/logout` | Clear session |
 | `POST` | `/auth/demo` | Issue a demo session (rate-limited) |
@@ -200,21 +201,23 @@ Errors use RFC 9457 `application/problem+json`. Validation via FluentValidation 
 
 ## 5. Authentication and authorisation
 
-### 5.1 Real user — Entra ID, single tenant
+### 5.1 Real users — Sign in with Google (Apple later)
 
-- A dedicated free **Entra ID tenant** owned by Ricky (not the employer's). One user in it.
-- App registration: **single-tenant**, web platform, redirect URI `https://<domain>/auth/callback`, ID tokens only (no API scopes needed — the app is its own resource).
-- Security Defaults enabled (free MFA). Passkey registered in Microsoft Authenticator.
-- **Defence in depth:** the API additionally checks the ID token's `oid` claim against a configured allowlist. Tenant misconfiguration alone cannot admit anyone.
-- No registration endpoint exists. Users are created by the migration/seed, never by the app.
+*Revised 15 Nov 2026 (L1, decision D1 in `docs/multi-user-launch-plan.md`). Until then this was one Entra ID tenant with an `oid` allowlist and users created by `migrate`.*
+
+- The server connects to each provider directly with ASP.NET Core's OpenID Connect handler: Google at `https://accounts.google.com`, scopes `openid email profile`, one OAuth web client per environment, redirect URI `https://<domain>/auth/callback`. No Entra External ID, no identity directory, no passwords. Setup: `docs/google_sign_in_setup.md`.
+- Providers are a list (`OidcSignIn.All`); Sign in with Apple (L1b) is a second entry with its own login and callback paths. Without a provider's `ClientId` and `ClientSecret` it is left out, and with none the app runs demo-only.
+- **Open sign-up:** the first sign-in creates the `User` (`Login`), keyed `google:<sub>`. A concurrent duplicate loses on the unique `ExternalId` index and re-reads the winner. The provider's `email_verified` must be true, or the sign-in is refused (`auth.email-unverified`). The token's `name` becomes the display name on creation; the email is refreshed on every sign-in.
+- No account linking: the same person through Google and Apple is two accounts.
+- **The original account** (keyed by an Entra oid) is carried over by `Auth:AdoptLegacyUserEmail`: the first Google sign-in with that verified email re-points the one remaining non-demo row with a bare oid at the Google subject. Anything ambiguous falls through to an ordinary sign-up.
 
 ### 5.2 BFF cookie pattern
 
 The server, not the browser, performs OpenID Connect:
 
-1. `/auth/login` redirects to Entra with authorization-code flow + PKCE (ASP.NET Core's OpenID Connect handler against the tenant's own authority; `Microsoft.Identity.Web` was dropped in M5 because its issuer validation cannot run without the network, see `docs/plans/m5-auth.md`).
-2. Entra redirects to `/auth/callback` with a one-time code.
-3. The API exchanges the code for tokens server-to-server, validates the ID token, maps `oid` → `User.Id`.
+1. `/auth/login` redirects to Google with authorization-code flow + PKCE (ASP.NET Core's OpenID Connect handler against Google's authority, with `prompt=select_account` so a shared phone can switch accounts).
+2. Google redirects to `/auth/callback` with a one-time code.
+3. The API exchanges the code for tokens server-to-server, validates the ID token, maps `google:<sub>` → `User.Id` (creating the user on first sign-in).
 4. The API issues an ASP.NET cookie: `HttpOnly`, `Secure`, `SameSite=Strict`, sliding expiry 30 days, encrypted/signed with Data Protection.
 5. React never sees a token; `fetch('/api/...')` sends the cookie automatically.
 6. Whether anyone is signed in is simply whether `GET /api/me` answers: the cookie is `HttpOnly`, so the page cannot look at it. A `401` from any request drops the SPA back to its sign-in screen.
@@ -242,11 +245,11 @@ Key ring persisted to Azure Blob Storage (`PersistKeysToAzureBlobStorage`) so co
 | Edge | Cloudflare proxied DNS: WAF managed rules, bot fight mode, DDoS, origin IP hidden. ACA ingress restricted to Cloudflare IP ranges. |
 | Transport | HTTPS only, HSTS (preload after first month), TLS 1.2+. TLS ends at the ingress, so the app honours `X-Forwarded-Proto` (`Edge`, M9): outside Development antiforgery refuses requests it sees as plain http, and every write would fail. The client address is Cloudflare's `CF-Connecting-IP`. |
 | Headers | CSP (`default-src 'self'`; inline styles allowed because React and Recharts set style attributes; the built SPA has no inline scripts), `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `frame-ancestors 'none'`. Set by the app, tested, not by Cloudflare rules. |
-| Auth | Single-tenant Entra + `oid` allowlist, MFA, passkey, BFF cookie, anti-forgery on state-changing requests (ASP.NET Core antiforgery: token from `GET /auth/csrf`, sent back as `X-XSRF-TOKEN` on every non-GET; bound to the signed-in user, so it is fetched again after sign-in and sign-out). |
+| Auth | Google OpenID Connect (verified email required; MFA and passkeys are the Google account's), BFF cookie, anti-forgery on state-changing requests (ASP.NET Core antiforgery: token from `GET /auth/csrf`, sent back as `X-XSRF-TOKEN` on every non-GET; bound to the signed-in user, so it is fetched again after sign-in and sign-out). |
 | Rate limiting | ASP.NET `RateLimiter`: global per-IP sliding window; stricter on `/auth/*`. |
 | Data | Tenant filter on every query; parameterised queries via EF; `decimal` money; no PII in logs. |
 | Database | Not publicly reachable; firewall = "Allow Azure services" only; TDE at rest (default); 7-day PITR (Basic). |
-| Secrets | None in repo. Connection string and Entra client secret as ACA secrets; pipeline auth via OIDC federated credential (no stored Azure credentials in GitHub). |
+| Secrets | None in repo. Connection string and Google client secret as ACA secrets; pipeline auth via OIDC federated credential (no stored Azure credentials in GitHub). |
 | Supply chain | Dependabot for NuGet, npm, Actions; CodeQL on PRs. |
 | Privacy | Export (`GET /api/me/export`) and delete-account endpoints exist even for one user; no third-party analytics. |
 
@@ -327,7 +330,7 @@ Environment protection on `production` requires a manual approval only if desire
 | `storage.bicep` | Storage account (LRS), blob container `dataprotection` |
 | `sql.bicep` | SQL logical server (Entra admin), Basic database, firewall rule *AllowAzureServices*, TDE default |
 | `aca-environment.bicep` | Container Apps environment bound to the workspace |
-| `aca-app.bicep` | Container App: ingress external 443, min 1 / max 3 replicas, HTTP scale rule, system-assigned identity, secrets (connection string, Entra client secret), env vars, health probes |
+| `aca-app.bicep` | Container App: ingress external 443, min 1 / max 3 replicas, HTTP scale rule, system-assigned identity, secrets (connection string, Google client secret), env vars, health probes |
 | `aca-jobs.bicep` | `budget-migrate` (manual trigger), `budget-rollover` (cron `5 * * * *`, parallelism 1, short replica timeout), `budget-demo-reset` (cron `0 17 * * *`). Cron expressions are UTC |
 | `identity.bicep` | User-assigned identity + federated credential for the GitHub repo (`repo:rickychongjl/<repo>:ref:refs/heads/main`), role assignments (Contributor on the RG, AcrPull not needed — GHCR) |
 
@@ -340,7 +343,7 @@ Learning notes to capture as you go: modules and outputs, `existing` references,
 ## 12. Observability
 
 - **Application Insights** SDK in the API: automatic request, dependency (SQL), exception and performance telemetry with per-request correlation IDs; adaptive sampling on; log level `Information` in prod.
-- **Structured logging** via `ILogger` with event IDs. Sign-in events log `oid`, IP (Cloudflare `CF-Connecting-IP`), user agent, and outcome — the audit trail.
+- **Structured logging** via `ILogger` with event IDs. A refused sign-in logs its code and provider only; no email, subject or name is ever logged.
 - **Health:** `/health` (liveness, no DB) for ACA probes; `/health/ready` (DB ping) for the dashboard only, so a DB blip never restarts the container.
 - **Rollover logging:** each job run logs users checked and cycles created. The request-time fallback logs a warning when it is the one that creates a cycle, because that means the job missed it.
 - **Alerts:** server errors (5xx, at least 3) > 5% of requests over 15 min; P95 latency > 1 s over at least 20 requests; both exclude the liveness probe; rollover job failed; demo-reset job failed; Cost Management budget alert at A$30/month.
@@ -351,7 +354,7 @@ Learning notes to capture as you go: modules and outputs, `existing` references,
 ## 13. Local development
 
 - `docker-compose.yml`: `sql` (SQL Server 2022 Express, volume-backed), `api` (dev image, hot reload optional). `web` runs via `npm run dev` with Vite proxying `/api` and `/auth` to the API — same-origin behaviour preserved locally.
-- Local auth: Entra works against `https://localhost:5001` as a registered redirect URI; a `Development`-only "dev login" endpoint is **not** provided — use the demo session locally instead to keep prod and dev auth identical.
+- Local auth: Google works against `https://localhost:5001` and `http://localhost:8080` as registered redirect URIs (`docs/google_sign_in_setup.md`); a `Development`-only "dev login" endpoint is **not** provided — use the demo session locally instead to keep prod and dev auth identical.
 - `make`/`just` targets or npm scripts: `up`, `test`, `test:e2e`, `migrate`, `rollover`, `reset-demo`. No scheduler runs locally; rollover happens through the request-time fallback, or by running the `rollover` target by hand.
 - Windows host with Docker Desktop; Testcontainers and Playwright both supported.
 
@@ -415,7 +418,7 @@ budget-pwa/
 | Log Analytics + Application Insights | Free 5 GB | 0 |
 | Cloudflare | Free | 0 |
 | GitHub (private repo, Actions, GHCR) | Free | 0 |
-| Entra ID tenant | Free | 0 |
+| Google OAuth client | Free | 0 |
 | Domain | — | ~1.50 |
 | **Total** | | **~A$15–18** |
 
@@ -428,7 +431,7 @@ Levers: scale the container to zero (saves ~A$5, adds cold starts); move SQL to 
 1. **Monolith over decoupled SPA** — one deployable, same-origin auth; split criteria documented.
 2. **Azure Container Apps over App Service** — cheaper warm instance, scale-to-zero option, jobs for migrations.
 3. **BFF cookie auth over SPA tokens** — tokens never reach the browser.
-4. **Entra ID single-tenant over ASP.NET Identity** — MFA/passkeys for free, no password storage, no sign-up surface.
+4. **Sign in with Google (Apple later), connected directly, over ASP.NET Identity or Entra** — no password storage, open sign-up with the first sign-in creating the account, MFA and passkeys from the user's own Google account. Revised 15 Nov 2026 from Entra ID single-tenant plus an `oid` allowlist (L1).
 5. **Provisioned Basic SQL over serverless free offer** — latency requirement outweighs ~A$7/month.
 6. **Migrations as a Container Apps Job** — runs inside Azure, before the new revision, no public DB path.
 7. **Narrow repositories over generic `IRepository<T>`** — testability without leaking `IQueryable`.

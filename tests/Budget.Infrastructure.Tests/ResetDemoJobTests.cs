@@ -25,7 +25,7 @@ public sealed class ResetDemoJobTests(SqlServerFixture sql)
             await db.SaveChangesAsync();
         }
 
-        await using var services = JobHost.BuildServices(sql.ConnectionString, allowedOids: null);
+        await using var services = JobHost.BuildServices(sql.ConnectionString);
         Guid demoId;
         await using (var scope = services.CreateAsyncScope())
         {
@@ -73,7 +73,7 @@ public sealed class ResetDemoJobTests(SqlServerFixture sql)
     [Fact]
     public async Task Empty_leaves_the_demo_with_nothing_and_a_reset_puts_the_fixture_back()
     {
-        await using var services = JobHost.BuildServices(sql.ConnectionString, allowedOids: null);
+        await using var services = JobHost.BuildServices(sql.ConnectionString);
         Guid demoId;
         await using (var scope = services.CreateAsyncScope())
         {

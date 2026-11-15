@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { LogOut } from 'lucide-react'
+import { CircleAlert, Download, LogOut, Trash2 } from 'lucide-react'
 import { useId, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
-import { api } from '../../api/client'
+import { api, NetworkError } from '../../api/client'
 import type { Cycle, Me } from '../../api/types'
 import { addDays, formatDate, todayIn } from '../../format/dates'
 import { Screen } from '../../shell/Screen'
@@ -13,10 +13,13 @@ import { Card } from '../../ui/Card'
 import { Dialog } from '../../ui/Dialog'
 import { Field } from '../../ui/Field'
 import { SegmentedControl } from '../../ui/SegmentedControl'
+import { Sheet } from '../../ui/Sheet'
 import { useToast } from '../../ui/useToast'
 import { useSession } from '../auth/useSession'
 import { useCurrentCycle } from '../home/useCurrentCycle'
+import { PlanSection } from '../plans/PlanSection'
 import styles from './Settings.module.css'
+import { saveFile } from './saveFile'
 
 const THEMES = [
   { value: 'system', label: 'System' },
@@ -31,6 +34,7 @@ export function Settings() {
   const current = useCurrentCycle()
   const [theme, setTheme] = useState<ThemePreference>(getPreference)
   const [leaving, setLeaving] = useState(false)
+  const exportId = useId()
 
   async function leave() {
     setLeaving(true)
@@ -68,19 +72,170 @@ export function Settings() {
         </Card>
       </section>
 
+      <PlanSection />
+
       {/* Only the current cycle's start can move (story "Settings 3"), and only once it is confirmed. Remounts when the
           saved date changes, so the field never shows a stale one. */}
       {cycle?.status === 'Confirmed' && <StartDate key={`${cycle.id}:${cycle.startDate}`} cycle={cycle} me={me} />}
 
       <Profile key={`${me.displayName}:${me.timeZone}`} me={me} />
 
-      <section className={styles.section}>
-        <h2 className={styles.heading}>Account</h2>
+      <section aria-labelledby="account" className={styles.section}>
+        <h2 id="account" className={styles.heading}>
+          Account
+        </h2>
+        <ExportData id={exportId} />
         <Button variant="secondary" icon={LogOut} pending={leaving} onClick={leave}>
           Sign out
         </Button>
+        <DeleteAccount exportId={exportId} />
       </section>
     </Screen>
+  )
+}
+
+// A download, not a write, but it needs the server: disabled offline and says so (CLAUDE.md "needs a connection"). Fetched
+// through the API client rather than a plain link, so a refusal (rate limit, signed out) is a toast here instead of a broken
+// file in the browser's downloads.
+function ExportData({ id }: { id: string }) {
+  const toast = useToast()
+  const online = useOnline()
+
+  const exportData = useMutation({
+    mutationFn: () => api.download('/api/me/export'),
+    onSuccess: ({ blob, fileName }) => {
+      saveFile(blob, fileName ?? 'tightarse-export.zip')
+      toast.show({ message: 'Export downloaded' })
+    },
+    onError: (error: Error) =>
+      toast.show({ message: error instanceof NetworkError ? "Couldn't export. Check your connection and try again." : error.message, tone: 'error' }),
+  })
+
+  return (
+    <>
+      <Button id={id} variant="secondary" icon={Download} pending={exportData.isPending} disabled={!online} onClick={() => exportData.mutate()}>
+        Export my data
+      </Button>
+      <p className={styles.detail}>{online ? 'A ZIP with a spreadsheet (CSV) of your cycles, categories and transactions, and one JSON file with everything.' : 'Needs a connection.'}</p>
+    </>
+  )
+}
+
+// What the server checks for (DeleteAccount.Confirmation).
+const CONFIRMATION = 'DELETE'
+
+// Decision D5: everything goes at once, after the word is typed. The demo is shared and the server refuses it
+// (demo.account.undeletable), so it is not offered there.
+function DeleteAccount({ exportId }: { exportId: string }) {
+  const { me } = useSession()
+  const online = useOnline()
+  const [open, setOpen] = useState(false)
+
+  // The sheet closes first, which returns focus to the button that opened it; then focus moves on to Export.
+  function exportFirst() {
+    setOpen(false)
+    setTimeout(() => document.getElementById(exportId)?.focus())
+  }
+
+  if (me.isDemo) {
+    return <p className={styles.detail}>The demo is shared, so it can't be deleted.</p>
+  }
+
+  return (
+    <>
+      <Button variant="destructive" icon={Trash2} disabled={!online} onClick={() => setOpen(true)}>
+        Delete account
+      </Button>
+      {!online && <p className={styles.detail}>Deleting your account needs a connection.</p>}
+      {/* Mounted only while open, so the typed word never survives a close. */}
+      {open && <DeleteAccountSheet onClose={() => setOpen(false)} onExportFirst={exportFirst} />}
+    </>
+  )
+}
+
+// A Sheet rather than a Dialog because it holds a field (MASTER 9: a Dialog is for confirmations only).
+function DeleteAccountSheet({ onClose, onExportFirst }: { onClose: () => void; onExportFirst: () => void }) {
+  const { signOut } = useSession()
+  const toast = useToast()
+  const online = useOnline()
+  const field = useRef<HTMLInputElement>(null)
+  const [typed, setTyped] = useState('')
+  const [problem, setProblem] = useState<string>()
+  const confirmed = typed.trim() === CONFIRMATION
+
+  // Straight to the API: deleting is the server's job and cannot be queued. The server has signed the session out by the
+  // time it answers, so this device is cleared the way sign-out clears it, without asking the server again. The toast
+  // lives above the session gate, so it is still showing on the sign-in screen.
+  const remove = useMutation({
+    mutationFn: () => api.delete('/api/me', { confirm: CONFIRMATION }),
+    onSuccess: async () => {
+      toast.show({ message: 'Your account and all its data have been deleted.' })
+      await signOut({ accountDeleted: true })
+    },
+    onError: (error: Error) => {
+      setProblem(error instanceof NetworkError ? "Couldn't delete your account. Check your connection and try again." : error.message)
+      field.current?.focus()
+    },
+  })
+
+  const canDelete = confirmed && online && !remove.isPending
+
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    if (canDelete) {
+      setProblem(undefined)
+      remove.mutate()
+    }
+  }
+
+  return (
+    <Sheet
+      open
+      title="Delete your account?"
+      // Once the request is in flight the answer decides what happens next, so the sheet stays until it comes.
+      onClose={() => !remove.isPending && onClose()}
+      footer={
+        <div className={styles.actions}>
+          <Button variant="secondary" disabled={remove.isPending} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form="delete-account" variant="destructive" icon={Trash2} pending={remove.isPending} disabled={!confirmed || !online}>
+            Delete account
+          </Button>
+        </div>
+      }
+    >
+      <form id="delete-account" className={styles.sheetBody} onSubmit={submit} noValidate>
+        {problem && (
+          <p role="alert" className={styles.problem}>
+            <CircleAlert aria-hidden="true" className={styles.problemIcon} />
+            {problem}
+          </p>
+        )}
+        <p>
+          This deletes your account and everything in it straight away: every cycle, category and transaction, and your profile. It can't be undone.
+        </p>
+        <p className={styles.detail}>Copies in our backups are gone within 7 days.</p>
+        <div className={styles.exportFirst}>
+          <p className={styles.detail}>Want a copy first? Export your data before you delete.</p>
+          <Button variant="ghost" icon={Download} onClick={onExportFirst}>
+            Export my data first
+          </Button>
+        </div>
+        <Field
+          ref={field}
+          label={`Type ${CONFIRMATION} to confirm`}
+          value={typed}
+          autoComplete="off"
+          autoCapitalize="characters"
+          autoCorrect="off"
+          spellCheck={false}
+          enterKeyHint="done"
+          hint={online ? undefined : 'Deleting your account needs a connection.'}
+          onChange={(event) => setTyped(event.target.value)}
+        />
+      </form>
+    </Sheet>
   )
 }
 

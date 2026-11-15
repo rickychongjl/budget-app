@@ -2,7 +2,8 @@ using '../main.bicep'
 
 // Secrets and the email come from the shell that runs the deployment, never from this file:
 //   $env:SQL_ADMIN_PASSWORD = '...'; $env:ALERT_EMAIL = '...'   (PowerShell)
-// The Entra values are the same as local user-secrets, except the client secret, which is production's own (budget-prod).
+// Google: production's own OAuth client (docs/google_sign_in_setup.md), not the local one. The adopt email is the owner's
+// Google address; it is personal, so it comes from the shell too, and once the owner has signed in once it can be left empty.
 
 param env = 'prod'
 param image = 'ghcr.io/rickychongjl/budget-app:latest'
@@ -14,10 +15,10 @@ param budgetStartDate = '2026-10-01'
 param sqlAdminLogin = 'budgetadmin'
 param sqlAdminPassword = readEnvironmentVariable('SQL_ADMIN_PASSWORD')
 
-param entraTenantId = readEnvironmentVariable('ENTRA_TENANT_ID', '')
-param entraClientId = readEnvironmentVariable('ENTRA_CLIENT_ID', '')
-param entraClientSecret = readEnvironmentVariable('ENTRA_CLIENT_SECRET', '')
-param allowedOids = readEnvironmentVariable('AUTH_ALLOWED_OIDS', '')
+param googleClientId = readEnvironmentVariable('GOOGLE_CLIENT_ID', '')
+param googleClientSecret = readEnvironmentVariable('GOOGLE_CLIENT_SECRET', '')
+param adoptLegacyUserEmail = readEnvironmentVariable('AUTH_ADOPT_LEGACY_USER_EMAIL', '')
+param complimentaryPremiumEmails = readEnvironmentVariable('PLANS_COMPLIMENTARY_PREMIUM_EMAILS', '')
 
 // Runbook steps 6 to 8 (docs/plans/m9-infra.md) fill these in, in that order.
 param customDomain = 'tightarse.app'

@@ -13,9 +13,11 @@ public sealed class BudgetDbContext(DbContextOptions<BudgetDbContext> options, I
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<CycleCategory> CycleCategories => Set<CycleCategory>();
     public DbSet<Transaction> Transactions => Set<Transaction>();
+    public DbSet<Subscription> Subscriptions => Set<Subscription>();
 
     // A property, not the constructor parameter, so EF re-reads it per query instead of baking one user into the cached model.
-    private Guid CurrentUserId => currentUser.Id;
+    // Internal so UserRepository.DeleteAccountAsync can apply the same rule to the User row, which has no filter.
+    internal Guid CurrentUserId => currentUser.Id;
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configuration) =>
         configuration.Properties<decimal>().HavePrecision(18, 2);
@@ -88,12 +90,14 @@ public sealed class BudgetDbContext(DbContextOptions<BudgetDbContext> options, I
         {
             b.ToTable("User");
             b.Property(x => x.Id).ValueGeneratedNever();
-            b.Property(x => x.ExternalId).HasMaxLength(64);
+            b.Property(x => x.ExternalId).HasMaxLength(ExternalIdentity.MaxLength);
             b.Property(x => x.DisplayName).HasMaxLength(100);
             b.Property(x => x.IsDemo);
             b.Property(x => x.TimeZone).HasMaxLength(64);
             b.Property(x => x.Currency).HasMaxLength(3);
             b.Property(x => x.CreatedAt);
+            // The longest address SMTP allows. Nullable: Apple can withhold it, and rows from before Google sign-in have none.
+            b.Property(x => x.Email).HasMaxLength(254);
             b.HasIndex(x => x.ExternalId).IsUnique();
         });
 
@@ -160,5 +164,36 @@ public sealed class BudgetDbContext(DbContextOptions<BudgetDbContext> options, I
             b.HasIndex(x => new { x.UserId, x.OccurredOn });
             b.HasIndex(x => new { x.UserId, x.ClientId }).IsUnique();
         });
+
+        // Source, status and plan are stored as the codes in SubscriptionCodes, and the database refuses anything else,
+        // so a row written by hand or by a billing adapter with a typo fails at the insert instead of at the next read.
+        // Compared in a binary collation: the database default ignores case, but reading the row back does not.
+        model.Entity<Subscription>(b =>
+        {
+            b.ToTable("Subscription", t =>
+            {
+                t.HasCheckConstraint("CK_Subscription_Source", OneOf("Source", SubscriptionCodes.Sources));
+                t.HasCheckConstraint("CK_Subscription_Status", OneOf("Status", SubscriptionCodes.Statuses));
+                t.HasCheckConstraint("CK_Subscription_Plan", OneOf("Plan", SubscriptionCodes.PlanCodes));
+            });
+            b.HasQueryFilter(x => x.UserId == CurrentUserId);
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.UserId);
+            b.Property(x => x.Source).HasMaxLength(20)
+                .HasConversion<string>(v => SubscriptionCodes.Of(v), v => SubscriptionCodes.ParseSource(v));
+            // An App Store original transaction id is short; a Google Play purchase token can run to a few hundred characters.
+            b.Property(x => x.ExternalId).HasMaxLength(512);
+            b.Property(x => x.Status).HasMaxLength(20)
+                .HasConversion<string>(v => SubscriptionCodes.Of(v), v => SubscriptionCodes.ParseStatus(v));
+            b.Property(x => x.Plan).HasMaxLength(20)
+                .HasConversion<string>(v => SubscriptionCodes.Of(v), v => SubscriptionCodes.ParsePlan(v));
+            b.Property(x => x.CreatedAt);
+            b.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+            // One row per store subscription: a billing notification replayed finds the row it made. A manual grant has no id.
+            b.HasIndex(x => new { x.UserId, x.Source, x.ExternalId }).IsUnique().HasFilter("[ExternalId] IS NOT NULL");
+        });
     }
+
+    private static string OneOf(string column, IEnumerable<string> codes) =>
+        $"[{column}] COLLATE Latin1_General_100_BIN2 IN ({string.Join(", ", codes.Select(c => $"'{c}'"))})";
 }

@@ -22,6 +22,8 @@ namespace Budget.Api.Tests;
 // each creates its own user, so the tenant filter keeps them apart.
 public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    public const string ComplimentaryEmail = "complimentary@plans.test";
+
     private readonly MsSqlContainer _container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
 
     public async Task InitializeAsync()
@@ -45,19 +47,23 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         // Every test shares one address, so the production limit would trip halfway through the run. RateLimitTests lowers it again.
         builder.UseSetting("RateLimiting:PermitLimit", "1000000");
         builder.UseSetting("RateLimiting:AuthPermitLimit", "1000000");
+        builder.UseSetting("RateLimiting:ExportPermitLimit", "1000000");
         // The host runs as Development, which loads the developer's user-secrets. Without these a machine that has done the
-        // Entra setup would run the suite against the real tenant and allowlist. EntraSignInTests set their own.
-        builder.UseSetting("Entra:ClientId", "");
-        builder.UseSetting("Auth:AllowedOids", "");
+        // Google setup would run the suite against the real client, and could adopt a test row. GoogleSignInTests set their own.
+        builder.UseSetting("Google:ClientId", "");
+        builder.UseSetting("Google:ClientSecret", "");
+        builder.UseSetting("Auth:AdoptLegacyUserEmail", "");
+        // Fixed, so a developer's own address in user-secrets never makes a test user Premium. PlanTests use this one.
+        builder.UseSetting("Plans:ComplimentaryPremiumEmails", ComplimentaryEmail);
 
         builder.ConfigureTestServices(services => services
             .AddAuthentication(TestAuth.SchemeName)
             .AddScheme<AuthenticationSchemeOptions, TestAuth>(TestAuth.SchemeName, null));
     }
 
-    public async Task<User> NewUserAsync(bool isDemo = false, string? externalId = null)
+    public async Task<User> NewUserAsync(bool isDemo = false, string? externalId = null, string? email = null)
     {
-        var user = new User("Test", "Australia/Sydney", "AUD", DateTimeOffset.UtcNow, externalId, isDemo);
+        var user = new User("Test", "Australia/Sydney", "AUD", DateTimeOffset.UtcNow, externalId, isDemo, email);
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<BudgetDbContext>();
         db.Users.Add(user);
@@ -126,7 +132,7 @@ internal static class CsrfClientExtensions
         host.CreateDefaultClient((options ?? new()).BaseAddress, new CsrfHandler(), new CookieContainerHandler());
 }
 
-// Lets a test act as any user without signing in: only the demo user can get a real cookie until Entra arrives in M5.
+// Lets a test act as any user without signing in (GoogleSignInTests walk the real round trip instead).
 // Everything after authentication is the real pipeline.
 internal sealed class TestAuth(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder)
     : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)

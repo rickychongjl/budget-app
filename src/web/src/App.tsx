@@ -8,6 +8,8 @@ import { CycleDetail } from './features/cycles/CycleDetail'
 import { Cycles } from './features/cycles/Cycles'
 import { Home } from './features/home/Home'
 import { Onboarding } from './features/onboarding/Onboarding'
+import { Privacy, Terms } from './features/public/Legal'
+import { Pricing } from './features/public/Pricing'
 import { Settings } from './features/settings/Settings'
 import { CategoryTransactions } from './features/transactions/CategoryTransactions'
 import { OutboxSync } from './offline/OutboxSync'
@@ -45,26 +47,40 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <UpdatePrompt />
-        {/* Signed out, every path shows the sign-in screen; the routes below exist only for someone signed in. */}
-        <SessionGate>
-          <OutboxSync />
-          <BrowserRouter>
-            <Routes>
-              <Route element={<AppShell />}>
-                <Route index element={<Home />} />
-                <Route path="cycles" element={<Cycles />} />
-                <Route path="cycles/:id" element={<CycleDetail />} />
-                <Route path="cycles/:cycleId/categories/:categoryId" element={<CategoryTransactions />} />
-                <Route path="settings" element={<Settings />} />
-                <Route path="settings/categories" element={<Categories />} />
-                <Route path="onboarding" element={<Onboarding />} />
-              </Route>
-              {/* /signin once signed in, and anything unknown, goes Home. The server has already answered /api and /auth. */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </BrowserRouter>
-        </SessionGate>
+        <BrowserRouter>
+          <Routes>
+            {/* Public pages (decision D4): they need no session and no server, so they render for anyone, signed in or
+                out, and offline from the precached app shell. "/" is public too, but only signed out (SessionGate). */}
+            <Route path="pricing" element={<Pricing />} />
+            <Route path="privacy" element={<Privacy />} />
+            <Route path="terms" element={<Terms />} />
+            <Route path="*" element={<SignedInApp />} />
+          </Routes>
+        </BrowserRouter>
       </ToastProvider>
     </QueryClientProvider>
+  )
+}
+
+// Signed out, "/" is the landing page and every other path the sign-in screen; the routes below exist only for someone
+// signed in.
+function SignedInApp() {
+  return (
+    <SessionGate>
+      <OutboxSync />
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route index element={<Home />} />
+          <Route path="cycles" element={<Cycles />} />
+          <Route path="cycles/:id" element={<CycleDetail />} />
+          <Route path="cycles/:cycleId/categories/:categoryId" element={<CategoryTransactions />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="settings/categories" element={<Categories />} />
+          <Route path="onboarding" element={<Onboarding />} />
+        </Route>
+        {/* /signin once signed in, and anything unknown, goes Home. The server has already answered /api and /auth. */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </SessionGate>
   )
 }
