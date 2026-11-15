@@ -201,9 +201,11 @@ public class RepositoryTests(SqlServerFixture sql)
             (await transactions.AnyForCategoryAsync(cycle.Id, fuel.Id)).Should().BeTrue();
             (await transactions.AnyForCategoryAsync(next.Id, fuel.Id)).Should().BeFalse();
             (await transactions.CountAsync()).Should().Be(4);
+            (await transactions.ListAllAsync()).Select(t => t.Id).Should().Equal(early.Id, late.Id, sameDayLater.Id, elsewhere.Id);
             await using (var nobodyElse = sql.ContextFor(await sql.NewUserAsync()))
             {
                 (await new TransactionRepository(nobodyElse).CountAsync()).Should().Be(0);
+                (await new TransactionRepository(nobodyElse).ListAllAsync()).Should().BeEmpty();
             }
 
             transactions.Remove((await transactions.GetAsync(late.Id))!);

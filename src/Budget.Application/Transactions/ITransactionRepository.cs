@@ -9,6 +9,9 @@ public interface ITransactionRepository
     // Newest first.
     Task<IReadOnlyList<Transaction>> ListForCycleAsync(Guid cycleId, Guid? categoryId = null, CancellationToken ct = default);
 
+    // Every transaction in every cycle, oldest first: what the export writes out. A user has at most a few thousand.
+    Task<IReadOnlyList<Transaction>> ListAllAsync(CancellationToken ct = default);
+
     // Every cycle at once, summed in the database: what the report needs without loading a transaction.
     Task<IReadOnlyList<CategoryTotal>> SumByCategoryAsync(CancellationToken ct = default);
     Task<Transaction?> GetAsync(Guid id, CancellationToken ct = default);

@@ -82,6 +82,8 @@ internal sealed class FakeStore : ICurrentUser, IUnitOfWork, IUserRepository, IC
         Task.FromResult<IReadOnlyList<Transaction>>([.. Transactions
             .Where(t => t.UserId == Id && t.CycleId == cycleId && (categoryId is null || t.CategoryId == categoryId))
             .OrderByDescending(t => t.OccurredOn).ThenByDescending(t => t.CreatedAt)]);
+    Task<IReadOnlyList<Transaction>> ITransactionRepository.ListAllAsync(CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<Transaction>>([.. Transactions.Where(t => t.UserId == Id).OrderBy(t => t.OccurredOn).ThenBy(t => t.CreatedAt)]);
     Task<IReadOnlyList<CategoryTotal>> ITransactionRepository.SumByCategoryAsync(CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<CategoryTotal>>([.. Transactions
             .Where(t => t.UserId == Id)

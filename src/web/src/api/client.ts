@@ -54,8 +54,10 @@ export function onUnauthorized(handler: () => void) {
   unauthorized = handler
 }
 
-async function send<T>(method: string, path: string, body?: unknown, retried = false): Promise<T> {
-  const headers: Record<string, string> = { Accept: 'application/json' }
+// Every request goes through here: the token on a write, one retry on a stale token, a 401 back to sign-in, and a refusal
+// as ProblemError. A success comes back as the raw Response for the caller to read.
+async function request(method: string, path: string, accept: string, body?: unknown, retried = false): Promise<Response> {
+  const headers: Record<string, string> = { Accept: accept }
   if (body !== undefined) {
     headers['Content-Type'] = 'application/json'
   }
@@ -76,13 +78,13 @@ async function send<T>(method: string, path: string, body?: unknown, retried = f
   }
 
   if (response.ok) {
-    return (response.status === 204 ? undefined : await response.json()) as T
+    return response
   }
 
   const problem = await response.json().catch(() => ({}))
   if (response.status === 400 && problem.code === 'csrf.invalid' && !retried) {
     resetCsrf()
-    return send<T>(method, path, body, true)
+    return request(method, path, accept, body, true)
   }
   if (response.status === 401) {
     unauthorized()
@@ -90,9 +92,24 @@ async function send<T>(method: string, path: string, body?: unknown, retried = f
   throw new ProblemError(response.status, problem)
 }
 
+async function send<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const response = await request(method, path, 'application/json', body)
+  return (response.status === 204 ? undefined : await response.json()) as T
+}
+
+// A file to save rather than JSON to read: the body, and the name the server gave it in Content-Disposition.
+export type Download = { blob: Blob; fileName: string | undefined }
+
+async function download(path: string): Promise<Download> {
+  const response = await request('GET', path, '*/*')
+  const disposition = response.headers.get('Content-Disposition') ?? ''
+  return { blob: await response.blob(), fileName: /filename="?([^";]+)"?/i.exec(disposition)?.[1] }
+}
+
 export const api = {
   get: <T>(path: string) => send<T>('GET', path),
   post: <T = void>(path: string, body?: unknown) => send<T>('POST', path, body),
   patch: <T = void>(path: string, body?: unknown) => send<T>('PATCH', path, body),
   delete: <T = void>(path: string) => send<T>('DELETE', path),
+  download,
 }

@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { LogOut } from 'lucide-react'
+import { Download, LogOut } from 'lucide-react'
 import { useId, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
-import { api } from '../../api/client'
+import { api, NetworkError } from '../../api/client'
 import type { Cycle, Me } from '../../api/types'
 import { addDays, formatDate, todayIn } from '../../format/dates'
 import { Screen } from '../../shell/Screen'
@@ -17,6 +17,7 @@ import { useToast } from '../../ui/useToast'
 import { useSession } from '../auth/useSession'
 import { useCurrentCycle } from '../home/useCurrentCycle'
 import styles from './Settings.module.css'
+import { saveFile } from './saveFile'
 
 const THEMES = [
   { value: 'system', label: 'System' },
@@ -74,13 +75,43 @@ export function Settings() {
 
       <Profile key={`${me.displayName}:${me.timeZone}`} me={me} />
 
-      <section className={styles.section}>
-        <h2 className={styles.heading}>Account</h2>
+      <section aria-labelledby="account" className={styles.section}>
+        <h2 id="account" className={styles.heading}>
+          Account
+        </h2>
+        <ExportData />
         <Button variant="secondary" icon={LogOut} pending={leaving} onClick={leave}>
           Sign out
         </Button>
       </section>
     </Screen>
+  )
+}
+
+// A download, not a write, but it needs the server: disabled offline and says so (CLAUDE.md "needs a connection"). Fetched
+// through the API client rather than a plain link, so a refusal (rate limit, signed out) is a toast here instead of a broken
+// file in the browser's downloads.
+function ExportData() {
+  const toast = useToast()
+  const online = useOnline()
+
+  const exportData = useMutation({
+    mutationFn: () => api.download('/api/me/export'),
+    onSuccess: ({ blob, fileName }) => {
+      saveFile(blob, fileName ?? 'tightarse-export.zip')
+      toast.show({ message: 'Export downloaded' })
+    },
+    onError: (error: Error) =>
+      toast.show({ message: error instanceof NetworkError ? "Couldn't export. Check your connection and try again." : error.message, tone: 'error' }),
+  })
+
+  return (
+    <>
+      <Button variant="secondary" icon={Download} pending={exportData.isPending} disabled={!online} onClick={() => exportData.mutate()}>
+        Export my data
+      </Button>
+      <p className={styles.detail}>{online ? 'A ZIP with a spreadsheet (CSV) of your cycles, categories and transactions, and one JSON file with everything.' : 'Needs a connection.'}</p>
+    </>
   )
 }
 

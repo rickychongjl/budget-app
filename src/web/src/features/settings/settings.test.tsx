@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router'
@@ -176,5 +176,64 @@ describe('current cycle start date', () => {
 
     await screen.findByRole('region', { name: 'Profile' })
     await waitFor(() => expect(screen.queryByRole('region', { name: 'Current cycle' })).not.toBeInTheDocument())
+  })
+})
+
+// Settings → Account: the export is a download from the server, so it needs a connection.
+describe('export my data', () => {
+  const account = () => within(screen.getByRole('region', { name: 'Account' }))
+
+  function stubDownloads() {
+    const saved: { href: string; download: string }[] = []
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:export'), revokeObjectURL: vi.fn() })
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      saved.push({ href: this.href, download: this.download })
+    })
+    return saved
+  }
+
+  test('downloads the ZIP under the name the server gave it', async () => {
+    const saved = stubDownloads()
+    server.use(
+      http.get('/api/me/export', () =>
+        new HttpResponse(new Uint8Array([80, 75, 3, 4]), {
+          headers: { 'Content-Type': 'application/zip', 'Content-Disposition': 'attachment; filename="tightarse-export-2026-09-20.zip"' },
+        }),
+      ),
+    )
+    renderSettings()
+
+    await userEvent.click(account().getByRole('button', { name: 'Export my data' }))
+
+    expect(await screen.findByText('Export downloaded')).toBeInTheDocument()
+    expect(saved).toEqual([{ href: 'blob:export', download: 'tightarse-export-2026-09-20.zip' }])
+    expect(URL.createObjectURL).toHaveBeenCalledWith(expect.objectContaining({ size: 4, type: 'application/zip' }))
+  })
+
+  test('a refusal is said in a toast and nothing is saved', async () => {
+    const saved = stubDownloads()
+    server.use(http.get('/api/me/export', () => HttpResponse.json({ status: 429, code: 'rate-limited', detail: 'Too many requests. Try again shortly.' }, { status: 429 })))
+    renderSettings()
+
+    await userEvent.click(account().getByRole('button', { name: 'Export my data' }))
+
+    expect(await screen.findByText('Too many requests. Try again shortly.')).toBeInTheDocument()
+    expect(saved).toEqual([])
+  })
+
+  test('works for the demo too', () => {
+    renderSettings({ ...RICKY, displayName: 'Demo', isDemo: true })
+
+    expect(account().getByRole('button', { name: 'Export my data' })).toBeEnabled()
+  })
+
+  test('offline, it cannot start and the reason is on screen', () => {
+    renderSettings()
+
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    act(() => void window.dispatchEvent(new Event('offline')))
+
+    expect(account().getByRole('button', { name: 'Export my data' })).toBeDisabled()
+    expect(account().getByText('Needs a connection.')).toBeInTheDocument()
   })
 })
