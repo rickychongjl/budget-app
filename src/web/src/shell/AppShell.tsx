@@ -1,4 +1,4 @@
-import { CalendarRange, Plus, Settings } from 'lucide-react'
+import { CalendarRange, Plus, ReceiptText, Settings } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router'
 import { AddTransactionSheet } from '../features/transactions/AddTransactionSheet'
@@ -34,11 +34,17 @@ export function AppShell() {
           </span>
           Home
         </NavLink>
-        {/* Not a route: adding happens over whatever screen you are on. */}
-        <button type="button" className={styles.tab} onClick={() => setAdding(true)}>
-          <Plus aria-hidden="true" />
-          Add
-        </button>
+        <NavLink to="/activity" className={tabClass}>
+          <ReceiptText aria-hidden="true" />
+          Activity
+        </NavLink>
+        {/* Not a route: adding happens over whatever screen you are on. The one tab without a caption: the raised
+            circle is the label, and the accessible name says what it does. */}
+        <div className={styles.addCell}>
+          <button type="button" className={styles.add} aria-label="Add transaction" onClick={() => setAdding(true)}>
+            <Plus aria-hidden="true" />
+          </button>
+        </div>
         <NavLink to="/cycles" className={tabClass}>
           <CalendarRange aria-hidden="true" />
           Cycles

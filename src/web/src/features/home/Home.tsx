@@ -123,7 +123,7 @@ export function CategorySection({ id, title, rows, currency, cycleId, today }: S
       <Card>
         <ul className={styles.rows}>
           {rows.map((row) => (
-            <CategoryRow key={row.categoryId} row={row} currency={currency} to={`/cycles/${cycleId}/categories/${row.categoryId}`} today={today} />
+            <CategoryRow key={row.categoryId} row={row} currency={currency} to={`/activity?cycle=${cycleId}&category=${row.categoryId}`} today={today} />
           ))}
         </ul>
       </Card>

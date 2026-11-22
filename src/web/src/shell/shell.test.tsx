@@ -31,6 +31,7 @@ function renderShell(path = '/') {
       <Routes>
         <Route element={<AppShell />}>
           <Route index element={<Screen title="Home"><Where /></Screen>} />
+          <Route path="activity" element={<Screen title="Activity"><Where /></Screen>} />
           <Route path="cycles" element={<Screen title="Cycles"><Where /></Screen>} />
           <Route path="settings" element={<Screen title="Settings"><Where /></Screen>} />
         </Route>
@@ -51,7 +52,7 @@ function setOnline(online: boolean) {
 afterEach(() => setOnline(true))
 
 describe('top bar', () => {
-  test.each(['/', '/cycles', '/settings'])('on %s it shows the app mark before the title', (path) => {
+  test.each(['/', '/activity', '/cycles', '/settings'])('on %s it shows the app mark before the title', (path) => {
     renderShell(path)
     const bar = screen.getByRole('heading', { level: 1 }).parentElement!
 
@@ -60,25 +61,36 @@ describe('top bar', () => {
 })
 
 describe('tab bar', () => {
-  test('has the four tabs, each with a label that is always visible', () => {
-    const tabs = renderShell()
+  test('has five tabs in order, Add in the middle', () => {
+    renderShell()
 
-    expect(tabs.getByRole('link', { name: 'Home' })).toBeInTheDocument()
-    expect(tabs.getByRole('button', { name: 'Add' })).toBeInTheDocument()
-    expect(tabs.getByRole('link', { name: 'Cycles' })).toBeInTheDocument()
-    expect(tabs.getByRole('link', { name: 'Settings' })).toBeInTheDocument()
+    const names = [...screen.getByRole('navigation', { name: 'Main' }).querySelectorAll('a, button')].map((tab) => tab.getAttribute('aria-label') ?? tab.textContent)
+    expect(names).toEqual(['Home', 'Activity', 'Add transaction', 'Cycles', 'Settings'])
   })
 
-  test('announces the current tab, and only that one', async () => {
+  test.each([
+    ['/', 'Home'],
+    ['/activity', 'Activity'],
+    ['/cycles', 'Cycles'],
+    ['/settings', 'Settings'],
+  ])('on %s only %s is announced as current', (path, current) => {
+    const tabs = renderShell(path)
+
+    for (const tab of tabs.getAllByRole('link')) {
+      if (tab.textContent === current) expect(tab).toHaveAttribute('aria-current', 'page')
+      else expect(tab).not.toHaveAttribute('aria-current')
+    }
+    expect(tabs.getByRole('button', { name: 'Add transaction' })).not.toHaveAttribute('aria-current')
+  })
+
+  test('tapping a tab moves the current marker with it', async () => {
     const tabs = renderShell('/')
-    expect(tabs.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
-    expect(tabs.getByRole('link', { name: 'Cycles' })).not.toHaveAttribute('aria-current')
 
-    await userEvent.click(tabs.getByRole('link', { name: 'Cycles' }))
+    await userEvent.click(tabs.getByRole('link', { name: 'Activity' }))
 
-    expect(tabs.getByRole('link', { name: 'Cycles' })).toHaveAttribute('aria-current', 'page')
+    expect(tabs.getByRole('link', { name: 'Activity' })).toHaveAttribute('aria-current', 'page')
     expect(tabs.getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current')
-    expect(screen.getByRole('heading', { level: 1, name: 'Cycles' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Activity' })).toBeInTheDocument()
   })
 
   test('Home carries the app mark, and its name is still only "Home"', () => {
@@ -91,7 +103,7 @@ describe('tab bar', () => {
   test('Add opens the sheet over the current screen rather than navigating', async () => {
     const tabs = renderShell('/cycles')
 
-    await userEvent.click(tabs.getByRole('button', { name: 'Add' }))
+    await userEvent.click(tabs.getByRole('button', { name: 'Add transaction' }))
 
     expect(screen.getByRole('dialog', { name: 'Add transaction' })).toBeInTheDocument()
     expect(screen.getByTestId('where')).toHaveTextContent('/cycles')

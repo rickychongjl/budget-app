@@ -1,5 +1,5 @@
+import { ChipGroup } from '../../ui/ChipGroup'
 import { SegmentedControl } from '../../ui/SegmentedControl'
-import { toSlot } from '../../ui/slots'
 import styles from './Trend.module.css'
 import type { TrendCategory, TrendFilter } from './trend'
 
@@ -29,23 +29,13 @@ export function TrendFilterControl({ filter, categories, onChange }: Props) {
         }}
       />
 
-      {/* MASTER 9: more options than a segmented control can hold, so a scrolling chip row in its own container. */}
       {filter.kind === 'category' && categories.length > 0 && (
-        <div role="radiogroup" aria-label="Category" className={styles.chips}>
-          {categories.map((category) => (
-            <label key={category.id} className={styles.chip} data-slot={toSlot(category.colour)}>
-              <input
-                type="radio"
-                name="trend-category"
-                className={styles.chipInput}
-                value={category.id}
-                checked={category.id === chosen}
-                onChange={() => onChange({ kind: 'category', categoryId: category.id, name: category.name })}
-              />
-              <span className={styles.chipText}>{category.name}</span>
-            </label>
-          ))}
-        </div>
+        <ChipGroup
+          label="Category"
+          options={categories.map((category) => ({ value: category.id, label: category.name, colour: category.colour }))}
+          value={chosen ?? ''}
+          onChange={(id) => onChange({ kind: 'category', categoryId: id, name: categories.find((category) => category.id === id)!.name })}
+        />
       )}
     </div>
   )

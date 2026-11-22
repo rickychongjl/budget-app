@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { cycleDay, cycleElapsed, formatDate, formatRange, todayIn } from './dates'
+import { cycleDay, cycleElapsed, formatDate, formatDay, formatRange, todayIn } from './dates'
 import { formatMoney } from './money'
 
 // MASTER section 11.
@@ -111,5 +111,21 @@ describe('todayIn', () => {
 
   test('an unknown time zone falls back to UTC rather than throwing', () => {
     expect(todayIn('Mars/Olympus', now)).toBe('2026-09-20')
+  })
+})
+
+describe('formatDay', () => {
+  test.each([
+    ['2026-09-20', 'Today'],
+    ['2026-09-19', 'Yesterday'],
+    ['2026-09-18', 'Fri 18 Sep'],
+    ['2026-01-01', 'Thu 1 Jan'],
+    ['2025-12-31', 'Wed 31 Dec 2025'],
+  ])('%s reads "%s"', (date, expected) => {
+    expect(formatDay(date, '2026-09-20')).toBe(expected)
+  })
+
+  test('yesterday across a month and a year', () => {
+    expect(formatDay('2025-12-31', '2026-01-01')).toBe('Yesterday')
   })
 })

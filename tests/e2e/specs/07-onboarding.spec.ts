@@ -36,7 +36,7 @@ test('Onboarding 1 to 5: from nothing to a confirmed first cycle', async ({ page
   await test.step('5 (first half): nothing can be recorded, and the budget cannot be confirmed, until there is a category', async () => {
     await expect(page.getByRole('button', { name: 'Confirm budget' })).toBeDisabled()
     await expect(page.getByText('Add at least one category first.')).toBeVisible()
-    await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Add' }).click()
+    await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Add transaction' }).click()
     const sheet = page.getByRole('dialog', { name: 'Add transaction' })
     await expect(sheet).toContainText('Confirm your budget before adding transactions.')
     await sheet.getByRole('button', { name: 'Close' }).click()
