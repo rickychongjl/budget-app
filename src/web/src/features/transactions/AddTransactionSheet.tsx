@@ -1,5 +1,5 @@
-import { Check, SearchX, ShieldCheck, Star, Trash2 } from 'lucide-react'
-import { useMemo, useState, type KeyboardEvent } from 'react'
+import { Check, ChevronDown, SearchX, ShieldCheck, Star, Trash2 } from 'lucide-react'
+import { useMemo, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import type { CategoryRollup, CategoryType, CycleSummary, EditTransactionRequest, Transaction } from '../../api/types'
 import { todayIn } from '../../format/dates'
 import { enqueue } from '../../offline/outbox'
@@ -12,6 +12,7 @@ import { IconChip } from '../../ui/IconChip'
 import { SegmentedControl } from '../../ui/SegmentedControl'
 import { Sheet } from '../../ui/Sheet'
 import { Skeleton } from '../../ui/Skeleton'
+import { toSlot } from '../../ui/slots'
 import { useToast } from '../../ui/useToast'
 import { useSession } from '../auth/useSession'
 import { readFavourites } from '../categories/favourites'
@@ -34,6 +35,21 @@ const readLastUsed = (type: CategoryType) => {
     return null
   }
 }
+
+// How often each category was picked on this device, by id: orders the chips after the pinned ones. Same footing as
+// the last-used key above.
+const USES_KEY = 'budget.categoryUses'
+const readUses = (): Record<string, number> => {
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(USES_KEY) ?? '{}')
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, number>) : {}
+  } catch {
+    return {}
+  }
+}
+
+// Enough for the usual picks to be one tap, few enough to sit in two rows above the keypad at 360px.
+const CHIPS = 6
 
 type Props = { open: boolean; onClose: () => void }
 
@@ -72,20 +88,30 @@ function Form({ summary, loading, editing, onClose }: { summary: CycleSummary | 
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   // Read once, when the sheet opens: pinning happens on the Categories screen, never while this sheet is up.
   const [favourites] = useState(readFavourites)
+  const [uses] = useState(readUses)
+  const [more, setMore] = useState(false)
 
-  // Pinned categories lead the picker, in the order they were pinned. A pin remembers an id, not a cycle, and the ids
-  // are this cycle's own rows, so a pin left over from a removed category simply matches nothing.
-  const pinned = useMemo(() => {
-    const ofType = new Map((summary?.rollup.categories ?? []).filter((row) => row.type === type).map((row) => [row.categoryId, row]))
-    return favourites.flatMap((id) => ofType.get(id) ?? [])
-  }, [summary, type, favourites])
+  const ofType = useMemo(() => (summary?.rollup.categories ?? []).filter((row) => row.type === type), [summary, type])
 
+  // Pinned categories lead, in the order they were pinned. A pin remembers an id, not a cycle, and the ids are this
+  // cycle's own rows, so a pin left over from a removed category simply matches nothing.
+  const pinned = useMemo(() => favourites.flatMap((id) => ofType.find((row) => row.categoryId === id) ?? []), [ofType, favourites])
+  const unpinned = useMemo(() => ofType.filter((row) => !favourites.includes(row.categoryId)), [ofType, favourites])
+
+  // The full list behind More: last used first, then the cycle's own order.
   const rest = useMemo(() => {
     const lastUsed = readLastUsed(type)
-    const ofType = (summary?.rollup.categories ?? []).filter((row) => row.type === type && !favourites.includes(row.categoryId))
-    // Last used first, then the cycle's own order.
-    return [...ofType.filter((row) => row.categoryId === lastUsed), ...ofType.filter((row) => row.categoryId !== lastUsed)]
-  }, [summary, type, favourites])
+    return [...unpinned.filter((row) => row.categoryId === lastUsed), ...unpinned.filter((row) => row.categoryId !== lastUsed)]
+  }, [unpinned, type])
+
+  // The chips: pinned, then most used, then the cycle's own order (the sort is stable, so equal counts keep it).
+  const top = useMemo(
+    () => [...pinned, ...unpinned.toSorted((a, b) => (Number(uses[b.categoryId]) || 0) - (Number(uses[a.categoryId]) || 0))].slice(0, CHIPS),
+    [pinned, unpinned, uses],
+  )
+  // A pick from More, or the category being edited, stays in view as the selected chip.
+  const picked = ofType.find((row) => row.categoryId === categoryId)
+  const chips = picked && !top.includes(picked) ? [...top, picked] : top
 
   const searchTerm = search.trim().toLowerCase()
   const matching = (rows: CategoryRollup[]) => rows.filter((row) => row.name.toLowerCase().includes(searchTerm))
@@ -103,9 +129,33 @@ function Form({ summary, loading, editing, onClose }: { summary: CycleSummary | 
   )
   const before = editing && { cycleId, categoryId: editing.categoryId, amount: editing.amount }
 
+  // The bare icon in the category's slot colour, not the 40px icon chip, so that six fit in two or three rows at 360px.
+  // When selected the tick takes the icon's place: the pill keeps its width and nothing rewraps under the finger.
+  const chip = (row: CategoryRollup) => {
+    const Icon = categoryIcon(row.icon)
+    return (
+      <label key={row.categoryId} className={styles.chip} style={{ '--chip': `var(--cat-${toSlot(row.colour)})` } as CSSProperties}>
+        <input type="radio" name="category" className={styles.radio} checked={row.categoryId === categoryId} onChange={() => setCategoryId(row.categoryId)} />
+        <Icon aria-hidden="true" className={styles.chipIcon} />
+        <Check aria-hidden="true" className={styles.chipTick} />
+        <span className={styles.chipName}>{row.name}</span>
+      </label>
+    )
+  }
+
   const categoryRow = (row: CategoryRollup) => (
     <label key={row.categoryId} className={styles.category}>
-      <input type="radio" name="category" className={styles.radio} checked={row.categoryId === categoryId} onChange={() => setCategoryId(row.categoryId)} />
+      <input
+        type="radio"
+        name="category-all"
+        className={styles.radio}
+        checked={row.categoryId === categoryId}
+        onChange={() => {
+          setCategoryId(row.categoryId)
+          setMore(false)
+          setSearch('')
+        }}
+      />
       <IconChip icon={categoryIcon(row.icon)} colour={row.colour} />
       <span className={styles.categoryName}>{row.name}</span>
       {favourites.includes(row.categoryId) && <Star aria-hidden="true" className={styles.star} />}
@@ -141,6 +191,8 @@ function Form({ summary, loading, editing, onClose }: { summary: CycleSummary | 
     await enqueue({ type: 'transaction.create', create: { clientId, cycleId, categoryId, amount, occurredOn: date, note: trimmed } })
     try {
       localStorage.setItem(lastUsedKey(type), categoryId)
+      const now = readUses()
+      localStorage.setItem(USES_KEY, JSON.stringify({ ...now, [categoryId]: (Number(now[categoryId]) || 0) + 1 }))
     } catch {
       // Private mode: the list just keeps the cycle's order.
     }
@@ -211,26 +263,44 @@ function Form({ summary, loading, editing, onClose }: { summary: CycleSummary | 
           <span className={styles.symbol}>{symbol}</span>
           {text || '0'}
         </p>
-        <Keypad onKey={(key) => setText((now) => press(now, key))} />
 
-        <div className={styles.picker}>
-          <Field label="Search categories" type="search" value={search} onChange={(event) => setSearch(event.target.value)} enterKeyHint="search" />
-          {matches.length === 0 ? (
-            <EmptyState icon={SearchX}>{search.trim() ? `No category matches "${search.trim()}".` : `This cycle has no ${type === 'Debit' ? 'spending' : 'income'} categories.`}</EmptyState>
-          ) : (
-            <div role="radiogroup" aria-label="Category" className={styles.categories}>
-              {pinnedMatches.length > 0 && <p className={styles.groupLabel}>Favourites</p>}
-              {pinnedMatches.map(categoryRow)}
-              {pinnedMatches.length > 0 && restMatches.length > 0 && <p className={styles.groupLabel}>All categories</p>}
-              {restMatches.map(categoryRow)}
-            </div>
-          )}
-        </div>
+        {/* Above the keypad, so the usual entry is amount, one tap, Save, with nothing to scroll (MASTER 9). */}
+        {ofType.length === 0 ? (
+          <EmptyState icon={SearchX}>{`This cycle has no ${type === 'Debit' ? 'spending' : 'income'} categories.`}</EmptyState>
+        ) : (
+          <div role="radiogroup" aria-label="Category" className={styles.chips}>
+            {chips.map(chip)}
+            {ofType.length > top.length && (
+              <button type="button" className={styles.chip} aria-expanded={more} onClick={() => setMore((open) => !open)}>
+                <span className={styles.chipName}>More</span>
+                <ChevronDown aria-hidden="true" className={styles.chevron} />
+              </button>
+            )}
+          </div>
+        )}
+
+        {more && (
+          <div className={styles.picker}>
+            <Field label="Search categories" type="search" value={search} onChange={(event) => setSearch(event.target.value)} enterKeyHint="search" />
+            {matches.length === 0 ? (
+              <EmptyState icon={SearchX}>{`No category matches "${search.trim()}".`}</EmptyState>
+            ) : (
+              <div role="radiogroup" aria-label="All categories" className={styles.categories}>
+                {pinnedMatches.length > 0 && <p className={styles.groupLabel}>Favourites</p>}
+                {pinnedMatches.map(categoryRow)}
+                {pinnedMatches.length > 0 && restMatches.length > 0 && <p className={styles.groupLabel}>All categories</p>}
+                {restMatches.map(categoryRow)}
+              </div>
+            )}
+          </div>
+        )}
+
+        <Keypad onKey={(key) => setText((now) => press(now, key))} />
 
         <Field label="Date" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
 
-        {/* Always on screen (MASTER 9): optional, not hidden behind a button. It sits below the picker because the
-            picker is the required choice and its list is capped, which keeps this a short flick away, never a hunt. */}
+        {/* Always on screen (MASTER 9): optional, not hidden behind a button. Full width rather than beside the date,
+            so a note has room to be read back while it is typed. */}
         <Field label="Note" value={note} maxLength={me.isDemo ? 200 : 280} onChange={(event) => setNote(event.target.value)} />
 
         {editing && (
