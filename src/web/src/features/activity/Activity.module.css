@@ -1,0 +1,85 @@
+/* minmax(0, 1fr) throughout: the chip row and a long note must scroll or truncate, never widen the page. */
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.range {
+  font: var(--text-caption);
+  color: var(--color-text-muted);
+}
+
+.day {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+.dayHeading {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font: var(--text-label);
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.rows {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rows > li + li {
+  border-top: 1px solid var(--color-border);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--space-2) 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  transition: background var(--dur-press);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.row:active {
+  background: var(--color-surface-2);
+}
+
+.text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.name,
+.note {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name {
+  font: var(--text-heading);
+}
+
+.note {
+  font: var(--text-label);
+  color: var(--color-text-muted);
+}
+
+/* Amounts never truncate (MASTER 6). */
+.amount {
+  flex: none;
+  font: var(--text-heading);
+}

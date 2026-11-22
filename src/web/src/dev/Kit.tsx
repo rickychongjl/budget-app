@@ -5,6 +5,7 @@ import { getPreference, setPreference, type ThemePreference } from '../theme/the
 import { BrandMark } from '../ui/BrandMark'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
+import { ChipGroup } from '../ui/ChipGroup'
 import { Dialog } from '../ui/Dialog'
 import { EmptyState } from '../ui/EmptyState'
 import { Field } from '../ui/Field'
@@ -69,6 +70,7 @@ function Toasts() {
 export default function Kit() {
   const [theme, setTheme] = useState<ThemePreference>(getPreference)
   const [type, setType] = useState<'debit' | 'credit'>('debit')
+  const [chip, setChip] = useState('')
   const [sheet, setSheet] = useState(false)
   const [dialog, setDialog] = useState(false)
   const [pending, setPending] = useState(false)
@@ -120,6 +122,15 @@ export default function Kit() {
           <Field label="Start date" type="date" />
           <Field label="Budget" inputMode="decimal" defaultValue="abc" error="Enter an amount, like 400.00" />
           <Field label="Disabled" disabled defaultValue="Read only in the demo" />
+        </Section>
+
+        <Section title="Chip row (more than four options; scrolls in its own box)">
+          <ChipGroup
+            label="Category"
+            options={[{ value: '', label: 'All' }, ...SLOTS.map((slot) => ({ value: slot, label: `A ${slot} category with a long name`, colour: slot }))]}
+            value={chip}
+            onChange={setChip}
+          />
         </Section>
 
         <Section title="Segmented control">

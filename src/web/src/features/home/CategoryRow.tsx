@@ -1,4 +1,4 @@
-import { Check, ChevronRight, CircleAlert, Gauge, TrendingUp, TriangleAlert } from 'lucide-react'
+import { Check, CircleAlert, Gauge, TrendingUp, TriangleAlert } from 'lucide-react'
 import { Link } from 'react-router'
 import type { CategoryRollup } from '../../api/types'
 import { formatMoney } from '../../format/money'
@@ -13,7 +13,7 @@ const STATUS_ICONS = { 'triangle-alert': TriangleAlert, 'circle-alert': CircleAl
 type Props = {
   row: CategoryRollup
   currency: string
-  // Where a tap goes: this category's transactions in this cycle.
+  // Where a tap goes: Activity, filtered to this category in this cycle.
   to: string
   // How far through the cycle today is, for the current cycle only: draws the today line and allows "ahead of pace".
   today?: number
@@ -28,7 +28,7 @@ export function CategoryRow({ row, currency, to, today }: Props) {
 
   return (
     <li>
-      {/* The whole row is the link, and the chevron says so without relying on a pointer cursor. */}
+      {/* The whole row is the link. No chevron (MASTER 9): every category row is tappable, so it would say nothing. */}
       <Link to={to} className={styles.row}>
       <IconChip icon={categoryIcon(row.icon)} colour={row.colour} />
       <div className={styles.body}>
@@ -49,7 +49,6 @@ export function CategoryRow({ row, currency, to, today }: Props) {
           {status.word}
         </p>
       </div>
-      <ChevronRight aria-hidden="true" className={styles.chevron} />
       </Link>
     </li>
   )

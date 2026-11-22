@@ -222,7 +222,7 @@ describe('CycleDetail', () => {
     expect(await screen.findByRole('heading', { level: 1, name: '11 Aug to 9 Sep' })).toBeInTheDocument()
     expect(screen.getByText('$640.00')).toBeInTheDocument()
     expect(screen.getByText('spent of $700.00 budgeted')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Groceries/ })).toHaveAttribute('href', '/cycles/p2/categories/food')
+    expect(screen.getByRole('link', { name: /Groceries/ })).toHaveAttribute('href', '/activity?cycle=p2&category=food')
   })
 
   test('the current cycle marks today on its bars', async () => {
