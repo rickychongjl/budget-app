@@ -25,12 +25,17 @@ export function categoryStatus(row: CategoryRollup, currency: string, elapsed?: 
     if (row.status === 'Over') {
       return { tone: 'negative', icon: 'circle-alert', word: `Over by ${money(-row.remaining)}` }
     }
+    // A commitment (marked "In one go") is paid, not spent down: "$X left" and the 80% warning mean nothing for a bill.
+    if (!row.spreadEvenly) {
+      // actual > 0: a $0 bill with nothing paid is not a success worth a green check.
+      return row.remaining <= 0 && row.actual > 0 ? { tone: 'positive', icon: 'check', word: 'Paid' } : { tone: 'normal', word: `${money(row.remaining)} still due` }
+    }
     const word = `${money(row.remaining)} left`
     if (row.percentUsed !== null && row.percentUsed >= WARNING_AT) {
       return { tone: 'warning', icon: 'triangle-alert', word }
     }
     // Past the today line on the bar. Muted, not amber: a nudge, not an alarm, and it goes away as the days catch up.
-    const ahead = elapsed === undefined || !row.spreadEvenly ? 0 : cents(row.actual - cents(row.budgeted * elapsed))
+    const ahead = elapsed === undefined ? 0 : cents(row.actual - cents(row.budgeted * elapsed))
     return ahead > 0 ? { tone: 'normal', icon: 'gauge', word: `${money(ahead)} ahead of pace` } : { tone: 'normal', word }
   }
 
