@@ -1,9 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { CircleAlert, Star, Trash2 } from 'lucide-react'
+import { CalendarCheck, CircleAlert, Star, Trash2 } from 'lucide-react'
 import { useRef, useState, type CSSProperties } from 'react'
 import { api } from '../../api/client'
 import type { CategoryRollup, CategoryType, EditCategoryRequest } from '../../api/types'
-import { parseMoney } from '../../format/money'
+import { todayIn } from '../../format/dates'
+import { formatMoney, parseMoney } from '../../format/money'
 import { enqueue } from '../../offline/outbox'
 import { Button } from '../../ui/Button'
 import { CATEGORY_ICONS } from '../../ui/categoryIcons'
@@ -13,6 +14,9 @@ import { SegmentedControl } from '../../ui/SegmentedControl'
 import { Sheet } from '../../ui/Sheet'
 import { SLOTS, toSlot } from '../../ui/slots'
 import { useToast } from '../../ui/useToast'
+import { useSession } from '../auth/useSession'
+import { useCycle } from '../cycles/useCycle'
+import { useTransactions } from '../transactions/useTransactions'
 import styles from './CategorySheet.module.css'
 import { isFavourite, toggleFavourite } from './favourites'
 
@@ -53,6 +57,18 @@ export function CategorySheet({ cycleId, rows, editing, online, onClose }: Props
   // Whether the person touched "How is it spent?". An answer that leaves spreadEvenly out must not be read as
   // "it is a spread cost", which would turn a bill into one the moment anything else on the sheet was saved.
   const [spentEdited, setSpentEdited] = useState(false)
+  const [autoPay, setAutoPay] = useState(editing?.autoPay ?? false)
+  // Only a spending bill paid in one go can be auto-paid (the server refuses anything else), so moving it back to
+  // "Over the cycle" switches auto-pay off with it.
+  const autoPaid = type === 'Debit' && spent === 'once' && autoPay
+  // Rollover pays from the next cycle on. Turning auto-pay on in the current one offers to pay it too, but only for a
+  // bill with no transactions there yet. The list is read while the toggle is on, so it is to hand by Save; offline
+  // with nothing stored, nobody is asked.
+  const { me } = useSession()
+  const cycle = useCycle(cycleId).data?.cycle
+  const offerPay = autoPaid && !editing?.autoPay && cycle?.phase === 'Current' && cycle.status === 'Confirmed'
+  const transactions = useTransactions(cycleId, { enabled: offerPay && editing !== undefined })
+  const [paying, setPaying] = useState<{ categoryId: string; amount: number }>()
   // A new category takes the next unused slot; after eight they repeat and the icon tells them apart (MASTER 3.4).
   const [colour, setColour] = useState<string>(() => (editing ? toSlot(editing.colour) : (SLOTS.find((slot) => !rows.some((row) => row.colour === slot)) ?? SLOTS[rows.length % SLOTS.length])))
   const [errors, setErrors] = useState<{ name?: string; budget?: string }>({})
@@ -67,7 +83,7 @@ export function CategorySheet({ cycleId, rows, editing, online, onClose }: Props
   }
   const add = useMutation({
     mutationFn: (budgetAmount: number) =>
-      api.post(`/api/cycles/${cycleId}/categories`, {
+      api.post<{ categoryId: string }>(`/api/cycles/${cycleId}/categories`, {
         type,
         name: name.trim(),
         icon,
@@ -75,9 +91,10 @@ export function CategorySheet({ cycleId, rows, editing, online, onClose }: Props
         sortOrder: rows.length,
         budgetAmount,
         // Income has no pace, so it is not asked and not sent.
-        ...(type === 'Debit' && { spreadEvenly: spent === 'spread' }),
+        ...(type === 'Debit' && { spreadEvenly: spent === 'spread', autoPay: autoPaid }),
       }),
-    onSuccess: done,
+    // A new category has no transactions, so the only question is whether to pay this cycle.
+    onSuccess: async ({ categoryId }, budgetAmount) => (offerPay && budgetAmount > 0 ? setPaying({ categoryId, amount: budgetAmount }) : done()),
     onError: (error: Error) => setProblem(error.message),
   })
   const remove = useMutation({
@@ -116,11 +133,21 @@ export function CategorySheet({ cycleId, rows, editing, online, onClose }: Props
     if (icon !== editing.icon) category.icon = icon
     if (colour !== editing.colour) category.colour = colour
     if (type === 'Debit' && spentEdited && (spent === 'spread') !== editing.spreadEvenly) category.spreadEvenly = spent === 'spread'
+    if (autoPaid !== (editing.autoPay ?? false)) category.autoPay = autoPaid
     if (Object.keys(category).length > 0) {
       await enqueue({ type: 'category.edit', cycleId, categoryId: editing.categoryId, category })
       toast.show({ message: 'Saved' })
     }
+    if (offerPay && budgetAmount > 0 && transactions.data && !transactions.data.some((t) => t.categoryId === editing.categoryId)) {
+      return setPaying({ categoryId: editing.categoryId, amount: budgetAmount })
+    }
     onClose()
+  }
+
+  // An ordinary queued transaction, like one typed in, so it works offline and can be edited or deleted.
+  async function payThisCycle() {
+    await enqueue({ type: 'transaction.create', create: { clientId: crypto.randomUUID(), cycleId, categoryId: paying!.categoryId, amount: paying!.amount, occurredOn: todayIn(me.timeZone), note: 'Auto-paid' } })
+    await done()
   }
 
   const title = editing ? `Edit ${editing.name}` : 'Add category'
@@ -169,6 +196,16 @@ export function CategorySheet({ cycleId, rows, editing, online, onClose }: Props
               setSpentEdited(true)
             }} />
             <p className={styles.hint}>{spent === 'spread' ? 'Home says when spending runs ahead of the days gone.' : 'A bill paid in one go is never ahead of pace.'}</p>
+          </div>
+        )}
+
+        {type === 'Debit' && spent === 'once' && (
+          <div className={styles.group}>
+            {/* A toggle like Favourite: the label stays, the pressed state changes (MASTER 9). */}
+            <Button variant="secondary" icon={CalendarCheck} aria-pressed={autoPay} onClick={() => setAutoPay(!autoPay)}>
+              Mark as paid when a new cycle starts
+            </Button>
+            <p className={styles.hint}>Adds the full budget as paid on the first day of each new cycle. Edit it if the bill differs.</p>
           </div>
         )}
 
@@ -232,6 +269,22 @@ export function CategorySheet({ cycleId, rows, editing, online, onClose }: Props
         }
       >
         It is removed from this cycle only. A category with transactions in this cycle cannot be removed.
+      </Dialog>
+
+      <Dialog
+        open={paying !== undefined}
+        title={`Mark ${name.trim()} as paid for this cycle too?`}
+        onClose={() => void done()}
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => void done()}>
+              Not now
+            </Button>
+            <Button onClick={() => void payThisCycle()}>Mark as paid</Button>
+          </>
+        }
+      >
+        From the next cycle it is paid when the cycle starts. This adds {formatMoney(paying?.amount ?? 0, me.currency)} as paid today.
       </Dialog>
     </Sheet>
   )

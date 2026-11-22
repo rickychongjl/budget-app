@@ -136,6 +136,7 @@ public sealed class BudgetDbContext(DbContextOptions<BudgetDbContext> options, I
             // No HasDefaultValue: with a store default of true, EF would skip sending false and the row would come
             // back true. The migration gives the column its default for rows written before it and by the old version.
             b.Property(x => x.SpreadEvenly);
+            b.Property(x => x.AutoPay);
             b.HasOne<Cycle>().WithMany()
                 .HasForeignKey(x => new { x.UserId, x.CycleId }).HasPrincipalKey(x => new { x.UserId, x.Id })
                 .OnDelete(DeleteBehavior.Restrict);

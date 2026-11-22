@@ -11,8 +11,9 @@ public sealed class CycleEditTests
     // 10 Feb 2026 in Sydney: a chain from 1 Jan has a past cycle, a current one (31 Jan) and any futures.
     private Cycles Sut()
     {
-        var today = new UserToday(_store, _store, new FixedClock(new DateTimeOffset(2026, 2, 10, 1, 0, 0, TimeSpan.Zero)));
-        return new Cycles(_store, _store, _store, _store, _store, new CycleFinder(_store, today), new RolloverCycles(_store, _store, today, _store), new ListLogger<Cycles>());
+        var clock = new FixedClock(new DateTimeOffset(2026, 2, 10, 1, 0, 0, TimeSpan.Zero));
+        var today = new UserToday(_store, _store, clock);
+        return new Cycles(_store, _store, _store, _store, _store, new CycleFinder(_store, today), new RolloverCycles(_store, _store, _store, today, _store, clock), new ListLogger<Cycles>());
     }
 
     private (Cycle Past, Cycle Current, Cycle Future) Chain()

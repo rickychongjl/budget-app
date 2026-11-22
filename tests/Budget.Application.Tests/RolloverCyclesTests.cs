@@ -7,8 +7,11 @@ public sealed class RolloverCyclesTests
     private static readonly DateOnly Jan1 = new(2026, 1, 1);
     private readonly FakeStore _store = new();
 
-    private RolloverCycles At(int year, int month, int day, int hourUtc = 12) =>
-        new(_store, _store, new UserToday(_store, _store, new FixedClock(new DateTimeOffset(year, month, day, hourUtc, 0, 0, TimeSpan.Zero))), _store);
+    private RolloverCycles At(int year, int month, int day, int hourUtc = 12)
+    {
+        var clock = new FixedClock(new DateTimeOffset(year, month, day, hourUtc, 0, 0, TimeSpan.Zero));
+        return new(_store, _store, _store, new UserToday(_store, _store, clock), _store, clock);
+    }
 
     private Cycle ConfirmedCycle(User user, DateOnly start)
     {
@@ -121,5 +124,60 @@ public sealed class RolloverCyclesTests
         var run = () => At(2026, 2, 5).RunAsync();
 
         (await run.Should().ThrowAsync<NotFoundException>()).Which.Code.Should().Be("user.not-found");
+    }
+
+    [Fact]
+    public async Task Each_new_cycle_gets_one_payment_per_auto_pay_bill_in_the_same_save()
+    {
+        var user = _store.SignIn();
+        var first = ConfirmedCycle(user, Jan1);
+        var rent = new CycleCategory(first, Guid.NewGuid(), "Rent", "house", "slate", 0, 2200m, spreadEvenly: false, autoPay: true);
+        _store.CycleCategories.Add(rent);
+        _store.CycleCategories.Add(new CycleCategory(first, Guid.NewGuid(), "Water", "droplet", "teal", 1, 0m, spreadEvenly: false, autoPay: true));
+        _store.CycleCategories.Add(new CycleCategory(first, Guid.NewGuid(), "Power", "zap", "amber", 2, 150m, spreadEvenly: false));
+        _store.CycleCategories.Add(new CycleCategory(first, Guid.NewGuid(), "Groceries", "shopping-cart", "blue", 3, 600m));
+
+        await At(2026, 3, 5).RunAsync();
+
+        var created = _store.Cycles.Skip(1).ToList();
+        _store.Transactions.Select(t => (t.CycleId, t.CategoryId, t.Amount, t.OccurredOn, t.Note)).Should().BeEquivalentTo(
+            created.Select(c => (c.Id, rent.CategoryId, 2200m, c.StartDate, (string?)"Auto-paid")));
+        _store.Transactions.Select(t => t.ClientId).Should().OnlyHaveUniqueItems();
+        _store.Saves.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Running_twice_does_not_pay_twice()
+    {
+        var first = ConfirmedCycle(_store.SignIn(), Jan1);
+        _store.CycleCategories.Add(new CycleCategory(first, Guid.NewGuid(), "Rent", "house", "slate", 0, 2200m, spreadEvenly: false, autoPay: true));
+
+        await At(2026, 2, 5).RunAsync();
+        await At(2026, 2, 5).RunAsync();
+
+        _store.Transactions.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task A_draft_cycle_gets_no_payments()
+    {
+        var draft = new Cycle(_store.SignIn().Id, Jan1);
+        _store.Cycles.Add(draft);
+        _store.CycleCategories.Add(new CycleCategory(draft, Guid.NewGuid(), "Rent", "house", "slate", 0, 2200m, spreadEvenly: false, autoPay: true));
+
+        await At(2026, 6, 1).RunAsync();
+
+        _store.Transactions.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task The_bill_already_in_the_cycle_being_left_is_not_paid_again()
+    {
+        var first = ConfirmedCycle(_store.SignIn(), Jan1);
+        _store.CycleCategories.Add(new CycleCategory(first, Guid.NewGuid(), "Rent", "house", "slate", 0, 2200m, spreadEvenly: false, autoPay: true));
+
+        await At(2026, 2, 5).RunAsync();
+
+        _store.Transactions.Should().ContainSingle().Which.CycleId.Should().NotBe(first.Id);
     }
 }

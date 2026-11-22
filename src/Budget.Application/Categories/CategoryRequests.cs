@@ -5,10 +5,11 @@ namespace Budget.Application;
 
 // CategoryId puts an existing category into this cycle; without it, Type is required and a new category is created.
 // SpreadEvenly defaults to true: most spending is a little at a time, and a bill is the exception the user marks.
-public sealed record AddCategoryRequest(Guid? CategoryId, CategoryType? Type, string Name, string Icon, string Colour, int SortOrder, decimal BudgetAmount, bool? SpreadEvenly = null);
+// AutoPay defaults to false and needs SpreadEvenly false on a Debit category.
+public sealed record AddCategoryRequest(Guid? CategoryId, CategoryType? Type, string Name, string Icon, string Colour, int SortOrder, decimal BudgetAmount, bool? SpreadEvenly = null, bool? AutoPay = null);
 
 // A null field is left as it is. Type is not here: it is fixed for the life of the category.
-public sealed record EditCategoryRequest(string? Name, string? Icon, string? Colour, int? SortOrder, decimal? BudgetAmount, bool? SpreadEvenly = null);
+public sealed record EditCategoryRequest(string? Name, string? Icon, string? Colour, int? SortOrder, decimal? BudgetAmount, bool? SpreadEvenly = null, bool? AutoPay = null);
 
 // Lengths match the columns, so the user gets a field error instead of a database one.
 internal sealed class AddCategoryValidator : AbstractValidator<AddCategoryRequest>
@@ -32,7 +33,7 @@ internal sealed class EditCategoryValidator : AbstractValidator<EditCategoryRequ
     private EditCategoryValidator()
     {
         RuleFor(r => r)
-            .Must(r => r.Name is not null || r.Icon is not null || r.Colour is not null || r.SortOrder is not null || r.BudgetAmount is not null || r.SpreadEvenly is not null)
+            .Must(r => r.Name is not null || r.Icon is not null || r.Colour is not null || r.SortOrder is not null || r.BudgetAmount is not null || r.SpreadEvenly is not null || r.AutoPay is not null)
             .WithName("request")
             .WithMessage("Give at least one field to change.");
         RuleFor(r => r.Name).NotEmpty().MaximumLength(60).When(r => r.Name is not null);

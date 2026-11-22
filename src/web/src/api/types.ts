@@ -64,6 +64,8 @@ export type CategoryRollup = {
   status: RollupStatus
   // Spent a little at a time, so Home can say when spending runs ahead of the calendar. False for a bill paid in one go.
   spreadEvenly: boolean
+  // A bill rollover records as paid (the full budget) on the first day of each new cycle. Only with spreadEvenly false.
+  autoPay: boolean
 }
 
 // CycleRollup. accrued is closing minus opening, and null until both are known.
@@ -95,7 +97,7 @@ export type Transaction = {
 
 export type CreateTransactionRequest = Pick<Transaction, 'clientId' | 'cycleId' | 'categoryId' | 'amount' | 'occurredOn' | 'note'>
 export type EditTransactionRequest = Partial<Pick<Transaction, 'categoryId' | 'amount' | 'occurredOn' | 'note'>>
-export type EditCategoryRequest = Partial<{ name: string; icon: string; colour: string; sortOrder: number; budgetAmount: number; spreadEvenly: boolean }>
+export type EditCategoryRequest = Partial<{ name: string; icon: string; colour: string; sortOrder: number; budgetAmount: number; spreadEvenly: boolean; autoPay: boolean }>
 
 // TransactionResult / TransactionDeleted. requiresClosingBalanceReview: the write landed in a past cycle, so the UI
 // offers to update that cycle's closing balance. It comes from the server and is never guessed here.

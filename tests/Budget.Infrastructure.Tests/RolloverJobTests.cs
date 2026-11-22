@@ -46,4 +46,29 @@ public sealed class RolloverJobTests(SqlServerFixture sql)
         await using var draft = sql.ContextFor(draftOnly);
         (await draft.Cycles.CountAsync()).Should().Be(1);
     }
+
+    [Fact]
+    public async Task An_auto_pay_bill_is_paid_once_in_each_new_cycle_however_often_the_job_runs()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var user = await sql.NewUserAsync();
+        await using (var db = sql.ContextFor(user))
+        {
+            var cycle = TestData.Confirmed(user, today.AddDays(-40));
+            var category = new Category(user.Id, CategoryType.Debit, TestData.Now);
+            db.AddRange(cycle, category);
+            await db.SaveChangesAsync();
+            db.Add(new CycleCategory(cycle, category.Id, "Rent", "house", "slate", 0, 2200m, spreadEvenly: false, autoPay: true));
+            await db.SaveChangesAsync();
+        }
+
+        await using var services = JobHost.BuildServices(sql.ConnectionString);
+        await JobHost.RolloverAsync(services);
+        await JobHost.RolloverAsync(services);
+
+        await using var read = sql.ContextFor(user);
+        var latest = await read.Cycles.OrderBy(c => c.StartDate).LastAsync();
+        var payment = await read.Transactions.SingleAsync();
+        (payment.CycleId, payment.Amount, payment.OccurredOn, payment.Note).Should().Be((latest.Id, 2200m, latest.StartDate, "Auto-paid"));
+    }
 }

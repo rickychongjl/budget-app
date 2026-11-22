@@ -3,7 +3,7 @@ using FluentValidation;
 
 namespace Budget.Application;
 
-public sealed record CycleCategoryDto(Guid CategoryId, CategoryType Type, string Name, string Icon, string Colour, int SortOrder, decimal BudgetAmount, bool SpreadEvenly);
+public sealed record CycleCategoryDto(Guid CategoryId, CategoryType Type, string Name, string Icon, string Colour, int SortOrder, decimal BudgetAmount, bool SpreadEvenly, bool AutoPay);
 
 // The stable identity with its most recent name: what a report filter lists.
 public sealed record CategoryIdentityDto(Guid Id, CategoryType Type, string Name);
@@ -45,7 +45,9 @@ public sealed class CycleCategories(
             categories.Add(category);
         }
 
-        var snapshot = new CycleCategory(cycle, category.Id, request.Name, request.Icon, request.Colour, request.SortOrder, request.BudgetAmount, request.SpreadEvenly ?? true);
+        var autoPay = request.AutoPay ?? false;
+        EnsureAutoPayIsDebit(category, autoPay);
+        var snapshot = new CycleCategory(cycle, category.Id, request.Name, request.Icon, request.Colour, request.SortOrder, request.BudgetAmount, request.SpreadEvenly ?? true, autoPay);
         categories.Add(snapshot);
         await unitOfWork.SaveChangesAsync(ct);
         return ToDto(snapshot, category);
@@ -57,13 +59,16 @@ public sealed class CycleCategories(
 
         var snapshot = await FindEditableAsync(cycleId, categoryId, ct);
         var category = await categories.GetAsync(categoryId, ct) ?? throw NotFound();
+        var autoPay = request.AutoPay ?? snapshot.AutoPay;
+        EnsureAutoPayIsDebit(category, autoPay);
         snapshot.Edit(
             request.Name ?? snapshot.Name,
             request.Icon ?? snapshot.Icon,
             request.Colour ?? snapshot.Colour,
             request.SortOrder ?? snapshot.SortOrder,
             request.BudgetAmount ?? snapshot.BudgetAmount,
-            request.SpreadEvenly ?? snapshot.SpreadEvenly);
+            request.SpreadEvenly ?? snapshot.SpreadEvenly,
+            autoPay);
         await unitOfWork.SaveChangesAsync(ct);
         return ToDto(snapshot, category);
     }
@@ -109,8 +114,17 @@ public sealed class CycleCategories(
         return await categories.GetForCycleAsync(cycleId, categoryId, ct) ?? throw NotFound();
     }
 
+    // Income is not a bill: marking it received the day the cycle starts would hide that it has not arrived.
+    private static void EnsureAutoPayIsDebit(Category category, bool autoPay)
+    {
+        if (autoPay && category.Type != CategoryType.Debit)
+        {
+            throw new DomainException("category.auto-pay-credit", "Only a spending category can be marked as paid when a new cycle starts.");
+        }
+    }
+
     private static NotFoundException NotFound() => new("category.not-found", "Category not found.");
 
     private static CycleCategoryDto ToDto(CycleCategory snapshot, Category category) =>
-        new(category.Id, category.Type, snapshot.Name, snapshot.Icon, snapshot.Colour, snapshot.SortOrder, snapshot.BudgetAmount, snapshot.SpreadEvenly);
+        new(category.Id, category.Type, snapshot.Name, snapshot.Icon, snapshot.Colour, snapshot.SortOrder, snapshot.BudgetAmount, snapshot.SpreadEvenly, snapshot.AutoPay);
 }

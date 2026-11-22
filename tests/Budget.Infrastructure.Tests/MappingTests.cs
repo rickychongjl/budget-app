@@ -84,13 +84,13 @@ public class MappingTests(SqlServerFixture sql)
 
         await using (var edit = sql.ContextFor(user))
         {
-            (await edit.CycleCategories.SingleAsync()).Edit("Food", "apple", "green", 1, 650.5m, spreadEvenly: false);
+            (await edit.CycleCategories.SingleAsync()).Edit("Food", "apple", "green", 1, 650.5m, spreadEvenly: false, autoPay: true);
             await edit.SaveChangesAsync();
         }
 
         await using var db = sql.ContextFor(user);
         var read = await db.CycleCategories.SingleAsync();
-        (read.Name, read.Icon, read.Colour, read.SortOrder, read.BudgetAmount, read.SpreadEvenly).Should().Be(("Food", "apple", "green", 1, 650.5m, false));
+        (read.Name, read.Icon, read.Colour, read.SortOrder, read.BudgetAmount, read.SpreadEvenly, read.AutoPay).Should().Be(("Food", "apple", "green", 1, 650.5m, false, true));
     }
 
     // Expand before contract: the previous app version inserts snapshots without SpreadEvenly and must still succeed,
@@ -113,7 +113,9 @@ public class MappingTests(SqlServerFixture sql)
         }
 
         await using var db = sql.ContextFor(user);
-        (await db.CycleCategories.SingleAsync()).SpreadEvenly.Should().BeTrue();
+        var read = await db.CycleCategories.SingleAsync();
+        read.SpreadEvenly.Should().BeTrue();
+        read.AutoPay.Should().BeFalse("the previous version knows nothing of auto-pay");
     }
 
     // Shifting by exactly one cycle length makes each future cycle take the next one's old date,

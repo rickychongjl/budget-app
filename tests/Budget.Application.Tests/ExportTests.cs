@@ -124,7 +124,7 @@ public sealed class ExportDataTests
         first.Status.Should().Be(CycleStatus.Confirmed);
         first.EndDate.Should().Be(new DateOnly(2026, 1, 30));
         first.Categories.Select(c => c.Name).Should().Equal("Salary", "Food");
-        first.Categories[0].Should().Be(new CycleCategoryExport(s.Pay.Id, "Salary", CategoryType.Credit, 5000m, "wallet", "teal", 0, false));
+        first.Categories[0].Should().Be(new CycleCategoryExport(s.Pay.Id, "Salary", CategoryType.Credit, 5000m, "wallet", "teal", 0, false, false));
         first.Transactions.Select(t => t.Id).Should().Equal(s.Salary.Id, s.Lunch.Id, s.Refund.Id);
         first.Transactions[1].Should().Be(new TransactionExport(
             s.Lunch.Id, Jan1.AddDays(2), s.Food.Id, "Food", CategoryType.Debit, 12.5m, "=lunch", Now.AddHours(-3), Now.AddHours(-3)));
@@ -220,7 +220,7 @@ public sealed class ExportArchiveTests
                 CycleStatus.Confirmed,
                 1000m,
                 null,
-                [new CycleCategoryExport(Food, "=Food", CategoryType.Debit, 400m, "utensils", "blue", 0, true)],
+                [new CycleCategoryExport(Food, "=Food", CategoryType.Debit, 400m, "utensils", "blue", 0, true, false)],
                 [
                     new TransactionExport(Spent, new DateOnly(2026, 1, 3), Food, "=Food", CategoryType.Debit, 12.5m, "fish, chips", At, At),
                     new TransactionExport(Guid.NewGuid(), new DateOnly(2026, 1, 4), Food, "=Food", CategoryType.Debit, -2.5m, "-refund", At, At),
@@ -269,8 +269,8 @@ public sealed class ExportArchiveTests
             "Start date,End date,Status,Opening balance,Closing balance\r\n" +
             "2026-01-01,2026-01-30,Confirmed,1000.00,\r\n");
         Csv(files["categories.csv"]).Should().Be(
-            "Cycle start,Name,Type,Budget,Icon,Colour,Order,Spread evenly\r\n" +
-            "2026-01-01,'=Food,Debit,400.00,utensils,blue,0,true\r\n");
+            "Cycle start,Name,Type,Budget,Icon,Colour,Order,Spread evenly,Auto-pay\r\n" +
+            "2026-01-01,'=Food,Debit,400.00,utensils,blue,0,true,false\r\n");
         Csv(files["transactions.csv"]).Should().Be(
             "Date,Cycle start,Category,Type,Amount,Note,Created at\r\n" +
             "2026-01-03,2026-01-01,'=Food,Debit,12.50,\"fish, chips\",2026-02-01T15:00:00Z\r\n" +

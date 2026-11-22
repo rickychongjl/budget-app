@@ -3,7 +3,13 @@ using Budget.Domain;
 namespace Budget.Application;
 
 // The only place cycles are rolled over. Two callers: the hourly job and GET /api/cycles/current.
-public sealed class RolloverCycles(ICycleRepository cycles, ICategoryRepository categories, UserToday today, IUnitOfWork unitOfWork)
+public sealed class RolloverCycles(
+    ICycleRepository cycles,
+    ICategoryRepository categories,
+    ITransactionRepository transactions,
+    UserToday today,
+    IUnitOfWork unitOfWork,
+    TimeProvider clock)
 {
     // Returns how many cycles were created, so the request-time caller can tell that the job had fallen behind.
     public async Task<int> RunAsync(CancellationToken ct = default)
@@ -28,9 +34,16 @@ public sealed class RolloverCycles(ICycleRepository cycles, ICategoryRepository 
             cycles.Add(cycle);
         }
 
+        var newCycles = result.Cycles.ToDictionary(c => c.Id);
         foreach (var category in result.Categories)
         {
             categories.Add(category);
+
+            // Saved with the cycle, so losing the race below drops the payment along with the cycle it belongs to.
+            if (category.AutoPayment(newCycles[category.CycleId], clock.GetUtcNow()) is { } payment)
+            {
+                transactions.Add(payment);
+            }
         }
 
         try

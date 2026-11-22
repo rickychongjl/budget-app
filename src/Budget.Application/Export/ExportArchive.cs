@@ -55,7 +55,7 @@ public static class ExportArchive
 
         Csv(zip, "categories.csv", writer =>
         {
-            ExportCsv.WriteRow(writer, "Cycle start", "Name", "Type", "Budget", "Icon", "Colour", "Order", "Spread evenly");
+            ExportCsv.WriteRow(writer, "Cycle start", "Name", "Type", "Budget", "Icon", "Colour", "Order", "Spread evenly", "Auto-pay");
             foreach (var c in export.Cycles)
             {
                 foreach (var s in c.Categories)
@@ -69,7 +69,8 @@ public static class ExportArchive
                         ExportCsv.Text(s.Icon),
                         ExportCsv.Text(s.Colour),
                         ExportCsv.Number(s.Order),
-                        ExportCsv.Flag(s.SpreadEvenly));
+                        ExportCsv.Flag(s.SpreadEvenly),
+                        ExportCsv.Flag(s.AutoPay));
                 }
             }
         });

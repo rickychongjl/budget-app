@@ -46,7 +46,7 @@ public sealed class CycleCategoriesTests
         category.Type.Should().Be(CategoryType.Debit);
         category.CreatedAt.Should().Be(Now);
         _store.CycleCategories.Should().ContainSingle().Which.CycleId.Should().Be(chain.Current.Id);
-        dto.Should().Be(new CycleCategoryDto(category.Id, CategoryType.Debit, "Groceries", "shopping-cart", "blue", 0, 600m, SpreadEvenly: true));
+        dto.Should().Be(new CycleCategoryDto(category.Id, CategoryType.Debit, "Groceries", "shopping-cart", "blue", 0, 600m, SpreadEvenly: true, AutoPay: false));
         _store.Saves.Should().Be(1);
     }
 
@@ -59,6 +59,36 @@ public sealed class CycleCategoriesTests
 
         dto.SpreadEvenly.Should().BeFalse();
         _store.CycleCategories.Should().ContainSingle().Which.SpreadEvenly.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task A_bill_can_be_marked_as_paid_when_a_new_cycle_starts_and_unmarked_later()
+    {
+        var chain = Chain();
+
+        var added = await Sut().AddAsync(chain.Current.Id, NewGroceries with { Name = "Rent", SpreadEvenly = false, AutoPay = true });
+        var edited = await Sut().EditAsync(chain.Current.Id, added.CategoryId, new EditCategoryRequest(null, null, null, null, null, AutoPay: false));
+
+        added.AutoPay.Should().BeTrue();
+        edited.AutoPay.Should().BeFalse();
+        edited.SpreadEvenly.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Auto_pay_is_refused_on_income_and_on_spending_spread_over_the_cycle()
+    {
+        var chain = Chain();
+        var credit = NewGroceries with { Type = CategoryType.Credit, Name = "Salary", SpreadEvenly = false, AutoPay = true };
+        var existing = Existing(chain.Current);
+
+        var addCredit = () => Sut().AddAsync(chain.Current.Id, credit);
+        var addSpread = () => Sut().AddAsync(chain.Current.Id, NewGroceries with { AutoPay = true });
+        var editSpread = () => Sut().EditAsync(chain.Current.Id, existing.CategoryId, new EditCategoryRequest(null, null, null, null, null, AutoPay: true));
+
+        (await addCredit.Should().ThrowAsync<DomainException>()).Which.Code.Should().Be("category.auto-pay-credit");
+        (await addSpread.Should().ThrowAsync<DomainException>()).Which.Code.Should().Be("category.auto-pay-spread");
+        (await editSpread.Should().ThrowAsync<DomainException>()).Which.Code.Should().Be("category.auto-pay-spread");
+        _store.Saves.Should().Be(0);
     }
 
     [Fact]
@@ -137,7 +167,7 @@ public sealed class CycleCategoriesTests
 
         var dto = await Sut().EditAsync(chain.Current.Id, current.CategoryId, new EditCategoryRequest("Food", null, null, null, 750m));
 
-        dto.Should().Be(new CycleCategoryDto(current.CategoryId, CategoryType.Debit, "Food", "shopping-cart", "blue", 0, 750m, SpreadEvenly: true));
+        dto.Should().Be(new CycleCategoryDto(current.CategoryId, CategoryType.Debit, "Food", "shopping-cart", "blue", 0, 750m, SpreadEvenly: true, AutoPay: false));
         (future.Name, future.BudgetAmount).Should().Be(("Groceries", 600m));
         _store.Saves.Should().Be(1);
     }
