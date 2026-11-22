@@ -1,7 +1,9 @@
 .form {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-4);
+  /* 12 rather than 16: with the chips above the keypad, this is what keeps the whole keypad clear of Save on a
+     360x740 phone. */
+  gap: var(--space-3);
 }
 
 /* The one display-size number in the sheet (MASTER 9). It never truncates: nine digits fit at 360px. */
@@ -13,6 +15,86 @@
 
 .symbol {
   color: var(--color-text-muted);
+}
+
+/* The usual picks, wrapped into a couple of rows between the amount and the keypad. */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* A pill: the whole pill is the radio's label (or the More button), so the whole pill is the target. No border, so the
+   hidden radio fills the box and the target stays 44px tall. */
+.chip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 100%;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chip:active {
+  background: var(--color-border);
+}
+
+.chip:has(.radio:checked) {
+  background: var(--color-primary-soft);
+}
+
+.chip:has(.radio:focus-visible),
+button.chip:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.chipIcon,
+.chipTick,
+.chevron {
+  flex: none;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
+.chipIcon {
+  color: var(--chip);
+}
+
+/* Selected is the tint plus the tick, which stands where the icon was. */
+.chipTick {
+  display: none;
+  color: var(--color-primary);
+}
+
+.radio:checked ~ .chipIcon {
+  display: none;
+}
+
+.radio:checked ~ .chipTick {
+  display: block;
+}
+
+.chipName {
+  min-width: 0;
+  overflow: hidden;
+  font: var(--text-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  color: var(--color-text-muted);
+}
+
+.chip[aria-expanded='true'] .chevron {
+  transform: rotate(180deg);
 }
 
 .picker {
