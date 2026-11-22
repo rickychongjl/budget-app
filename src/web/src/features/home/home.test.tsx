@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
@@ -93,6 +94,9 @@ const SUMMARY: CycleSummary = {
   },
 }
 
+// A stat tile is a term and its value (dt/dd), so the value is found by its label.
+const tile = (scope: ReturnType<typeof within>, label: string) => scope.getByText(label, { selector: 'dt' }).nextElementSibling as HTMLElement
+
 function renderHome() {
   // 20 Sep in Sydney: day 11 of the cycle that started on the 10th.
   vi.setSystemTime(new Date('2026-09-20T02:00:00Z'))
@@ -114,27 +118,76 @@ beforeEach(async () => {
 })
 
 describe('Home', () => {
-  test('the cycle header: dates, day, and the one hero amount', async () => {
+  test('the screen is called Tightarse, whatever state it is in', async () => {
+    server.use(http.get('/api/cycles/current', () => new Promise(() => undefined)))
+    renderHome()
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Tightarse' })).toBeInTheDocument()
+  })
+
+  test('Spending is the tab it opens on: spent as the hero, the bar against budget, and the tiles', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     server.use(http.get('/api/cycles/current', () => HttpResponse.json(SUMMARY)))
     renderHome()
 
     expect(await screen.findByText('10 Sep to 9 Oct · day 11 of 30')).toBeInTheDocument()
-    expect(screen.getByText('$2,782.90')).toHaveClass('num')
-    expect(screen.getByText('spent of $3,200.00 budgeted')).toBeInTheDocument()
-    expect(screen.getByText('$5,200.00 received of $5,200.00 expected')).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Spending' })).toBeChecked()
+    const overview = within(screen.getByRole('group', { name: 'Cycle overview' }))
+    expect(overview.getByText('$2,782.90')).toHaveClass('num')
+    expect(overview.getByText('spent of $3,200.00 budgeted')).toBeInTheDocument()
+    expect(overview.getByRole('progressbar')).toHaveAttribute('aria-valuetext', 'Spent $2,782.90 of $3,200.00, $417.10 left')
+    expect(overview.getByTestId('today-line')).toBeInTheDocument()
+    // Day 11 of 30 leaves 20 days, today included: $417.10 over 20 days.
+    expect(tile(overview, 'Left to spend')).toHaveTextContent('$417.10')
+    expect(tile(overview, 'Days left')).toHaveTextContent('20')
+    expect(tile(overview, 'Per day left')).toHaveTextContent('$20.86')
+    expect(screen.getByRole('region', { name: 'Spending' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Income' })).not.toBeInTheDocument()
     vi.useRealTimers()
   })
 
-  test('spending and income are separate sections, in the order the API gives', async () => {
+  test('over budget overall: the bar is red and says so in words, and there is nothing left per day', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    server.use(http.get('/api/cycles/current', () => HttpResponse.json({ ...SUMMARY, rollup: { ...SUMMARY.rollup, debitsActual: 3250 } })))
+    renderHome()
+
+    const overview = within(await screen.findByRole('group', { name: 'Cycle overview' }))
+    expect(overview.getByText('Over by $50.00')).toBeInTheDocument()
+    expect(tile(overview, 'Per day left')).toHaveTextContent('$0.00')
+    vi.useRealTimers()
+  })
+
+  test('the Income tab swaps the hero, the bar and the list', async () => {
+    const user = userEvent.setup()
+    const salary = SUMMARY.rollup.categories[0]
+    const bonus = category({ name: 'Bonus', icon: 'gift', colour: 'green', type: 'Credit', budgeted: 1000, actual: 0 })
+    server.use(
+      http.get('/api/cycles/current', () =>
+        HttpResponse.json({ ...SUMMARY, rollup: { ...SUMMARY.rollup, categories: [salary, bonus, ...SUMMARY.rollup.categories.slice(1)], creditsBudgeted: 6200 } }),
+      ),
+    )
+    renderHome()
+
+    await user.click(await screen.findByRole('radio', { name: 'Income' }))
+
+    const overview = within(screen.getByRole('group', { name: 'Cycle overview' }))
+    expect(overview.getByText('$5,200.00')).toHaveClass('num')
+    expect(overview.getByText('received of $6,200.00 expected')).toBeInTheDocument()
+    expect(overview.getByRole('progressbar')).toHaveAttribute('aria-valuetext', 'Received $5,200.00 of $6,200.00, $1,000.00 to go')
+    expect(overview.queryByTestId('today-line')).not.toBeInTheDocument()
+    expect(tile(overview, 'Still to come')).toHaveTextContent('$1,000.00')
+    expect(tile(overview, 'Received')).toHaveTextContent('1 of 2')
+    const income = within(screen.getByRole('region', { name: 'Income' }))
+    expect(income.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Salary', 'Bonus'])
+    expect(screen.queryByRole('region', { name: 'Spending' })).not.toBeInTheDocument()
+  })
+
+  test('the Spending list is in the order the API gives', async () => {
     server.use(http.get('/api/cycles/current', () => HttpResponse.json(SUMMARY)))
     renderHome()
 
     const spending = within(await screen.findByRole('region', { name: 'Spending' }))
-    const income = within(screen.getByRole('region', { name: 'Income' }))
-
     expect(spending.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Rent', 'Groceries', 'Eating out'])
-    expect(income.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Salary'])
   })
 
   test('a row shows spent against budget, a bar that says the whole sentence, and the status in words', async () => {
@@ -166,8 +219,9 @@ describe('Home', () => {
 
     await screen.findByRole('heading', { level: 3, name: 'Eating out' })
     // Day 11 of 30.
+    // The three spending rows, and the overview bar.
     const lines = screen.getAllByTestId('today-line')
-    expect(lines).toHaveLength(SUMMARY.rollup.categories.length)
+    expect(lines).toHaveLength(4)
     for (const line of lines) {
       expect(parseFloat(line.style.left)).toBeCloseTo((11 / 30) * 100)
     }
@@ -242,5 +296,6 @@ describe('Home', () => {
     expect(await screen.findByText('$742.90 / $700.00')).toBeInTheDocument()
     expect(groceries().getByText('Over by $42.90')).toBeInTheDocument()
     expect(screen.getByText('$3,282.90')).toBeInTheDocument()
+    expect(screen.getByText('Over by $82.90')).toBeInTheDocument()
   })
 })

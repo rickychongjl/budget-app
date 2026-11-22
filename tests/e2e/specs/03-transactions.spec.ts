@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { addTransaction, categoryRow, fixtureSpent, money, today } from '../support'
+import { addTransaction, categoryRow, fixtureSpent, money, showOnHome, today } from '../support'
 
 // docs/user-stories.md, "Transactions". These add to the shared demo; the specs after this one allow for it.
 test.describe.configure({ mode: 'serial' })
@@ -17,13 +17,16 @@ test('Transactions 1: spending is entered on the keypad and filed under a debit 
 
 test('Transactions 2: income is entered the same way under a credit category', async ({ page }) => {
   await page.goto('/')
+  await showOnHome(page, 'Income')
   await expect(categoryRow(page, 'Salary')).toContainText('Received')
 
   await addTransaction(page, { type: 'Income', amount: '1', category: 'Salary' })
 
   // One dollar over what was expected: ahead, in green, with its icon and word.
   await expect(categoryRow(page, 'Salary')).toContainText('Ahead by $1.00')
-  await expect(page.getByText(/received of \$5,200\.00 expected/)).toContainText('$5,201.00')
+  const overview = page.getByRole('group', { name: 'Cycle overview' })
+  await expect(overview.getByText('received of $5,200.00 expected')).toBeVisible()
+  await expect(overview).toContainText('$5,201.00')
 })
 
 test('Transactions 3: a new transaction goes into the current cycle, dated today', async ({ page }) => {

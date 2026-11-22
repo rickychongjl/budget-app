@@ -34,7 +34,7 @@ test('the app opens with no signal: the worker serves the shell and the last bud
   await context.setOffline(true)
   await page.reload()
 
-  await expect(page.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Tightarse' })).toBeVisible()
   await expect(categoryRow(page, 'Groceries')).toBeVisible()
   await expect(page.getByText("Offline. Changes will sync when you're back online.")).toBeVisible()
 })
