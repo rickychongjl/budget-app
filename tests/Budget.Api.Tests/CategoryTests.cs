@@ -75,6 +75,24 @@ public sealed class CategoryTests(ApiFactory api)
     }
 
     [Fact]
+    public async Task A_bill_can_be_set_to_auto_pay_and_a_spread_category_cannot()
+    {
+        var a = await CurrentCycleAsync();
+        var categoryId = await AddAsync(a.Client, a.Cycle);
+        var url = $"/api/cycles/{a.Cycle.Id}/categories/{categoryId}";
+
+        var refused = await a.Client.PatchAsJsonAsync(url, new { autoPay = true });
+        var accepted = await a.Client.PatchAsJsonAsync(url, new { spreadEvenly = false, autoPay = true });
+
+        refused.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        (await refused.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("category.auto-pay-spread");
+        accepted.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await accepted.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("autoPay").GetBoolean().Should().BeTrue();
+        (await a.Client.GetFromJsonAsync<JsonElement>($"/api/cycles/{a.Cycle.Id}")).GetProperty("rollup").GetProperty("categories")[0]
+            .GetProperty("autoPay").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Delete_is_204_unless_the_category_has_transactions_in_that_cycle()
     {
         var a = await CurrentCycleAsync();

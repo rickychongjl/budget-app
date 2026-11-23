@@ -44,7 +44,7 @@ const CYCLES = [
 ]
 
 const row = (categoryId: string, name: string, type: 'Debit' | 'Credit', budgeted: number, actual: number): CategoryRollup => ({
-  categoryId, name, icon: 'tag', colour: 'blue', type, budgeted, actual, remaining: budgeted - actual, percentUsed: (actual / budgeted) * 100, status: actual > budgeted ? (type === 'Debit' ? 'Over' : 'Ahead') : 'OnTrack', spreadEvenly: true,
+  categoryId, name, icon: 'tag', colour: 'blue', type, budgeted, actual, remaining: budgeted - actual, percentUsed: (actual / budgeted) * 100, status: actual > budgeted ? (type === 'Debit' ? 'Over' : 'Ahead') : 'OnTrack', spreadEvenly: true, autoPay: false,
 })
 
 // What each cycle spent of the same $700 budget, so a row's own figures can be told apart from its neighbour's.

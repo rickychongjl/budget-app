@@ -21,7 +21,8 @@ public sealed class ReportsTests
     private Cycles CyclesAt(int year, int month, int day)
     {
         var today = Today(year, month, day);
-        return new Cycles(_store, _store, _store, _store, _store, new CycleFinder(_store, today), new RolloverCycles(_store, _store, today, _store), new ListLogger<Cycles>());
+        var clock = new FixedClock(new DateTimeOffset(year, month, day, 1, 0, 0, TimeSpan.Zero));
+        return new Cycles(_store, _store, _store, _store, _store, new CycleFinder(_store, today), new RolloverCycles(_store, _store, _store, today, _store, clock), new ListLogger<Cycles>());
     }
 
     private Cycle Confirmed(User user, DateOnly start)

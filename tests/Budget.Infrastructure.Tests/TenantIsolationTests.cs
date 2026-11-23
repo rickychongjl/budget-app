@@ -113,7 +113,7 @@ public class TenantIsolationTests(SqlServerFixture sql)
         await using (var db = sql.ContextFor(b))
         {
             db.Attach(a.CycleCategory);
-            a.CycleCategory.Edit("Hacked", "skull", "red", 0, 1m, spreadEvenly: true);
+            a.CycleCategory.Edit("Hacked", "skull", "red", 0, 1m, spreadEvenly: true, autoPay: false);
             await db.Invoking(x => x.SaveChangesAsync()).Should().ThrowAsync<InvalidOperationException>();
         }
 

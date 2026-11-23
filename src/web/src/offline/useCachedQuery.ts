@@ -8,11 +8,12 @@ import { db } from './db'
 // until the next one arrives (or if it never does) the stored one is what the screen gets. So cached data renders
 // first, skeletons appear only on a true first load, and an error is only an error when there is nothing to show.
 // `at` is when the server gave this answer, which the overlay needs to know which outbox rows it already includes.
-export function useCachedQuery<T>(queryKey: string[], queryFn: () => Promise<T>) {
+// enabled: false skips the network but still reads what is stored.
+export function useCachedQuery<T>(queryKey: string[], queryFn: () => Promise<T>, { enabled = true } = {}) {
   const { me } = useSession()
   // Per user, so one person's budget is never drawn for another even before configureOutbox has cleaned up.
   const cacheKey = `${me.id}:${queryKey.join('/')}`
-  const query = useQuery({ queryKey, queryFn })
+  const query = useQuery({ queryKey, queryFn, enabled })
   // undefined while IndexedDB is being read, null when there is no stored answer.
   const stored = useLiveQuery(() => db.cache.get(cacheKey).then((row) => row ?? null), [cacheKey])
 

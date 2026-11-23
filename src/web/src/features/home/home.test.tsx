@@ -15,7 +15,7 @@ import { Home } from './Home'
 const ME: Me = { id: 'u1', displayName: 'Demo', timeZone: 'Australia/Sydney', currency: 'AUD', isDemo: true, cycleLengthDays: 30 }
 
 function category(overrides: Partial<CategoryRollup>): CategoryRollup {
-  const base = { categoryId: crypto.randomUUID(), name: 'Food', icon: 'utensils', colour: 'orange', type: 'Debit' as const, budgeted: 400, actual: 0, spreadEvenly: true }
+  const base = { categoryId: crypto.randomUUID(), name: 'Food', icon: 'utensils', colour: 'orange', type: 'Debit' as const, budgeted: 400, actual: 0, spreadEvenly: true, autoPay: false }
   const row = { ...base, ...overrides }
   return {
     remaining: row.budgeted - row.actual,

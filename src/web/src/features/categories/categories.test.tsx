@@ -19,7 +19,7 @@ const cycle = (id: string, startDate: string, endDate: string, phase: Cycle['pha
 const CYCLES = [cycle('past', '2026-08-11', '2026-09-09', 'Past'), cycle('cur', '2026-09-10', '2026-10-09', 'Current'), cycle('fut', '2026-10-10', '2026-11-08', 'Future')]
 
 const row = (categoryId: string, name: string, type: 'Debit' | 'Credit', colour: string, budgeted: number): CategoryRollup => ({
-  categoryId, name, icon: 'tag', colour, type, budgeted, actual: 0, remaining: budgeted, percentUsed: 0, status: 'OnTrack', spreadEvenly: true,
+  categoryId, name, icon: 'tag', colour, type, budgeted, actual: 0, remaining: budgeted, percentUsed: 0, status: 'OnTrack', spreadEvenly: true, autoPay: false,
 })
 const ROWS = [row('pay', 'Salary', 'Credit', 'blue', 5200), row('rent', 'Rent', 'Debit', 'slate', 2200), row('food', 'Groceries', 'Debit', 'orange', 700), row('fun', 'Fun', 'Debit', 'violet', 200)]
 const summaryOf = (of: Cycle): CycleSummary => ({
@@ -117,6 +117,80 @@ describe('editing a category works offline', () => {
     await userEvent.click(sheet.getByRole('button', { name: 'Save' }))
 
     await waitFor(async () => expect(await queued()).toEqual([{ type: 'category.edit', cycleId: 'cur', categoryId: 'rent', category: { spreadEvenly: false } }]))
+  })
+
+  test('a bill paid in one go can be marked as paid when a new cycle starts', async () => {
+    server.use(http.get('/api/transactions', () => HttpResponse.json([])))
+    await renderScreen({ online: false })
+    const sheet = await openEdit('Rent')
+    const autoPay = () => sheet.queryByRole('button', { name: 'Mark as paid when a new cycle starts' })
+    expect(autoPay()).not.toBeInTheDocument()
+
+    await userEvent.click(sheet.getByRole('radio', { name: 'In one go' }))
+    expect(autoPay()).toHaveAttribute('aria-pressed', 'false')
+    await userEvent.click(autoPay()!)
+    expect(autoPay()).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.click(sheet.getByRole('button', { name: 'Save' }))
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Mark Rent as paid for this cycle too?' })).getByRole('button', { name: 'Not now' }))
+
+    await waitFor(async () => expect(await queued()).toEqual([{ type: 'category.edit', cycleId: 'cur', categoryId: 'rent', category: { spreadEvenly: false, autoPay: true } }]))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
+  const turnOnAutoPay = async (sheet: ReturnType<typeof within>) => {
+    await userEvent.click(sheet.getByRole('radio', { name: 'In one go' }))
+    await userEvent.click(sheet.getByRole('button', { name: 'Mark as paid when a new cycle starts' }))
+    await userEvent.click(sheet.getByRole('button', { name: 'Save' }))
+  }
+
+  test('turning auto-pay on mid-cycle offers to pay this cycle when the bill has no transactions in it yet', async () => {
+    server.use(http.get('/api/transactions', () => HttpResponse.json([])))
+    await renderScreen({ online: false })
+    await turnOnAutoPay(await openEdit('Rent'))
+
+    const prompt = within(await screen.findByRole('dialog', { name: 'Mark Rent as paid for this cycle too?' }))
+    expect(prompt.getByText(/\$2,200\.00/)).toBeInTheDocument()
+    await userEvent.click(prompt.getByRole('button', { name: 'Mark as paid' }))
+
+    await waitFor(async () => expect(await queued()).toEqual([
+      { type: 'category.edit', cycleId: 'cur', categoryId: 'rent', category: { spreadEvenly: false, autoPay: true } },
+      { type: 'transaction.create', create: { clientId: expect.any(String), cycleId: 'cur', categoryId: 'rent', amount: 2200, occurredOn: '2026-09-20', note: 'Auto-paid' } },
+    ]))
+  })
+
+  test('a bill that already has a transaction this cycle is not offered a second payment', async () => {
+    server.use(http.get('/api/transactions', () => HttpResponse.json([
+      { id: 't1', clientId: 'c1', cycleId: 'cur', categoryId: 'rent', amount: 2200, occurredOn: '2026-09-11', note: null, createdAt: '2026-09-11T00:00:00Z', updatedAt: '2026-09-11T00:00:00Z' },
+    ])))
+    await renderScreen({ online: false })
+    await turnOnAutoPay(await openEdit('Rent'))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(await queued()).toEqual([{ type: 'category.edit', cycleId: 'cur', categoryId: 'rent', category: { spreadEvenly: false, autoPay: true } }])
+  })
+
+  test('an upcoming cycle is paid by its own start, so it is not offered a payment now', async () => {
+    await renderScreen({ online: false })
+    await userEvent.selectOptions(screen.getByLabelText('Cycle'), 'fut')
+    await screen.findByRole('heading', { level: 3, name: 'Groceries' })
+    await turnOnAutoPay(await openEdit('Rent'))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(await queued()).toEqual([{ type: 'category.edit', cycleId: 'fut', categoryId: 'rent', category: { spreadEvenly: false, autoPay: true } }])
+  })
+
+  test('spreading an auto-paid bill over the cycle turns auto-pay off with it', async () => {
+    const autoPaid = ROWS.map((r) => (r.categoryId === 'rent' ? { ...r, spreadEvenly: false, autoPay: true } : r))
+    const summary = summaryOf(CYCLES[1])
+    server.use(http.get('/api/cycles/:id', () => HttpResponse.json({ ...summary, rollup: { ...summary.rollup, categories: autoPaid } })))
+    await renderScreen({ online: false })
+    const sheet = await openEdit('Rent')
+    expect(sheet.getByRole('button', { name: 'Mark as paid when a new cycle starts' })).toHaveAttribute('aria-pressed', 'true')
+
+    await userEvent.click(sheet.getByRole('radio', { name: 'Over the cycle' }))
+    await userEvent.click(sheet.getByRole('button', { name: 'Save' }))
+
+    await waitFor(async () => expect(await queued()).toEqual([{ type: 'category.edit', cycleId: 'cur', categoryId: 'rent', category: { spreadEvenly: true, autoPay: false } }]))
   })
 
   test('income has no pace, so it is not asked how it is spent', async () => {
@@ -230,7 +304,7 @@ describe('adding and removing need a connection', () => {
     let body: unknown
     server.use(http.post('/api/cycles/cur/categories', async ({ request }) => {
       body = await request.json()
-      return HttpResponse.json({}, { status: 201 })
+      return HttpResponse.json({ categoryId: 'ins' }, { status: 201 })
     }))
     await renderScreen()
 
@@ -239,9 +313,12 @@ describe('adding and removing need a connection', () => {
     await userEvent.type(sheet.getByLabelText('Name'), 'Insurance')
     await userEvent.type(sheet.getByLabelText('Budget'), '75')
     await userEvent.click(sheet.getByRole('radio', { name: 'In one go' }))
+    await userEvent.click(sheet.getByRole('button', { name: 'Mark as paid when a new cycle starts' }))
     await userEvent.click(sheet.getByRole('button', { name: 'Save' }))
 
-    await waitFor(() => expect(body).toMatchObject({ type: 'Debit', name: 'Insurance', budgetAmount: 75, spreadEvenly: false }))
+    await waitFor(() => expect(body).toMatchObject({ type: 'Debit', name: 'Insurance', budgetAmount: 75, spreadEvenly: false, autoPay: true }))
+    // New, so it has no transactions: asked straight away, without reading the list.
+    expect(await screen.findByRole('dialog', { name: 'Mark Insurance as paid for this cycle too?' })).toBeInTheDocument()
   })
 
   test('removing asks first, then deletes; a refusal is shown in the server\'s words', async () => {

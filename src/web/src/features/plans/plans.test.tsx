@@ -28,7 +28,7 @@ const PAST = cycle('past', '2026-08-11', '2026-09-09', 'Past')
 const CURRENT = cycle('cur', '2026-09-10', '2026-10-09', 'Current')
 
 const row = (n: number): CategoryRollup => ({
-  categoryId: `c${n}`, name: `Category ${n}`, icon: 'tag', colour: 'blue', type: 'Debit', budgeted: 100, actual: 0, remaining: 100, percentUsed: 0, status: 'OnTrack', spreadEvenly: true,
+  categoryId: `c${n}`, name: `Category ${n}`, icon: 'tag', colour: 'blue', type: 'Debit', budgeted: 100, actual: 0, remaining: 100, percentUsed: 0, status: 'OnTrack', spreadEvenly: true, autoPay: false,
 })
 const summary = (of: Cycle, rows: number): CycleSummary => ({
   cycle: of,

@@ -76,6 +76,9 @@ namespace Budget.Infrastructure.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<bool>("AutoPay")
+                        .HasColumnType("bit");
+
                     b.Property<decimal>("BudgetAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");

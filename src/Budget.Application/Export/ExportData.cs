@@ -6,7 +6,7 @@ namespace Budget.Application;
 public sealed record ProfileExport(string DisplayName, string? Email, string TimeZone, string Currency, bool IsDemo, DateTimeOffset CreatedAt);
 
 public sealed record CycleCategoryExport(
-    Guid CategoryId, string Name, CategoryType Type, decimal Budget, string Icon, string Colour, int Order, bool SpreadEvenly);
+    Guid CategoryId, string Name, CategoryType Type, decimal Budget, string Icon, string Colour, int Order, bool SpreadEvenly, bool AutoPay);
 
 // Category is the name the category had in the transaction's own cycle, so a later rename does not rewrite history.
 public sealed record TransactionExport(
@@ -57,7 +57,7 @@ public sealed class ExportData(
                 cycle.Status,
                 cycle.OpeningBalance,
                 cycle.ClosingBalance,
-                [.. snapshots[cycle.Id].Select(s => new CycleCategoryExport(s.CategoryId, s.Name, types[s.CategoryId], s.BudgetAmount, s.Icon, s.Colour, s.SortOrder, s.SpreadEvenly))],
+                [.. snapshots[cycle.Id].Select(s => new CycleCategoryExport(s.CategoryId, s.Name, types[s.CategoryId], s.BudgetAmount, s.Icon, s.Colour, s.SortOrder, s.SpreadEvenly, s.AutoPay))],
                 [.. byCycle[cycle.Id].Select(t => new TransactionExport(
                     t.Id,
                     t.OccurredOn,
