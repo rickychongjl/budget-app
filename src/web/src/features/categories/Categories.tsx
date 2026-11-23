@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, CloudOff, Plus, Shapes } from 'lucide-react'
+import { ArrowDown, ArrowUp, CloudOff, GripVertical, Plus, Shapes } from 'lucide-react'
 import { useState } from 'react'
 import { api } from '../../api/client'
 import type { CategoryRollup, CategoryType, Cycle } from '../../api/types'
@@ -101,19 +101,59 @@ export function CategoryList({ cycleId, online }: { cycleId: string; online: boo
   const max = limitsOf(me).maxCategoriesPerCycle
   const full = categoriesLeft(me, rows.length) === 0
 
+  // A drag in progress: the dragged row and its section's order as it stands under the finger. Kept until the queued
+  // edits land, so the list does not flash back to the old order in between.
+  const [drag, setDrag] = useState<{ type: CategoryType; id: string; ids: string[]; dropped: boolean } | null>(null)
+
   // The rollup is in sort order but does not carry the numbers, so a move renumbers the whole cycle to its new order.
   // That is exact whatever the stored values were. Through the outbox: reordering works offline (design section 7).
   // ponytail: one queued edit per category per move (at most 20). Send only the rows whose number changed once the
   // API returns sortOrder.
-  async function move(row: CategoryRollup, by: -1 | 1) {
-    const sameType = rows.filter((other) => other.type === row.type)
-    const neighbour = sameType[sameType.indexOf(row) + by]
-    const order = [...rows]
-    const from = order.indexOf(row)
-    const to = order.indexOf(neighbour)
-    ;[order[from], order[to]] = [order[to], order[from]]
-    for (const [sortOrder, category] of order.entries()) {
-      await enqueue({ type: 'category.edit', cycleId, categoryId: category.categoryId, category: { sortOrder } })
+  async function renumber(type: CategoryType, ids: string[]) {
+    const queue = [...ids]
+    const order = rows.map((row) => (row.type === type ? queue.shift()! : row.categoryId))
+    for (const [sortOrder, categoryId] of order.entries()) {
+      await enqueue({ type: 'category.edit', cycleId, categoryId, category: { sortOrder } })
+    }
+  }
+
+  const idsOf = (type: CategoryType) => rows.filter((row) => row.type === type).map((row) => row.categoryId)
+
+  function move(row: CategoryRollup, by: -1 | 1) {
+    const ids = idsOf(row.type)
+    const at = ids.indexOf(row.categoryId)
+    ;[ids[at], ids[at + by]] = [ids[at + by], ids[at]]
+    return renumber(row.type, ids)
+  }
+
+  function startDrag(event: React.PointerEvent<HTMLElement>, row: CategoryRollup) {
+    if (drag) return
+    // Captured, so the moves keep coming to the handle when the finger leaves it.
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+    setDrag({ type: row.type, id: row.categoryId, ids: idsOf(row.type), dropped: false })
+  }
+
+  // The dragged row goes after every other row whose middle is above the finger.
+  function dragTo(event: React.PointerEvent<HTMLElement>) {
+    if (!drag || drag.dropped) return
+    const items = [...(event.currentTarget.closest('ul')?.children ?? [])]
+    const others = items.filter((_, index) => drag.ids[index] !== drag.id)
+    const at = others.filter((item) => {
+      const box = item.getBoundingClientRect()
+      return box.top + box.height / 2 < event.clientY
+    }).length
+    const ids = drag.ids.filter((id) => id !== drag.id)
+    ids.splice(at, 0, drag.id)
+    if (ids.join() !== drag.ids.join()) setDrag({ ...drag, ids })
+  }
+
+  async function drop() {
+    if (!drag || drag.dropped) return
+    setDrag({ ...drag, dropped: true })
+    try {
+      if (drag.ids.join() !== idsOf(drag.type).join()) await renumber(drag.type, drag.ids)
+    } finally {
+      setDrag(null)
     }
   }
 
@@ -128,7 +168,7 @@ export function CategoryList({ cycleId, online }: { cycleId: string; online: boo
       {cycle.data && rows.length === 0 && <EmptyState icon={Shapes}>No categories in this cycle yet.</EmptyState>}
 
       {(['Debit', 'Credit'] as CategoryType[]).map((type) => {
-        const ofType = rows.filter((row) => row.type === type)
+        const ofType = drag?.type === type ? drag.ids.map((id) => rows.find((row) => row.categoryId === id)!) : rows.filter((row) => row.type === type)
         const title = type === 'Debit' ? 'Spending' : 'Income'
         return ofType.length === 0 ? null : (
           <section key={type} aria-labelledby={`categories-${type}`} className={styles.section}>
@@ -138,7 +178,7 @@ export function CategoryList({ cycleId, online }: { cycleId: string; online: boo
             <Card>
               <ul className={styles.list}>
                 {ofType.map((row, index) => (
-                  <li key={row.categoryId} className={styles.row}>
+                  <li key={row.categoryId} className={`${styles.row} ${drag?.id === row.categoryId ? styles.dragging : ''}`}>
                     <div className={styles.main}>
                       <IconChip icon={categoryIcon(row.icon)} colour={row.colour} />
                       <div className={styles.text}>
@@ -148,13 +188,25 @@ export function CategoryList({ cycleId, online }: { cycleId: string; online: boo
                       {/* Covers the chip and the text, so the whole left of the row opens the editor. */}
                       <button type="button" className={styles.edit} aria-label={`Edit ${row.name}`} onClick={() => setEditing(row)} />
                     </div>
-                    {/* Buttons, not a drag: every reorder has a button alternative, and here it is the only way. */}
+                    {/* The buttons are the drag's alternative (MASTER section 9), and the keyboard's and screen reader's way. */}
                     <button type="button" className={styles.move} aria-label={`Move ${row.name} up`} disabled={index === 0} onClick={() => void move(row, -1)}>
                       <ArrowUp aria-hidden="true" />
                     </button>
                     <button type="button" className={styles.move} aria-label={`Move ${row.name} down`} disabled={index === ofType.length - 1} onClick={() => void move(row, 1)}>
                       <ArrowDown aria-hidden="true" />
                     </button>
+                    {/* Only the handle drags, so a drag never fights the page's scrolling. Hidden from assistive tech: the buttons say the same. */}
+                    <span
+                      className={styles.handle}
+                      aria-hidden="true"
+                      data-testid={`drag ${row.name}`}
+                      onPointerDown={(event) => startDrag(event, row)}
+                      onPointerMove={dragTo}
+                      onPointerUp={() => void drop()}
+                      onPointerCancel={() => void drop()}
+                    >
+                      <GripVertical />
+                    </span>
                   </li>
                 ))}
               </ul>

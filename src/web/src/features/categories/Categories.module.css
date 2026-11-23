@@ -124,3 +124,32 @@
   width: var(--icon-sm);
   height: var(--icon-sm);
 }
+
+/* Its own region with touch-action off, so a press here drags and anywhere else scrolls. */
+.handle {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--target-min);
+  height: var(--target-min);
+  color: var(--color-text-muted);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.handle svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
+.dragging {
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+}
+
+.dragging .handle {
+  color: var(--color-text);
+  cursor: grabbing;
+}

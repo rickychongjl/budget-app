@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider, onlineManager } from '@tanstack/react-query'
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router'
@@ -258,7 +258,7 @@ describe('editing a category works offline', () => {
   })
 })
 
-describe('reordering is by button, and works offline', () => {
+describe('reordering is by button or drag, and works offline', () => {
   test('moving a row renumbers the whole cycle to its new order', async () => {
     await renderScreen({ online: false })
 
@@ -267,6 +267,24 @@ describe('reordering is by button, and works offline', () => {
     await waitFor(() => expect(names('Spending')).toEqual(['Groceries', 'Rent', 'Fun']))
     // Salary is first in the cycle's list and stays there; Groceries and Rent swap.
     expect((await queued()).map((item) => item.type === 'category.edit' && [item.categoryId, item.category.sortOrder])).toEqual([['pay', 0], ['food', 1], ['rent', 2], ['fun', 3]])
+  })
+
+  test('dragging a row by its handle drops it where the finger lets go', async () => {
+    await renderScreen({ online: false })
+    // jsdom lays nothing out: each Spending row is 50px tall, in the order it is drawn.
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const top = [...(this.parentElement?.children ?? [])].indexOf(this) * 50
+      return { top, height: 50, bottom: top + 50, left: 0, right: 0, width: 0, x: 0, y: top, toJSON: () => ({}) }
+    })
+    const handle = screen.getByTestId('drag Fun')
+
+    fireEvent.pointerDown(handle, { pointerId: 1, clientY: 125 })
+    fireEvent.pointerMove(handle, { pointerId: 1, clientY: 10 })
+    expect(names('Spending')).toEqual(['Fun', 'Rent', 'Groceries'])
+    fireEvent.pointerUp(handle, { pointerId: 1, clientY: 10 })
+
+    await waitFor(async () => expect((await queued()).map((item) => item.type === 'category.edit' && [item.categoryId, item.category.sortOrder])).toEqual([['pay', 0], ['fun', 1], ['rent', 2], ['food', 3]]))
+    await waitFor(() => expect(names('Spending')).toEqual(['Fun', 'Rent', 'Groceries']))
   })
 
   test('the first cannot move up and the last cannot move down', async () => {
