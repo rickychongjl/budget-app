@@ -79,17 +79,16 @@ test('Settings 9, 10: a category can be added mid-cycle, and removed only while 
   await add.getByRole('button', { name: 'Save' }).click()
   await expect(page.getByRole('heading', { level: 3, name: 'Gifts' })).toBeVisible()
 
-  await page.getByRole('button', { name: 'Edit Gifts' }).click()
-  await page.getByRole('button', { name: 'Remove from this cycle' }).click()
+  await page.getByRole('button', { name: 'Remove Gifts' }).click()
   await page.getByRole('dialog', { name: 'Remove Gifts?' }).getByRole('button', { name: 'Remove' }).click()
   await expect(page.getByText('Removed from this cycle', { exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { level: 3, name: 'Gifts' })).toHaveCount(0)
 
-  // Groceries has transactions this cycle, so the server says no and the sheet says why.
-  await page.getByRole('button', { name: 'Edit Groceries' }).click()
-  await page.getByRole('button', { name: 'Remove from this cycle' }).click()
-  await page.getByRole('dialog', { name: 'Remove Groceries?' }).getByRole('button', { name: 'Remove' }).click()
-  await expect(page.getByRole('dialog', { name: 'Edit Groceries' }).getByRole('alert')).toBeVisible()
+  // Groceries has transactions this cycle, so the server says no and the dialog says why.
+  await page.getByRole('button', { name: 'Remove Groceries' }).click()
+  const confirm = page.getByRole('dialog', { name: 'Remove Groceries?' })
+  await confirm.getByRole('button', { name: 'Remove' }).click()
+  await expect(confirm.getByRole('alert')).toBeVisible()
   await expect(page.getByRole('heading', { level: 3, name: 'Groceries' })).toBeVisible()
 })
 

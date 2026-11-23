@@ -33,9 +33,10 @@ test('adding or removing a category needs a connection, and says so instead of f
   await expect(page.getByRole('button', { name: 'Add category' })).toBeDisabled()
   await expect(page.getByText('Adding or removing a category needs a connection.')).toBeVisible()
 
+  await expect(page.getByRole('button', { name: 'Remove Fun' })).toBeDisabled()
+
   // Editing still works: it goes through the outbox.
   await page.getByRole('button', { name: 'Edit Fun' }).click()
   const sheet = page.getByRole('dialog', { name: 'Edit Fun' })
-  await expect(sheet.getByRole('button', { name: 'Remove from this cycle' })).toBeDisabled()
   await expect(sheet.getByRole('button', { name: 'Save' })).toBeEnabled()
 })

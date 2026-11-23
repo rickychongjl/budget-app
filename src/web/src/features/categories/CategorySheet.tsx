@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { CalendarCheck, CircleAlert, Star, Trash2 } from 'lucide-react'
+import { CalendarCheck, CircleAlert } from 'lucide-react'
 import { useRef, useState, type CSSProperties } from 'react'
 import { api } from '../../api/client'
 import type { CategoryRollup, CategoryType, EditCategoryRequest } from '../../api/types'
@@ -18,7 +18,6 @@ import { useSession } from '../auth/useSession'
 import { useCycle } from '../cycles/useCycle'
 import { useTransactions } from '../transactions/useTransactions'
 import styles from './CategorySheet.module.css'
-import { isFavourite, toggleFavourite } from './favourites'
 
 const TYPES = [
   { value: 'Debit', label: 'Spending' },
@@ -36,14 +35,13 @@ type Props = {
   rows: CategoryRollup[]
   // Absent when adding.
   editing?: CategoryRollup
-  online: boolean
   onClose: () => void
 }
 
-// Editing works offline through the outbox and is last-write-wins per field. Adding and removing go straight to the
-// API: a new category has no server id for queued transactions to point at, and "only if it has no transactions"
-// cannot be checked against a queue the server has not seen (design section 7).
-export function CategorySheet({ cycleId, rows, editing, online, onClose }: Props) {
+// Editing works offline through the outbox and is last-write-wins per field. Adding goes straight to the API: a new
+// category has no server id for queued transactions to point at (design section 7). Favourite and remove are on the
+// list's rows (Categories.tsx).
+export function CategorySheet({ cycleId, rows, editing, onClose }: Props) {
   const client = useQueryClient()
   const toast = useToast()
   const nameField = useRef<HTMLInputElement>(null)
@@ -73,9 +71,6 @@ export function CategorySheet({ cycleId, rows, editing, online, onClose }: Props
   const [colour, setColour] = useState<string>(() => (editing ? toSlot(editing.colour) : (SLOTS.find((slot) => !rows.some((row) => row.colour === slot)) ?? SLOTS[rows.length % SLOTS.length])))
   const [errors, setErrors] = useState<{ name?: string; budget?: string }>({})
   const [problem, setProblem] = useState<string>()
-  const [confirmingRemove, setConfirmingRemove] = useState(false)
-  // Per device, not per cycle: pinning is instant and never queued, so it needs no Save and works offline.
-  const [favourite, setFavourite] = useState(() => (editing ? isFavourite(editing.categoryId) : false))
 
   const done = async () => {
     await client.invalidateQueries({ queryKey: ['cycles'] })
@@ -96,18 +91,6 @@ export function CategorySheet({ cycleId, rows, editing, online, onClose }: Props
     // A new category has no transactions, so the only question is whether to pay this cycle.
     onSuccess: async ({ categoryId }, budgetAmount) => (offerPay && budgetAmount > 0 ? setPaying({ categoryId, amount: budgetAmount }) : done()),
     onError: (error: Error) => setProblem(error.message),
-  })
-  const remove = useMutation({
-    mutationFn: () => api.delete(`/api/cycles/${cycleId}/categories/${editing!.categoryId}`),
-    onSuccess: async () => {
-      navigator.vibrate?.(10)
-      toast.show({ message: 'Removed from this cycle' })
-      await done()
-    },
-    onError: (error: Error) => {
-      setConfirmingRemove(false)
-      setProblem(error.message)
-    },
   })
 
   async function save() {
@@ -174,17 +157,6 @@ export function CategorySheet({ cycleId, rows, editing, online, onClose }: Props
         {/* Debit or credit is fixed for the life of the category, so it is only asked when adding. */}
         {!editing && <SegmentedControl label="Type" options={TYPES} value={type} onChange={setType} />}
 
-        <Field ref={nameField} label="Name" value={name} maxLength={60} error={errors.name} onChange={(event) => setName(event.target.value)} />
-        <Field
-          ref={budgetField}
-          label="Budget"
-          inputMode="decimal"
-          value={budget}
-          error={errors.budget}
-          hint={type === 'Debit' ? 'The most you plan to spend this cycle.' : 'What you expect to receive this cycle.'}
-          onChange={(event) => setBudget(event.target.value)}
-        />
-
         {type === 'Debit' && (
           <div className={styles.group}>
             {/* Drawn as well as announced: the segments alone ("In one go") do not say what is being asked. */}
@@ -201,13 +173,24 @@ export function CategorySheet({ cycleId, rows, editing, online, onClose }: Props
 
         {type === 'Debit' && spent === 'once' && (
           <div className={styles.group}>
-            {/* A toggle like Favourite: the label stays, the pressed state changes (MASTER 9). */}
+            {/* A toggle: the label stays, the pressed state changes (MASTER 9). */}
             <Button variant="secondary" icon={CalendarCheck} aria-pressed={autoPay} onClick={() => setAutoPay(!autoPay)}>
               Mark as paid when a new cycle starts
             </Button>
             <p className={styles.hint}>Adds the full budget as paid on the first day of each new cycle. Edit it if the bill differs.</p>
           </div>
         )}
+
+        <Field ref={nameField} label="Name" value={name} maxLength={60} error={errors.name} onChange={(event) => setName(event.target.value)} />
+        <Field
+          ref={budgetField}
+          label="Budget"
+          inputMode="decimal"
+          value={budget}
+          error={errors.budget}
+          hint={type === 'Debit' ? 'The most you plan to spend this cycle.' : 'What you expect to receive this cycle.'}
+          onChange={(event) => setBudget(event.target.value)}
+        />
 
         <fieldset className={styles.group}>
           <legend className={styles.legend}>Colour</legend>
@@ -233,43 +216,7 @@ export function CategorySheet({ cycleId, rows, editing, online, onClose }: Props
           </div>
         </fieldset>
 
-        {editing && (
-          <div className={styles.group}>
-            {/* A toggle, so it is announced as one; the label never changes, the pressed state does (MASTER 9). */}
-            <Button variant="secondary" icon={Star} aria-pressed={favourite} onClick={() => setFavourite(toggleFavourite(editing.categoryId).includes(editing.categoryId))}>
-              Favourite
-            </Button>
-            <p className={styles.hint}>Listed first when you add a transaction. Saved on this device.</p>
-          </div>
-        )}
-
-        {editing && (
-          <>
-            <Button variant="destructive" icon={Trash2} disabled={!online} onClick={() => setConfirmingRemove(true)}>
-              Remove from this cycle
-            </Button>
-            {!online && <p className={styles.reason}>Removing a category needs a connection.</p>}
-          </>
-        )}
       </div>
-
-      <Dialog
-        open={confirmingRemove}
-        title={`Remove ${editing?.name}?`}
-        onClose={() => setConfirmingRemove(false)}
-        actions={
-          <>
-            <Button variant="secondary" onClick={() => setConfirmingRemove(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" pending={remove.isPending} onClick={() => remove.mutate()}>
-              Remove
-            </Button>
-          </>
-        }
-      >
-        It is removed from this cycle only. A category with transactions in this cycle cannot be removed.
-      </Dialog>
 
       <Dialog
         open={paying !== undefined}
