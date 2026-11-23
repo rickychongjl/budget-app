@@ -42,7 +42,8 @@ export function CategoryRow({ row, currency, to, today }: Props) {
           value={row.percentUsed === null ? null : row.percentUsed / 100}
           tone={status.tone}
           label={`${row.name}: ${actual} of ${budgeted}, ${status.word}`}
-          today={today}
+          // A bill paid in one go has no pace, so where today falls says nothing about it.
+          today={row.type === 'Debit' && !row.spreadEvenly ? undefined : today}
         />
         <p className={`${styles.status} ${styles[status.tone]} num`}>
           {StatusIcon && <StatusIcon aria-hidden="true" className={styles.statusIcon} />}

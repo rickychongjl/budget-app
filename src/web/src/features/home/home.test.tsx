@@ -228,16 +228,17 @@ describe('Home', () => {
     expect(screen.getByRole('link', { name: 'Set up your first cycle' })).toHaveAttribute('href', '/onboarding')
   })
 
-  test('every bar has a line where today falls in the cycle', async () => {
+  test('every bar but a bill paid in one go has a line where today falls in the cycle', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     server.use(http.get('/api/cycles/current', () => HttpResponse.json(SUMMARY)))
     renderHome()
 
     await screen.findByRole('heading', { level: 3, name: 'Eating out' })
     // Day 11 of 30.
-    // The three spending rows, and the overview bar.
+    // Groceries, Eating out and the overview bar. Rent is paid in one go, so where today falls says nothing about it.
     const lines = screen.getAllByTestId('today-line')
-    expect(lines).toHaveLength(4)
+    expect(lines).toHaveLength(3)
+    expect(within(screen.getByRole('heading', { level: 3, name: 'Rent' }).closest('li')!).queryByTestId('today-line')).not.toBeInTheDocument()
     for (const line of lines) {
       expect(parseFloat(line.style.left)).toBeCloseTo((11 / 30) * 100)
     }
