@@ -150,6 +150,7 @@ function CycleOverview({ tab, rollup, currency, daysLeft, elapsed }: OverviewPro
       percentUsed: budgeted === 0 ? null : (actual / budgeted) * 100,
       status: actual > budgeted ? (isSpending ? 'Over' : 'Ahead') : 'OnTrack',
       spreadEvenly: true,
+      autoPay: false,
     },
     currency,
   )
