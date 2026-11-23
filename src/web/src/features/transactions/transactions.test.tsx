@@ -4,13 +4,13 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { useState } from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { CategoryRollup, CycleSummary, Me } from '../../api/types'
+import type { CategoryRollup, CycleSummary, Me, Transaction } from '../../api/types'
 import { db } from '../../offline/db'
 import { configureOutbox, stopOutbox } from '../../offline/outbox'
 import { server } from '../../test/server'
 import { ToastProvider } from '../../ui/Toast'
 import { SessionContext } from '../auth/useSession'
-import { AddTransactionSheet } from './AddTransactionSheet'
+import { AddTransactionSheet, EditTransactionSheet } from './AddTransactionSheet'
 import { amountOf, press } from './amountInput'
 
 describe('keypad', () => {
@@ -53,6 +53,15 @@ const SUMMARY: CycleSummary = {
     debitsBudgeted: 300, debitsActual: 0, creditsBudgeted: 100, creditsActual: 0, net: 0, accrued: null,
   },
 }
+
+// More spending categories than there are chips: a..h in the cycle's order.
+const BIG: CycleSummary = {
+  ...SUMMARY,
+  rollup: { ...SUMMARY.rollup, categories: [row('pay', 'Salary', 'Credit'), ...[...'abcdefgh'].map((id) => row(id, `Cat ${id.toUpperCase()}`, 'Debit'))] },
+}
+
+const chipNames = (sheet: ReturnType<typeof within>) =>
+  within(sheet.getByRole('radiogroup', { name: 'Category' })).getAllByRole('radio').map((r) => r.closest('label')!.textContent)
 
 function Harness() {
   const [open, setOpen] = useState(true)
@@ -125,15 +134,16 @@ describe('AddTransactionSheet', () => {
   })
 
   test('search narrows the list, and says so when nothing matches', async () => {
-    const sheet = await renderSheet()
-    await sheet.findByRole('radio', { name: 'Groceries' })
+    const sheet = await renderSheet(BIG)
+    await userEvent.click(sheet.getByRole('button', { name: 'More' }))
+    expect(sheet.getByRole('button', { name: 'More' })).toHaveAttribute('aria-expanded', 'true')
 
-    await userEvent.type(sheet.getByRole('searchbox', { name: 'Search categories' }), 'gro')
-    expect(sheet.getByRole('radio', { name: 'Groceries' })).toBeInTheDocument()
-    expect(sheet.queryByRole('radio', { name: 'Rent' })).not.toBeInTheDocument()
+    await userEvent.type(sheet.getByRole('searchbox', { name: 'Search categories' }), 'cat g')
+    const list = within(sheet.getByRole('radiogroup', { name: 'All categories' }))
+    expect(list.getAllByRole('radio').map((r) => r.closest('label')!.textContent)).toEqual(['Cat G'])
 
     await userEvent.type(sheet.getByRole('searchbox', { name: 'Search categories' }), 'xyz')
-    expect(sheet.getByText('No category matches "groxyz".')).toBeInTheDocument()
+    expect(sheet.getByText('No category matches "cat gxyz".')).toBeInTheDocument()
   })
 
   test('Save needs an amount and a category', async () => {
@@ -199,7 +209,7 @@ describe('AddTransactionSheet', () => {
     await waitFor(async () => expect(await queued()).toEqual([]))
   })
 
-  test('the category used last is listed first next time, per type', async () => {
+  test('the category used most is a chip first next time', async () => {
     const sheet = await renderSheet()
     await tap(sheet, '5')
     await userEvent.click(await sheet.findByRole('radio', { name: 'Fun' }))
@@ -216,9 +226,14 @@ describe('AddTransactionSheet', () => {
     expect(again.getByRole('radio', { name: 'Fun' })).not.toBeChecked()
   })
 
-  test('the picker comes before the date and the note, so the required choice is not behind the optional ones', async () => {
+  test('amount, then the chips, then the keypad, then the date and the note', async () => {
     const sheet = await renderSheet()
-    const picker = await sheet.findByRole('searchbox', { name: 'Search categories' })
+    const picker = sheet.getByRole('radiogroup', { name: 'Category' })
+    const follows = (a: Element, b: Element) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+
+    expect(follows(sheet.getByLabelText('Amount'), picker)).toBe(true)
+    expect(follows(picker, sheet.getByRole('button', { name: 'Backspace' }))).toBe(true)
+    expect(follows(sheet.getByRole('button', { name: 'Backspace' }), sheet.getByLabelText('Date'))).toBe(true)
 
     expect(picker.compareDocumentPosition(sheet.getByLabelText('Date')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(picker.compareDocumentPosition(sheet.getByLabelText('Note')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
@@ -230,7 +245,39 @@ describe('AddTransactionSheet', () => {
 
     const names = (await sheet.findAllByRole('radio', { name: /Rent|Groceries|Fun/ })).map((r) => r.closest('label')!.textContent)
     expect(names).toEqual(['Fun', 'Rent', 'Groceries'])
-    expect(sheet.getByText('Favourites')).toBeInTheDocument()
+  })
+
+  test('at most six chips: pinned, then most used, then the cycle order, and More for the rest', async () => {
+    localStorage.setItem('budget.favouriteCategories', JSON.stringify(['h']))
+    localStorage.setItem('budget.categoryUses', JSON.stringify({ f: 3, c: 1, h: 9 }))
+    const sheet = await renderSheet(BIG)
+
+    expect(chipNames(sheet)).toEqual(['Cat H', 'Cat F', 'Cat C', 'Cat A', 'Cat B', 'Cat D'])
+    expect(sheet.getByRole('button', { name: 'More' })).toHaveAttribute('aria-expanded', 'false')
+    expect(sheet.queryByRole('searchbox')).not.toBeInTheDocument()
+  })
+
+  test('no More when every category is already a chip', async () => {
+    const sheet = await renderSheet()
+    await sheet.findByRole('radio', { name: 'Rent' })
+
+    expect(sheet.queryByRole('button', { name: 'More' })).not.toBeInTheDocument()
+  })
+
+  test('a category picked from More becomes the selected chip and is saved', async () => {
+    const sheet = await renderSheet(BIG)
+    await tap(sheet, '7')
+    await userEvent.click(sheet.getByRole('button', { name: 'More' }))
+
+    await userEvent.click(within(sheet.getByRole('radiogroup', { name: 'All categories' })).getByRole('radio', { name: 'Cat G' }))
+
+    // The list closes, and the pick stays in view as a chip.
+    expect(sheet.queryByRole('radiogroup', { name: 'All categories' })).not.toBeInTheDocument()
+    expect(within(sheet.getByRole('radiogroup', { name: 'Category' })).getByRole('radio', { name: 'Cat G' })).toBeChecked()
+    await userEvent.click(sheet.getByRole('button', { name: 'Save' }))
+    await waitFor(async () => expect(await queued()).toHaveLength(1))
+    expect((await queued())[0]).toMatchObject({ create: { categoryId: 'g', amount: 7 } })
+    expect(JSON.parse(localStorage.getItem('budget.categoryUses')!)).toEqual({ g: 1 })
   })
 
   test('a pinned category of the other type is not listed among these', async () => {
@@ -241,6 +288,24 @@ describe('AddTransactionSheet', () => {
     // Salary is pinned, but it is income: Spending still starts with its own categories.
     const names = sheet.getAllByRole('radio', { name: /Rent|Groceries|Fun/ }).map((r) => r.closest('label')!.textContent)
     expect(names).toEqual(['Rent', 'Groceries', 'Fun'])
+  })
+
+  test('editing a transaction whose category is not a chip shows it as the selected chip', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    const tx: Transaction = {
+      id: 'id-t', clientId: 't', cycleId: 'c1', categoryId: 'g', amount: 12, occurredOn: '2026-09-12', note: null, createdAt: '2026-09-12T01:00:00Z', updatedAt: '2026-09-12T01:00:00Z',
+    }
+    render(
+      <SessionContext value={{ me: ME, signOut: async () => undefined }}>
+        <ToastProvider>
+          <EditTransactionSheet transaction={tx} summary={BIG} onClose={() => undefined} />
+        </ToastProvider>
+      </SessionContext>,
+    )
+    const sheet = within(await screen.findByRole('dialog', { name: 'Edit transaction' }))
+
+    expect(chipNames(sheet)).toEqual(['Cat A', 'Cat B', 'Cat C', 'Cat D', 'Cat E', 'Cat F', 'Cat G'])
+    expect(within(sheet.getByRole('radiogroup', { name: 'Category' })).getByRole('radio', { name: 'Cat G' })).toBeChecked()
   })
 
   test.each([

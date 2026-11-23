@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { addTransaction, categoryRow, fixtureSpent, money, showOnHome, today } from '../support'
+import { addTransaction, categoryRow, fixtureSpent, money, showOnHome } from '../support'
 
 // docs/user-stories.md, "Transactions". These add to the shared demo; the specs after this one allow for it.
 test.describe.configure({ mode: 'serial' })
@@ -33,11 +33,13 @@ test('Transactions 3: a new transaction goes into the current cycle, dated today
   await page.goto('/')
   await categoryRow(page, 'Groceries').click()
 
-  await expect(page.getByRole('heading', { level: 1, name: 'Groceries' })).toBeVisible()
+  // Activity, filtered to the row's category.
+  await expect(page.getByRole('heading', { level: 1, name: 'Activity' })).toBeVisible()
+  await expect(page.getByRole('radiogroup', { name: 'Category' }).getByRole('radio', { name: 'Groceries' })).toBeChecked()
   const row = page.getByRole('button', { name: /Playwright groceries/ })
   await expect(row).toContainText('$42.00')
-  // Dated today, as "22 Sep".
-  await expect(row).toContainText(new RegExp(`\\b${Number(today().slice(8))} [A-Z][a-z]+`))
+  // Dated today: it sits under the "Today" heading.
+  await expect(page.getByRole('region', { name: /^Today/ })).toContainText('Playwright groceries')
 })
 
 test('Transactions 4: editing or deleting in a past cycle asks about that cycle\'s closing balance', async ({ page }) => {

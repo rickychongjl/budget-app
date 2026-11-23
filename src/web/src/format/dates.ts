@@ -49,3 +49,12 @@ export function todayIn(timeZone: string, now = new Date()) {
     return format('UTC')
   }
 }
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+// A day heading on Activity: "Today", "Yesterday", then "Sat 21 Nov".
+export function formatDay(date: string, today: string) {
+  if (date === today) return 'Today'
+  if (date === addDays(today, -1)) return 'Yesterday'
+  return `${WEEKDAYS[new Date(toUtc(date)).getUTCDay()]} ${formatDate(date, today)}`
+}

@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { lazy, Suspense, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { NetworkError, ProblemError } from './api/client'
+import { Activity } from './features/activity/Activity'
 import { SessionGate } from './features/auth/SessionGate'
 import { Categories } from './features/categories/Categories'
 import { CycleDetail } from './features/cycles/CycleDetail'
@@ -11,7 +12,6 @@ import { Onboarding } from './features/onboarding/Onboarding'
 import { Privacy, Terms } from './features/public/Legal'
 import { Pricing } from './features/public/Pricing'
 import { Settings } from './features/settings/Settings'
-import { CategoryTransactions } from './features/transactions/CategoryTransactions'
 import { OutboxSync } from './offline/OutboxSync'
 import { UpdatePrompt } from './pwa/UpdatePrompt'
 import { AppShell } from './shell/AppShell'
@@ -71,9 +71,9 @@ function SignedInApp() {
       <Routes>
         <Route element={<AppShell />}>
           <Route index element={<Home />} />
+          <Route path="activity" element={<Activity />} />
           <Route path="cycles" element={<Cycles />} />
           <Route path="cycles/:id" element={<CycleDetail />} />
-          <Route path="cycles/:cycleId/categories/:categoryId" element={<CategoryTransactions />} />
           <Route path="settings" element={<Settings />} />
           <Route path="settings/categories" element={<Categories />} />
           <Route path="onboarding" element={<Onboarding />} />

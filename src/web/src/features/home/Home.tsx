@@ -134,8 +134,9 @@ function CycleOverview({ tab, rollup, currency, daysLeft, elapsed }: OverviewPro
   const actual = isSpending ? rollup.debitsActual : rollup.creditsActual
   const remaining = Math.round((budgeted - actual) * 100) / 100
   // The cycle as one category, so the totals take the same status rules as a row. Over and Ahead are decided here only
-  // because the totals may include queued rows the server has not counted; spreadEvenly is off because a bill paid in one
-  // go would read as running ahead of the calendar.
+  // because the totals may include queued rows the server has not counted. spreadEvenly is on because the totals are
+  // spending, not a bill (off would read "Paid" / "still due"); no elapsed is passed, so a bill paid in one go never makes
+  // the whole cycle read as ahead of pace.
   const status = categoryStatus(
     {
       categoryId: '',
@@ -148,7 +149,7 @@ function CycleOverview({ tab, rollup, currency, daysLeft, elapsed }: OverviewPro
       remaining,
       percentUsed: budgeted === 0 ? null : (actual / budgeted) * 100,
       status: actual > budgeted ? (isSpending ? 'Over' : 'Ahead') : 'OnTrack',
-      spreadEvenly: false,
+      spreadEvenly: true,
     },
     currency,
   )
@@ -222,7 +223,7 @@ export function CategorySection({ id, title, rows, currency, cycleId, today }: S
       <Card>
         <ul className={styles.rows}>
           {rows.map((row) => (
-            <CategoryRow key={row.categoryId} row={row} currency={currency} to={`/cycles/${cycleId}/categories/${row.categoryId}`} today={today} />
+            <CategoryRow key={row.categoryId} row={row} currency={currency} to={`/activity?cycle=${cycleId}&category=${row.categoryId}`} today={today} />
           ))}
         </ul>
       </Card>

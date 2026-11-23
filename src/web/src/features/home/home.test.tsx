@@ -55,13 +55,29 @@ describe('categoryStatus', () => {
     ['past the line', { actual: 200 }, DAY_11, 'normal', '$53.33 ahead of pace', 'gauge'],
     ['exactly on the line', { actual: 146.67 }, DAY_11, 'normal', '$253.33 left', undefined],
     ['behind the line', { actual: 100 }, DAY_11, 'normal', '$300.00 left', undefined],
-    ['a bill, paid in one go', { actual: 200, spreadEvenly: false }, DAY_11, 'normal', '$200.00 left', undefined],
+    ['a bill, paid in one go', { actual: 200, spreadEvenly: false }, DAY_11, 'normal', '$200.00 still due', undefined],
     ['not the current cycle', { actual: 200 }, undefined, 'normal', '$200.00 left', undefined],
     ['at 80% as well: warning wins', { actual: 320 }, DAY_11, 'warning', '$80.00 left', 'triangle-alert'],
     ['over as well: over wins', { actual: 420 }, DAY_11, 'negative', 'Over by $20.00', 'circle-alert'],
     ['income is never ahead of pace', { type: 'Credit', budgeted: 5000, actual: 2500 }, DAY_11, 'normal', '$2,500.00 to go', undefined],
   ] as const)('pace: %s', (_, overrides, elapsed, tone, word, icon) => {
     const status = categoryStatus(category(overrides), 'AUD', elapsed)
+
+    expect(status.tone).toBe(tone)
+    expect(status.word).toBe(word)
+    expect(status.icon).toBe(icon)
+  })
+
+  // MASTER 3.3, commitments: a bill marked "In one go" is paid, not spent down, so it never says "$X left".
+  test.each([
+    ['nothing paid yet', { actual: 0 }, 'normal', '$400.00 still due', undefined],
+    ['nothing budgeted, nothing paid: no green check', { budgeted: 0, actual: 0 }, 'normal', '$0.00 still due', undefined],
+    ['part-paid', { actual: 150 }, 'normal', '$250.00 still due', undefined],
+    ['part-paid past 80%: no warning for a bill', { actual: 350 }, 'normal', '$50.00 still due', undefined],
+    ['paid exactly', { actual: 400 }, 'positive', 'Paid', 'check'],
+    ['over', { actual: 420 }, 'negative', 'Over by $20.00', 'circle-alert'],
+  ] as const)('commitment: %s', (_, overrides, tone, word, icon) => {
+    const status = categoryStatus(category({ ...overrides, spreadEvenly: false }), 'AUD', 11 / 30)
 
     expect(status.tone).toBe(tone)
     expect(status.word).toBe(word)
