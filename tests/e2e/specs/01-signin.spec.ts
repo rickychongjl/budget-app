@@ -10,6 +10,6 @@ test('Try the demo signs in and lands on Home with the demo budget', async ({ pa
 
   await page.getByRole('button', { name: 'Try the demo' }).click()
 
-  await expect(page.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Tightarse' })).toBeVisible()
   await expect(page.getByRole('link', { name: /Groceries/ })).toBeVisible()
 })
