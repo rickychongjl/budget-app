@@ -73,13 +73,18 @@ Text on a soft background uses the matching status text colour. Text on a destru
 | Debit, spent over the cycle, current cycle only | under 80%, and past the today line | Ahead of pace | `--color-primary` | `gauge` | "$X ahead of pace", in `--color-text-muted` |
 | Debit | 80% to 100% | Warning | `--color-warning-fill` | `triangle-alert` | "$X left" |
 | Debit | over 100% | Negative | `--color-negative-fill` | `circle-alert` | "Over by $X" |
+| Debit commitment ("In one go") | unpaid or part-paid | Normal | `--color-primary` | none | "$X still due" |
+| Debit commitment | paid in full (100%) | Positive | `--color-positive-fill` | `check` | "Paid" |
+| Debit commitment | over 100% | Negative | `--color-negative-fill` | `circle-alert` | "Over by $X" |
 | Credit | under 100% of expected | Normal | `--color-primary` | none | "$X to go" |
 | Credit | exactly 100% | Positive | `--color-positive-fill` | `check` | "Received" |
 | Credit | over 100% | Positive | `--color-positive-fill` | `trending-up` | "Ahead by $X" |
 
 The thresholds are presentation only. Whether a category is over or ahead comes from the API rollup; the front end does not recompute it.
 
-**Ahead of pace** is a nudge, not an alarm, so it keeps the Normal bar and muted text; Over and Warning win over it. The today line sits at budget × day ÷ cycle length (the end of today), and $X is what has been spent beyond it. It needs a today, so a past or upcoming cycle never shows it. It applies only to a spending category marked as spent "Over the cycle" (`spreadEvenly`, the default); a bill marked "In one go" would otherwise read as ahead of pace from the day it is paid. Like the 80% threshold, the front end works it out, because it depends on today and a cached answer may be yesterday's.
+**Ahead of pace** is a nudge, not an alarm, so it keeps the Normal bar and muted text; Over and Warning win over it. The today line sits at budget × day ÷ cycle length (the end of today), and $X is what has been spent beyond it. It needs a today, so a past or upcoming cycle never shows it. It applies only to a spending category marked as spent "Over the cycle" (`spreadEvenly`, the default); a bill marked "In one go" would otherwise read as ahead of pace from the day it is paid.
+
+**Commitments** are spending categories marked "In one go" (`spreadEvenly` false): bills such as rent, rates or insurance. They are paid rather than spent down, so they never say "$X left", never show the 80% warning and never show Ahead of pace. Paid is a success, so it takes the Positive fill and `check`. Like the 80% threshold, the front end works it out, because it depends on today and a cached answer may be yesterday's.
 
 ### 3.4 Category and chart palette
 
@@ -174,13 +179,20 @@ Every interactive element is at least 44x44px (48px preferred) with at least 8px
 
 **App shell.** Top bar (56px plus top inset): the app mark then the screen title on the left, at most one action on the right. Scrolling content. Bottom tab bar.
 
-**Bottom tab bar.** Four tabs: Home, Add, Cycles, Settings. Height 56px plus bottom inset, `--color-surface`, 1px top border. Each tab is an icon with a caption label that is always visible. Home's icon is the app mark (section 8), not `house`. Active tab: `--color-primary` icon and label on a `--color-primary-soft` pill. Add opens the add-transaction sheet over the current screen rather than navigating. Each tab keeps its own scroll position and history; the back gesture is predictable.
+**Bottom tab bar.** Five tabs, the most it may hold: Home, Activity, Add, Cycles, Settings. Height 56px plus bottom inset, `--color-surface`, 1px top border. Each tab except Add is an icon with a caption label that is always visible. Home's icon is the app mark (section 8), not `house`; Activity's is `receipt-text`. The tab's label stays "Home", but the Home screen's title in the top bar is the app's name, "Tightarse", in every state (loading, error, empty). Active tab: `--color-primary` icon and label on a `--color-primary-soft` pill. Add sits in the middle as a raised 56px circle, filled `--color-primary` with a `--color-on-primary` `plus`, standing 16px proud of the bar; it is the one control with `--shadow-float` (cards stay flat). It has no caption, so its accessible name is "Add transaction". It opens the add-transaction sheet over the current screen rather than navigating, and is never marked current. Each tab keeps its own scroll position and history; the back gesture is predictable.
 
-**Card.** `--color-surface`, 1px border, `--radius-md`, 16 padding. A tappable card shows a trailing `chevron-right`.
+**Card.** `--color-surface`, 1px border, `--radius-md`, 16 padding. A tappable card shows a trailing `chevron-right`. Rows inside a list where every row is tappable (category rows, Activity rows) carry no chevron: it would be on every line and say nothing.
 
-**Cycle header (Home).** Caption "1 Sep to 30 Sep · day 12 of 30". The hero amount in `--text-display`: total spent. Under it, muted: "of $X budgeted". A second line shows received against expected.
+**Cycle header (Home).** Caption "1 Sep to 30 Sep · day 12 of 30", then a Spending / Income segmented control (Spending first and selected on open). The control picks what the overview below it and the category list show, one type at a time. The overview is built from tokens, never a chart library:
+- Spending: the hero in `--text-display` is total spent, with "spent of $X budgeted" muted under it; one full-width progress bar of spent against budgeted, with the today line, and its status word and icon under it (the cycle's totals take the category rules in 3.3, without ahead of pace); then stat tiles: Left to spend, Days left (today included), Per day left (left ÷ days left, never below zero).
+- Income: the hero is total received, with "received of $X expected"; the bar is received against expected, with no today line; tiles: Still to come, and Received (income categories received in full, "1 of 2").
+- Stat tiles: a caption label over a `--text-heading` value in `.num`, `--color-surface`, 1px border, `--radius-md`, three across at 360px and wrapping at large text sizes.
 
-**Category row.** Icon chip, name (`--text-heading`, truncates), amount "spent / budget" right-aligned in `.num`. Beneath: a progress bar 8px tall, `--radius-full`, track `--color-surface-2`, fill per 3.3, capped at 100% wide. Beneath that: the status word, with its icon when not Normal. The bar has `role="progressbar"` with `aria-valuetext` such as "Food: $420 of $400, over by $20". In the current cycle only (Home, and cycle detail when the cycle is Current and Confirmed), every bar also carries a today line: a 2px upright in `--color-text`, 4px proud of the track above and below, placed at day ÷ cycle length (the end of today). It is decorative (`aria-hidden`), since the cycle header says "day 12 of 30" in words, and it is never red. Past and upcoming cycles have no line. Debit and credit categories are listed in separate sections headed "Spending" and "Income".
+**Category row.** Icon chip, name (`--text-heading`, truncates), amount "spent / budget" right-aligned in `.num`. Beneath: a progress bar 8px tall, `--radius-full`, track `--color-surface-2`, fill per 3.3, capped at 100% wide. Beneath that: the status word, with its icon when not Normal. The bar has `role="progressbar"` with `aria-valuetext` such as "Food: $420 of $400, over by $20". In the current cycle only (Home, and cycle detail when the cycle is Current and Confirmed), every bar also carries a today line: a 2px upright in `--color-text`, 4px proud of the track above and below, placed at day ÷ cycle length (the end of today). It is decorative (`aria-hidden`), since the cycle header says "day 12 of 30" in words, and it is never red. Past and upcoming cycles have no line. Debit and credit categories are listed in separate sections headed "Spending" and "Income"; on Home only the one picked in the cycle header is shown.
+
+A category row is a link to Activity filtered to that category in that cycle.
+
+**Activity.** The current cycle's transactions (or, from a category row, that row's cycle), grouped by day, newest first. Each day has a heading, "Today", "Yesterday", then "Sat 21 Nov", with that day's total right-aligned in `.num`. Above the list: the cycle's date range as a caption, a Spending / Income segmented control, then a chip row ("All" plus each category of that type). The filter is kept in the URL, so a category row links straight to it and Back returns to the same view. A row is the category's icon chip, its name, the note (muted, truncates) and the amount; tapping it opens the edit sheet. Reached from a category row it has a Back button; from the tab it does not.
 
 **Status badge.** Pill, caption size, soft background with matching status text colour, icon plus word. Used in the cycle list (Current, Past, Upcoming, Draft) and on cycle detail.
 
@@ -191,8 +203,10 @@ Every interactive element is at least 44x44px (48px preferred) with at least 8px
 **Add-transaction sheet.** A bottom sheet that opens with the amount focused.
 - The amount is shown in `--text-display` with the currency symbol. A Spending / Income segmented control sits above it.
 - The app's own numeric keypad: a 3 by 4 grid of digits, decimal point and backspace. Keys are at least 56px tall, `--color-surface-2`, `--radius-sm`, separated by 8px. The keypad, not the system keyboard, is used here so the layout does not jump.
-- Category picker: a search field, then the categories pinned as favourites (in the order they were pinned), then the last-used category, then the rest, filtered by the Spending / Income choice. A pin is per device and is set from the category's own sheet on Categories. Pinned rows carry a small star, and the grouping is a caption reading "Favourites" rather than a heading, because every row belongs to one radio group. Rows are category rows without the bar.
-- The date defaults to today. The note is optional and always shown, under the date: never behind a button. The category list is the only part of the form that grows, so it is capped at about four rows and scrolls inside its own box, which keeps the date and the note a short flick away however many categories a cycle has.
+- Order, top to bottom: Spending / Income, amount, category chips, keypad, date, note, then the sticky Save. A spend on a usual category is amount, one tap, Save, with nothing to scroll at 360px.
+- Category chips: at most six categories of the chosen type, as one radio group of pills (44px tall, `--color-surface-2`, no border: the category's icon in its slot colour, then the name, which truncates). Order: pinned favourites (in the order they were pinned), then the most used on this device, then the cycle's own order to fill. A pin is per device and is set from the category's own sheet on Categories; the use count is per device too. Selected is the `--color-primary-soft` tint plus a tick that stands in place of the icon, so the pill keeps its width and nothing rewraps; the focus ring is on the pill. A category picked from More, or the one being edited, is shown as the selected chip even when it is not among the six.
+- A last pill, More, appears only when some categories are not chips. It opens a search field and the full list under the chips: favourites, then the last-used category, then the rest. Pinned rows carry a small star, and the grouping is a caption reading "Favourites" rather than a heading, because every row belongs to one radio group. Rows are category rows without the bar. Picking one closes the list. The list is capped at about four rows and scrolls inside its own box.
+- The date defaults to today. The note is optional and always shown, full width under the date: never behind a button.
 - Save is a sticky primary button, disabled until there is an amount and a category. On save: haptic, the sheet closes, and a toast says "Saved" with an Undo action.
 - Saving into a past cycle shows the closing-balance prompt (see Dialog).
 
@@ -219,7 +233,7 @@ Every interactive element is at least 44x44px (48px preferred) with at least 8px
 
 Recharts, drawn as SVG.
 
-- **Home and cycle detail do not use a chart library.** The category rows with progress bars are the visualisation. They are more readable on a phone than a pie or bar chart and carry the status rules.
+- **Home and cycle detail do not use a chart library.** The category rows with progress bars are the visualisation. They are more readable on a phone than a pie or bar chart and carry the status rules. Home's cycle overview is the same progress bar plus stat tiles, drawn from tokens.
 - **Trend (Cycles page):** a line chart across cycles. Filters: Total spending, one category, or Money accrued. One series at a time by default, in `--color-primary` for total and accrued, or the category's slot colour for a category.
   - If several categories are ever shown together, the limit is four, each with its slot colour **and** its line style from 3.4, labelled at the line end rather than in a separate legend.
   - Accrued can go below zero: draw a zero baseline in `--color-border-strong`. The line stays one colour; positive and negative are shown in the tooltip and the table with + and − signs.

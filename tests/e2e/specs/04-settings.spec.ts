@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { addDays, categoryRow, currentCycleStartOffset, cycleCount, today } from '../support'
+import { addDays, categoryRow, currentCycleStartOffset, cycleCount, showOnHome, today } from '../support'
 
 // docs/user-stories.md, "Settings". Serial: the later stories build on what the earlier ones changed.
 test.describe.configure({ mode: 'serial' })
@@ -65,7 +65,8 @@ test('Settings 3, 4, 5, 6: only the current start date moves, never into the pre
 
   // The pay that came in on the old first day is now dated before the cycle starts, and is still counted in it.
   await page.goto('/')
-  await expect(page.getByText(/received of \$5,200\.00 expected/)).toBeVisible()
+  await showOnHome(page, 'Income')
+  await expect(page.getByText('received of $5,200.00 expected')).toBeVisible()
   await expect(categoryRow(page, 'Salary')).toContainText('$5,20')
 })
 

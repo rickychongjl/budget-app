@@ -13,13 +13,6 @@
   background: var(--color-surface-2);
 }
 
-.chevron {
-  flex: none;
-  width: var(--icon-sm);
-  height: var(--icon-sm);
-  color: var(--color-text-muted);
-}
-
 /* minmax(0, 1fr): without it a long name widens the whole page instead of truncating (found on /kit, slice 2). */
 .body {
   display: grid;

@@ -36,7 +36,7 @@ test('Onboarding 1 to 5: from nothing to a confirmed first cycle', async ({ page
   await test.step('5 (first half): nothing can be recorded, and the budget cannot be confirmed, until there is a category', async () => {
     await expect(page.getByRole('button', { name: 'Confirm budget' })).toBeDisabled()
     await expect(page.getByText('Add at least one category first.')).toBeVisible()
-    await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Add' }).click()
+    await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Add transaction' }).click()
     const sheet = page.getByRole('dialog', { name: 'Add transaction' })
     await expect(sheet).toContainText('Confirm your budget before adding transactions.')
     await sheet.getByRole('button', { name: 'Close' }).click()
@@ -64,9 +64,11 @@ test('Onboarding 1 to 5: from nothing to a confirmed first cycle', async ({ page
 
   await test.step('5: confirming opens the budget for transactions', async () => {
     await page.getByRole('button', { name: 'Confirm budget' }).click()
-    await expect(page.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Tightarse' })).toBeVisible()
     await expect(page.getByText('spent of $700.00 budgeted')).toBeVisible()
-    await expect(page.getByText('$0.00 received of $5,200.00 expected')).toBeVisible()
     await expect(categoryRow(page, 'Groceries')).toContainText('$0.00 / $700.00')
+    await showOnHome(page, 'Income')
+    await expect(page.getByText('received of $5,200.00 expected')).toBeVisible()
+    await expect(page.getByRole('group', { name: 'Cycle overview' })).toContainText('$0.00')
   })
 })

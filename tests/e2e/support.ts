@@ -36,11 +36,14 @@ export const money = (amount: number) => new Intl.NumberFormat('en-AU', { style:
 // A category row on Home or on a cycle's page: the whole row is one link.
 export const categoryRow = (page: Page, name: string) => page.getByRole('link', { name: new RegExp(name) })
 
+// Home lists one type at a time behind its Spending / Income control; Spending is the one it opens on.
+export const showOnHome = (page: Page, tab: 'Spending' | 'Income') => page.getByRole('radiogroup', { name: 'Show' }).getByRole('radio', { name: tab }).click()
+
 type NewTransaction = { type?: 'Spending' | 'Income'; amount: string; category: string; note?: string }
 
-// Through the Add tab, the way a person does it: the keypad, the search, the category, Save.
+// Through the Add button in the tab bar, the way a person does it: the keypad, the search, the category, Save.
 export async function addTransaction(page: Page, { type = 'Spending', amount, category, note }: NewTransaction) {
-  await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Add' }).click()
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Add transaction' }).click()
   const sheet = page.getByRole('dialog', { name: 'Add transaction' })
   await expect(sheet).toBeVisible()
   if (type === 'Income') {

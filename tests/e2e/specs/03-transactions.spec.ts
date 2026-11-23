@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { addTransaction, categoryRow, fixtureSpent, money, today } from '../support'
+import { addTransaction, categoryRow, fixtureSpent, money, showOnHome } from '../support'
 
 // docs/user-stories.md, "Transactions". These add to the shared demo; the specs after this one allow for it.
 test.describe.configure({ mode: 'serial' })
@@ -17,24 +17,29 @@ test('Transactions 1: spending is entered on the keypad and filed under a debit 
 
 test('Transactions 2: income is entered the same way under a credit category', async ({ page }) => {
   await page.goto('/')
+  await showOnHome(page, 'Income')
   await expect(categoryRow(page, 'Salary')).toContainText('Received')
 
   await addTransaction(page, { type: 'Income', amount: '1', category: 'Salary' })
 
   // One dollar over what was expected: ahead, in green, with its icon and word.
   await expect(categoryRow(page, 'Salary')).toContainText('Ahead by $1.00')
-  await expect(page.getByText(/received of \$5,200\.00 expected/)).toContainText('$5,201.00')
+  const overview = page.getByRole('group', { name: 'Cycle overview' })
+  await expect(overview.getByText('received of $5,200.00 expected')).toBeVisible()
+  await expect(overview).toContainText('$5,201.00')
 })
 
 test('Transactions 3: a new transaction goes into the current cycle, dated today', async ({ page }) => {
   await page.goto('/')
   await categoryRow(page, 'Groceries').click()
 
-  await expect(page.getByRole('heading', { level: 1, name: 'Groceries' })).toBeVisible()
+  // Activity, filtered to the row's category.
+  await expect(page.getByRole('heading', { level: 1, name: 'Activity' })).toBeVisible()
+  await expect(page.getByRole('radiogroup', { name: 'Category' }).getByRole('radio', { name: 'Groceries' })).toBeChecked()
   const row = page.getByRole('button', { name: /Playwright groceries/ })
   await expect(row).toContainText('$42.00')
-  // Dated today, as "22 Sep".
-  await expect(row).toContainText(new RegExp(`\\b${Number(today().slice(8))} [A-Z][a-z]+`))
+  // Dated today: it sits under the "Today" heading.
+  await expect(page.getByRole('region', { name: /^Today/ })).toContainText('Playwright groceries')
 })
 
 test('Transactions 4: editing or deleting in a past cycle asks about that cycle\'s closing balance', async ({ page }) => {
