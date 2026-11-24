@@ -1,10 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { CircleAlert, CloudOff, Plus, Shapes, Star, Trash2 } from 'lucide-react'
+import { CircleAlert, CloudOff, GripVertical, Plus, Shapes, Star, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { api } from '../../api/client'
 import type { CategoryRollup, CategoryType, Cycle } from '../../api/types'
 import { formatRange, todayIn } from '../../format/dates'
 import { formatMoney } from '../../format/money'
+import { enqueue } from '../../offline/outbox'
 import { useCachedQuery } from '../../offline/useCachedQuery'
 import { Screen } from '../../shell/Screen'
 import { useOnline } from '../../shell/useOnline'
@@ -93,7 +94,7 @@ function CycleCategories({ cycleId, online, picker }: { cycleId: string; online:
   )
 }
 
-// One cycle's categories: edit, pin, add, remove. Onboarding uses it too, against the draft cycle.
+// One cycle's categories: edit, pin, reorder, add, remove. Onboarding uses it too, against the draft cycle.
 export function CategoryList({ cycleId, online }: { cycleId: string; online: boolean }) {
   const { me } = useSession()
   const cycle = useCycle(cycleId)
@@ -125,6 +126,55 @@ export function CategoryList({ cycleId, online }: { cycleId: string; online: boo
     remove.reset()
   }
 
+  // A drag in progress: the dragged row and its section's order as it stands under the finger. Kept until the queued
+  // edits land, so the list does not flash back to the old order in between.
+  const [drag, setDrag] = useState<{ type: CategoryType; id: string; ids: string[]; dropped: boolean } | null>(null)
+
+  // The rollup is in sort order but does not carry the numbers, so a move renumbers the whole cycle to its new order.
+  // That is exact whatever the stored values were. Through the outbox: reordering works offline (design section 7).
+  // ponytail: one queued edit per category per move (at most 20). Send only the rows whose number changed once the
+  // API returns sortOrder.
+  async function renumber(type: CategoryType, ids: string[]) {
+    const queue = [...ids]
+    const order = rows.map((row) => (row.type === type ? queue.shift()! : row.categoryId))
+    for (const [sortOrder, categoryId] of order.entries()) {
+      await enqueue({ type: 'category.edit', cycleId, categoryId, category: { sortOrder } })
+    }
+  }
+
+  const idsOf = (type: CategoryType) => rows.filter((row) => row.type === type).map((row) => row.categoryId)
+
+  function startDrag(event: React.PointerEvent<HTMLElement>, row: CategoryRollup) {
+    if (drag) return
+    // Captured, so the moves keep coming to the handle when the finger leaves it.
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+    setDrag({ type: row.type, id: row.categoryId, ids: idsOf(row.type), dropped: false })
+  }
+
+  // The dragged row goes after every other row whose middle is above the finger.
+  function dragTo(event: React.PointerEvent<HTMLElement>) {
+    if (!drag || drag.dropped) return
+    const items = [...(event.currentTarget.closest('ul')?.children ?? [])]
+    const others = items.filter((_, index) => drag.ids[index] !== drag.id)
+    const at = others.filter((item) => {
+      const box = item.getBoundingClientRect()
+      return box.top + box.height / 2 < event.clientY
+    }).length
+    const ids = drag.ids.filter((id) => id !== drag.id)
+    ids.splice(at, 0, drag.id)
+    if (ids.join() !== drag.ids.join()) setDrag({ ...drag, ids })
+  }
+
+  async function drop() {
+    if (!drag || drag.dropped) return
+    setDrag({ ...drag, dropped: true })
+    try {
+      if (drag.ids.join() !== idsOf(drag.type).join()) await renumber(drag.type, drag.ids)
+    } finally {
+      setDrag(null)
+    }
+  }
+
   return (
     <>
       {cycle.isError && (
@@ -136,7 +186,7 @@ export function CategoryList({ cycleId, online }: { cycleId: string; online: boo
       {cycle.data && rows.length === 0 && <EmptyState icon={Shapes}>No categories in this cycle yet.</EmptyState>}
 
       {(['Debit', 'Credit'] as CategoryType[]).map((type) => {
-        const ofType = rows.filter((row) => row.type === type)
+        const ofType = drag?.type === type ? drag.ids.map((id) => rows.find((row) => row.categoryId === id)!) : rows.filter((row) => row.type === type)
         const title = type === 'Debit' ? 'Spending' : 'Income'
         return ofType.length === 0 ? null : (
           <section key={type} aria-labelledby={`categories-${type}`} className={styles.section}>
@@ -146,7 +196,7 @@ export function CategoryList({ cycleId, online }: { cycleId: string; online: boo
             <Card>
               <ul className={styles.list}>
                 {ofType.map((row) => (
-                  <li key={row.categoryId} className={styles.row}>
+                  <li key={row.categoryId} className={`${styles.row} ${drag?.id === row.categoryId ? styles.dragging : ''}`}>
                     <div className={styles.main}>
                       <IconChip icon={categoryIcon(row.icon)} colour={row.colour} />
                       <div className={styles.text}>
@@ -169,6 +219,19 @@ export function CategoryList({ cycleId, online }: { cycleId: string; online: boo
                     <button type="button" className={`${styles.action} ${styles.remove}`} aria-label={`Remove ${row.name}`} disabled={!online} onClick={() => setRemoving(row)}>
                       <Trash2 aria-hidden="true" />
                     </button>
+                    {/* Only the handle drags, so a drag never fights the page's scrolling. Pointer only: reordering has no keyboard or
+                        screen-reader way (MASTER 14 asks for a button alternative; dropped by choice, see PR #57). */}
+                    <span
+                      className={styles.handle}
+                      aria-hidden="true"
+                      data-testid={`drag ${row.name}`}
+                      onPointerDown={(event) => startDrag(event, row)}
+                      onPointerMove={dragTo}
+                      onPointerUp={() => void drop()}
+                      onPointerCancel={() => void drop()}
+                    >
+                      <GripVertical />
+                    </span>
                   </li>
                 ))}
               </ul>
