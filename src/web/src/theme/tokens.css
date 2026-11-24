@@ -77,6 +77,7 @@
   --color-warning: #b45309;
   --color-warning-fill: #b45309;
   --color-warning-soft: #fef3c7;
+  --color-favourite: #d97706;
   /* 3.4 */
   --cat-blue: #2563eb;
   --cat-orange: #c2410c;
@@ -117,6 +118,7 @@
   --color-warning: #fbbf24;
   --color-warning-fill: #fbbf24;
   --color-warning-soft: #3b2f14;
+  --color-favourite: #fbbf24;
   --cat-blue: #60a5fa;
   --cat-orange: #fb923c;
   --cat-violet: #a78bfa;

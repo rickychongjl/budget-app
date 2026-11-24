@@ -98,29 +98,56 @@
   background: var(--color-surface-2);
 }
 
-.move {
+.action {
   display: grid;
   place-items: center;
   flex: none;
   width: var(--target-min);
   height: var(--target-min);
-  border: 1px solid var(--color-border);
+  border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--color-text);
+  color: var(--color-text-muted);
   transition: background var(--dur-press);
   -webkit-tap-highlight-color: transparent;
 }
 
-.move:active:not(:disabled) {
+.action:active:not(:disabled) {
   background: var(--color-surface-2);
 }
 
-.move:disabled {
+.action:disabled {
   opacity: 0.4;
 }
 
-.move svg {
+.action svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
+/* Pinned: filled gold, not only outlined, so it reads without telling the colours apart. */
+.action[aria-pressed='true'] {
+  color: var(--color-favourite);
+}
+
+.action[aria-pressed='true'] svg {
+  fill: currentColor;
+}
+
+/* Red because it is destructive (MASTER 3.3). */
+.remove {
+  color: var(--color-negative);
+}
+
+.problem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  color: var(--color-negative);
+}
+
+.problemIcon {
+  flex: none;
   width: var(--icon-sm);
   height: var(--icon-sm);
 }

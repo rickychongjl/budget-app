@@ -258,17 +258,7 @@ describe('editing a category works offline', () => {
   })
 })
 
-describe('reordering is by button or drag, and works offline', () => {
-  test('moving a row renumbers the whole cycle to its new order', async () => {
-    await renderScreen({ online: false })
-
-    await userEvent.click(screen.getByRole('button', { name: 'Move Groceries up' }))
-
-    await waitFor(() => expect(names('Spending')).toEqual(['Groceries', 'Rent', 'Fun']))
-    // Salary is first in the cycle's list and stays there; Groceries and Rent swap.
-    expect((await queued()).map((item) => item.type === 'category.edit' && [item.categoryId, item.category.sortOrder])).toEqual([['pay', 0], ['food', 1], ['rent', 2], ['fun', 3]])
-  })
-
+describe('reordering is by drag, and works offline', () => {
   test('dragging a row by its handle drops it where the finger lets go', async () => {
     await renderScreen({ online: false })
     // jsdom lays nothing out: each Spending row is 50px tall, in the order it is drawn.
@@ -285,14 +275,6 @@ describe('reordering is by button or drag, and works offline', () => {
 
     await waitFor(async () => expect((await queued()).map((item) => item.type === 'category.edit' && [item.categoryId, item.category.sortOrder])).toEqual([['pay', 0], ['fun', 1], ['rent', 2], ['food', 3]]))
     await waitFor(() => expect(names('Spending')).toEqual(['Fun', 'Rent', 'Groceries']))
-  })
-
-  test('the first cannot move up and the last cannot move down', async () => {
-    await renderScreen()
-
-    expect(screen.getByRole('button', { name: 'Move Rent up' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Move Fun down' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Move Rent down' })).toBeEnabled()
   })
 })
 
@@ -342,12 +324,14 @@ describe('adding and removing need a connection', () => {
   test('removing asks first, then deletes; a refusal is shown in the server\'s words', async () => {
     server.use(http.delete('/api/cycles/cur/categories/food', () => HttpResponse.json({ status: 422, code: 'category.has-transactions', detail: 'Remove its transactions in this cycle first.' }, { status: 422 })))
     await renderScreen()
-    const sheet = await openEdit('Groceries')
 
-    await userEvent.click(sheet.getByRole('button', { name: 'Remove from this cycle' }))
-    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Remove Groceries?' })).getByRole('button', { name: 'Remove' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Remove Groceries' }))
+    const confirm = within(await screen.findByRole('dialog', { name: 'Remove Groceries?' }))
+    await userEvent.click(confirm.getByRole('button', { name: 'Remove' }))
 
-    expect(await sheet.findByRole('alert')).toHaveTextContent('Remove its transactions in this cycle first.')
+    // The dialog stays open with the reason, so the person sees why nothing went.
+    expect(await confirm.findByRole('alert')).toHaveTextContent('Remove its transactions in this cycle first.')
+    expect(screen.getByRole('heading', { level: 3, name: 'Groceries' })).toBeInTheDocument()
   })
 
   test('offline, both are disabled and the reason is on screen, not hidden', async () => {
@@ -358,17 +342,17 @@ describe('adding and removing need a connection', () => {
 
     expect(screen.getByRole('button', { name: 'Add category' })).toBeDisabled()
     expect(screen.getByText('Adding or removing a category needs a connection.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Remove Groceries' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Favourite Groceries' })).toBeEnabled()
     const sheet = await openEdit('Groceries')
-    expect(sheet.getByRole('button', { name: 'Remove from this cycle' })).toBeDisabled()
     expect(sheet.getByRole('button', { name: 'Save' })).toBeEnabled()
   })
 })
 
-describe('favourites are pinned by hand, per device', () => {
-  test('a category is pinned and unpinned from its sheet, and the pin outlives the sheet', async () => {
+describe('favourites are pinned by hand from the list, per device', () => {
+  test('a category is pinned and unpinned from its row, and the pin is kept on the device', async () => {
     await renderScreen({ online: false })
-    const sheet = await openEdit('Groceries')
-    const pin = sheet.getByRole('button', { name: 'Favourite' })
+    const pin = screen.getByRole('button', { name: 'Favourite Groceries' })
     expect(pin).toHaveAttribute('aria-pressed', 'false')
 
     await userEvent.click(pin)
@@ -380,20 +364,38 @@ describe('favourites are pinned by hand, per device', () => {
     expect(JSON.parse(localStorage.getItem('budget.favouriteCategories')!)).toEqual([])
   })
 
-  test('a pinned category opens already pinned', async () => {
+  test('a pinned category shows as pinned', async () => {
     localStorage.setItem('budget.favouriteCategories', JSON.stringify(['rent']))
     await renderScreen({ online: false })
-    const sheet = await openEdit('Rent')
 
-    expect(sheet.getByRole('button', { name: 'Favourite' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Favourite Rent' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   test('pinning is a device setting: it needs no connection and queues nothing for the server', async () => {
     await renderScreen({ online: false })
-    const sheet = await openEdit('Rent')
 
-    await userEvent.click(sheet.getByRole('button', { name: 'Favourite' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Favourite Rent' }))
 
     expect(await queued()).toEqual([])
+  })
+
+  test('the sheet no longer carries favourite or remove', async () => {
+    await renderScreen()
+    const sheet = await openEdit('Groceries')
+
+    expect(sheet.queryByRole('button', { name: /Favourite|Remove/ })).not.toBeInTheDocument()
+  })
+})
+
+describe('the sheet asks how it is spent first', () => {
+  test('"How is it spent?" and auto-pay come before the name', async () => {
+    await renderScreen()
+    const sheet = await openEdit('Rent')
+    await userEvent.click(sheet.getByRole('radio', { name: 'In one go' }))
+
+    const name = sheet.getByLabelText('Name')
+    for (const before of [sheet.getByRole('radiogroup', { name: 'How is it spent?' }), sheet.getByRole('button', { name: 'Mark as paid when a new cycle starts' })]) {
+      expect(before.compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    }
   })
 })

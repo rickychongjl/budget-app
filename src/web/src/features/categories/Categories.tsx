@@ -1,4 +1,5 @@
-import { ArrowDown, ArrowUp, CloudOff, GripVertical, Plus, Shapes } from 'lucide-react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { CircleAlert, CloudOff, GripVertical, Plus, Shapes, Star, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { api } from '../../api/client'
 import type { CategoryRollup, CategoryType, Cycle } from '../../api/types'
@@ -10,16 +11,19 @@ import { Screen } from '../../shell/Screen'
 import { useOnline } from '../../shell/useOnline'
 import { Button } from '../../ui/Button'
 import { Card } from '../../ui/Card'
+import { Dialog } from '../../ui/Dialog'
 import { categoryIcon } from '../../ui/categoryIcons'
 import { EmptyState } from '../../ui/EmptyState'
 import { IconChip } from '../../ui/IconChip'
 import { Skeleton } from '../../ui/Skeleton'
+import { useToast } from '../../ui/useToast'
 import { useSession } from '../auth/useSession'
 import { useCycle } from '../cycles/useCycle'
 import { categoriesLeft, limitsOf } from '../plans/plan'
 import { PremiumNote } from '../plans/PremiumNote'
 import styles from './Categories.module.css'
 import { CategorySheet } from './CategorySheet'
+import { readFavourites, toggleFavourite } from './favourites'
 
 // /settings/categories. Categories and budgets are a snapshot of one cycle (story "Settings 7"), so the screen is always
 // about one cycle: the current one, or an upcoming one. A past cycle's are read-only and are not offered.
@@ -90,7 +94,7 @@ function CycleCategories({ cycleId, online, picker }: { cycleId: string; online:
   )
 }
 
-// One cycle's categories: edit, reorder, add, remove. Onboarding uses it too, against the draft cycle.
+// One cycle's categories: edit, pin, reorder, add, remove. Onboarding uses it too, against the draft cycle.
 export function CategoryList({ cycleId, online }: { cycleId: string; online: boolean }) {
   const { me } = useSession()
   const cycle = useCycle(cycleId)
@@ -100,6 +104,27 @@ export function CategoryList({ cycleId, online }: { cycleId: string; online: boo
   // A cycle already over it (a downgraded user) keeps every row, and editing and removing them still work.
   const max = limitsOf(me).maxCategoriesPerCycle
   const full = categoriesLeft(me, rows.length) === 0
+
+  // Per device, not per cycle: pinning is instant and never queued, so it works offline.
+  const [favourites, setFavourites] = useState(readFavourites)
+  // Removing goes straight to the API: "only if it has no transactions" cannot be checked against a queue the server
+  // has not seen (design section 7). A refusal keeps the dialog open and says why in the server's words.
+  const client = useQueryClient()
+  const toast = useToast()
+  const [removing, setRemoving] = useState<CategoryRollup>()
+  const remove = useMutation({
+    mutationFn: (row: CategoryRollup) => api.delete(`/api/cycles/${cycleId}/categories/${row.categoryId}`),
+    onSuccess: async () => {
+      navigator.vibrate?.(10)
+      toast.show({ message: 'Removed from this cycle' })
+      setRemoving(undefined)
+      await client.invalidateQueries({ queryKey: ['cycles'] })
+    },
+  })
+  const closeRemove = () => {
+    setRemoving(undefined)
+    remove.reset()
+  }
 
   // A drag in progress: the dragged row and its section's order as it stands under the finger. Kept until the queued
   // edits land, so the list does not flash back to the old order in between.
@@ -118,13 +143,6 @@ export function CategoryList({ cycleId, online }: { cycleId: string; online: boo
   }
 
   const idsOf = (type: CategoryType) => rows.filter((row) => row.type === type).map((row) => row.categoryId)
-
-  function move(row: CategoryRollup, by: -1 | 1) {
-    const ids = idsOf(row.type)
-    const at = ids.indexOf(row.categoryId)
-    ;[ids[at], ids[at + by]] = [ids[at + by], ids[at]]
-    return renumber(row.type, ids)
-  }
 
   function startDrag(event: React.PointerEvent<HTMLElement>, row: CategoryRollup) {
     if (drag) return
@@ -177,7 +195,7 @@ export function CategoryList({ cycleId, online }: { cycleId: string; online: boo
             </h2>
             <Card>
               <ul className={styles.list}>
-                {ofType.map((row, index) => (
+                {ofType.map((row) => (
                   <li key={row.categoryId} className={`${styles.row} ${drag?.id === row.categoryId ? styles.dragging : ''}`}>
                     <div className={styles.main}>
                       <IconChip icon={categoryIcon(row.icon)} colour={row.colour} />
@@ -188,14 +206,21 @@ export function CategoryList({ cycleId, online }: { cycleId: string; online: boo
                       {/* Covers the chip and the text, so the whole left of the row opens the editor. */}
                       <button type="button" className={styles.edit} aria-label={`Edit ${row.name}`} onClick={() => setEditing(row)} />
                     </div>
-                    {/* The buttons are the drag's alternative (MASTER section 9), and the keyboard's and screen reader's way. */}
-                    <button type="button" className={styles.move} aria-label={`Move ${row.name} up`} disabled={index === 0} onClick={() => void move(row, -1)}>
-                      <ArrowUp aria-hidden="true" />
+                    {/* A toggle: the name stays, the pressed state and the gold fill change (MASTER 9). */}
+                    <button
+                      type="button"
+                      className={styles.action}
+                      aria-label={`Favourite ${row.name}`}
+                      aria-pressed={favourites.includes(row.categoryId)}
+                      onClick={() => setFavourites(toggleFavourite(row.categoryId))}
+                    >
+                      <Star aria-hidden="true" />
                     </button>
-                    <button type="button" className={styles.move} aria-label={`Move ${row.name} down`} disabled={index === ofType.length - 1} onClick={() => void move(row, 1)}>
-                      <ArrowDown aria-hidden="true" />
+                    <button type="button" className={`${styles.action} ${styles.remove}`} aria-label={`Remove ${row.name}`} disabled={!online} onClick={() => setRemoving(row)}>
+                      <Trash2 aria-hidden="true" />
                     </button>
-                    {/* Only the handle drags, so a drag never fights the page's scrolling. Hidden from assistive tech: the buttons say the same. */}
+                    {/* Only the handle drags, so a drag never fights the page's scrolling. Pointer only: reordering has no keyboard or
+                        screen-reader way (MASTER 14 asks for a button alternative; dropped by choice, see PR #57). */}
                     <span
                       className={styles.handle}
                       aria-hidden="true"
@@ -234,7 +259,32 @@ export function CategoryList({ cycleId, online }: { cycleId: string; online: boo
       {/* Said plainly, not hidden and not left to fail on tap (design section 7). */}
       {!online && <p className={styles.reason}>Adding or removing a category needs a connection.</p>}
 
-      {editing && <CategorySheet cycleId={cycleId} rows={rows} editing={editing === 'new' ? undefined : editing} online={online} onClose={() => setEditing(null)} />}
+      {editing && <CategorySheet cycleId={cycleId} rows={rows} editing={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} />}
+
+      <Dialog
+        open={removing !== undefined}
+        title={`Remove ${removing?.name}?`}
+        onClose={closeRemove}
+        actions={
+          <>
+            <Button variant="secondary" onClick={closeRemove}>
+              Cancel
+            </Button>
+            <Button variant="destructive" pending={remove.isPending} disabled={!online} onClick={() => remove.mutate(removing!)}>
+              Remove
+            </Button>
+          </>
+        }
+      >
+        {remove.error ? (
+          <span role="alert" className={styles.problem}>
+            <CircleAlert aria-hidden="true" className={styles.problemIcon} />
+            {remove.error.message}
+          </span>
+        ) : (
+          'It is removed from this cycle only. A category with transactions in this cycle cannot be removed.'
+        )}
+      </Dialog>
     </>
   )
 }
